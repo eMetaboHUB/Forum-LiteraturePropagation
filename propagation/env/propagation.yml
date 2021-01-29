@@ -8,3 +8,5 @@ dependencies:
   - scipy  
   - argparse
   - python-igraph
+  - pycairo
+  - pylint

@@ -1,0 +1,14 @@
+image: continuumio/miniconda3:latest
+
+stages:
+- build
+
+variables:
+  PROPAGATION_ENVIRONMENT_FILE: propagation/env/propagation.yml
+  PROPAGATION_ENVIRONMENT_NAME: propagation
+
+build_env_prop:
+  stage: build
+  script:
+  - conda env create --force --file $PROPAGATION_ENVIRONMENT_FILE
+  - source activate propagation

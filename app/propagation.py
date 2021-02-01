@@ -22,5 +22,6 @@ def import_metabolic_network(path, undirected = True, format = "gml"):
     print("Metabolic network has been imported successfully.")
     print("> Number of vertices: " + str(g.vcount()))
     print("> Number of edges: " + str(g.ecount()))
-    g.to_undirected()
+    if undirected:
+        g.to_undirected()
     return g

@@ -20,5 +20,5 @@ main_test:
   tags:
     - docker
   script:
-    - ls -al
+    - apt-get install -y build-essential
     - make test

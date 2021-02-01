@@ -24,11 +24,9 @@ ifneq ("$(wildcard $(ENV_DIR))","")
 else
 	@echo ">>> Detected conda, but '$(ENVIRONMENT_NAME)' environment is missing. Installing ..."
 	conda env create --file $(ENVIRONMENT_FILE)
-	@echo "> Activate environment: '$(ENVIRONMENT_NAME)'"
-	$(CONDA_ACTIVATE) $(ENVIRONMENT_NAME)
+endif
 	@echo "> Show environment list"
 	conda env list
-endif
 else
 	@echo "> Install conda first"
 endif
@@ -38,3 +36,10 @@ environment_remove:
 	conda remove --yes --name $(ENVIRONMENT_NAME) --all
 	@echo "> Show environment list"
 	conda env list
+
+start: environment_create
+	@echo "> Activate environment: '$(ENVIRONMENT_NAME)'"
+	$(CONDA_ACTIVATE) $(ENVIRONMENT_NAME)
+	conda env list
+	@echo "> Start main.py"
+	python3 app/main.py

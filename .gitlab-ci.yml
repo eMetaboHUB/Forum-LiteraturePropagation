@@ -4,14 +4,14 @@ stages:
 - build
 
 variables:
-  PROPAGATION_ENVIRONMENT_FILE: propagation/env/propagation.yml
+  PROPAGATION_ENVIRONMENT_FILE: env/propagation.yml
   PROPAGATION_ENVIRONMENT_NAME: propagation
 
 build_env_prop:
+  before_script:
+    apt-get install -y libcairo2-dev libjpeg-dev libgif-dev build-essential
   stage: build
   tags:
     - docker
   script:
-  - apt-get install -y pkg-config libcairo2-dev
-  - conda env create --force --file $PROPAGATION_ENVIRONMENT_FILE
-  - source activate propagation
+  - make environment_create

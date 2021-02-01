@@ -17,8 +17,6 @@ install_lib:
 
 main_test:
   stage: tests
-  tags:
-    - docker
   script:
     - echo "Start tests"
     - make test

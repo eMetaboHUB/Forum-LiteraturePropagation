@@ -1,20 +1,19 @@
 image: continuumio/miniconda3:latest
 
 stages:
-- build
+- lib
 - tests
 
 variables:
   PROPAGATION_ENVIRONMENT_FILE: env/propagation.yml
   PROPAGATION_ENVIRONMENT_NAME: propagation
 
-build_env_prop:
-  stage: build
+install_lib:
+  stage: lib
   tags:
     - docker
   script:
   - apt-get install -y libcairo2-dev libjpeg-dev libgif-dev build-essential
-  - make environment_create
 
 main_test:
   stage: tests

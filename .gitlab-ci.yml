@@ -1,15 +1,15 @@
 image: continuumio/miniconda3:latest
 
 stages:
-- tests
+- lib
 
 variables:
   PROPAGATION_ENVIRONMENT_FILE: env/propagation.yml
   PROPAGATION_ENVIRONMENT_NAME: propagation
 
-main_test:
-  stage: tests
+install_lib:
+  stage: lib
   tags:
     - docker
   script:
-    - make test
+  - make test

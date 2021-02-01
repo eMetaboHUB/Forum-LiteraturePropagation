@@ -37,9 +37,9 @@ environment_remove:
 	@echo "> Show environment list"
 	conda env list
 
-start: environment_create
+test: environment_create
 	@echo "> Activate environment: '$(ENVIRONMENT_NAME)'"
 	$(CONDA_ACTIVATE) $(ENVIRONMENT_NAME)
 	conda env list
-	@echo "> Start main.py"
-	python3 app/main.py
+	@echo "> Start main.py test"
+	python3 app/main.py --graph="tests/data/test_urea.gml"

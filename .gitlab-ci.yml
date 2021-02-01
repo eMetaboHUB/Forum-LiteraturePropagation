@@ -8,10 +8,9 @@ variables:
   PROPAGATION_ENVIRONMENT_NAME: propagation
 
 build_env_prop:
-  before_script:
-    apt-get install -y libcairo2-dev libjpeg-dev libgif-dev build-essential
   stage: build
   tags:
     - docker
   script:
+  - apt-get install -y libcairo2-dev libjpeg-dev libgif-dev build-essential
   - make environment_create

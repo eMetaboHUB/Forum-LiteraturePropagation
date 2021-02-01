@@ -1,0 +1,12 @@
+name: propagation
+dependencies:
+- python=3.7
+- pip
+- pip:
+  - numpy
+  - pandas
+  - scipy  
+  - argparse
+  - python-igraph
+  - pycairo
+  - pylint

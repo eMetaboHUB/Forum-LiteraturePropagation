@@ -22,4 +22,6 @@ functional_tests:
   tags:
     - docker
   script:
+    - echo "==================================";
+    - echo "[info] run tests from Makefile ";
     - make test

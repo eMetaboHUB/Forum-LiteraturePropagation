@@ -11,12 +11,14 @@ variables:
 install_lib:
   stage: lib
   tags:
-    - docker
+    - bash
   script:
   - apt-get install -y libcairo2-dev libjpeg-dev libgif-dev build-essential
 
 main_test:
   stage: tests
+  tags:
+    - docker
   script:
     - echo "Start tests"
     - make test

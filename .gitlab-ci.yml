@@ -12,4 +12,5 @@ install_lib:
   tags:
     - docker
   script:
+  - apt-get install -y libcairo2-dev libjpeg-dev libgif-dev build-essential
   - make test

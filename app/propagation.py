@@ -90,10 +90,19 @@ def compute_PR(A, i, alpha = 0.8, epsilon = 1e-9):
     
     return r
 
-def propagation_volume(g):
+def propagation_volume(g, name_att = "label"):
+    """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
+
+    Args:
+        g ([igraph.Graph]): The compound graph
+        name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
+
+    Returns:
+        [pandas.DataFrame]: A data.frame representing the probability matrix obtained after propagation. Propability vectors are stored in columns.
+    """
     A = np.array(g.get_adjacency().data)
     full = np.zeros(A.shape)
     for i in range(0, A.shape[0]):
         full[:, i] = compute_PR(A, i)[:, 0]
-    df = pd.DataFrame(full, columns=g.vs["label"], index=g.vs["label"])
+    df = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
     return df

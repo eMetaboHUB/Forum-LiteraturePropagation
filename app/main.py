@@ -9,8 +9,12 @@ parser.add_argument("--graph", help="path to metabolic network compound graph", 
 args = parser.parse_args()
 g = import_metabolic_network(args.g_path)
 A = propagation_volume(g)
-c = compute_PR(A, 1)
-print(g.vs["label"])
-print(c.shape)
-print(c.sum(axis = 1))
-print(c)
+
+c0 = compute_PR(A, 0)
+c1 = compute_PR(A, 1)
+
+print(c1.shape)
+print(np.sum(c1, axis = 0))
+
+print(c0.shape)
+print(np.sum(c0, axis = 0))

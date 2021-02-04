@@ -4,6 +4,7 @@ import cairo
 import pandas as pd
 import numpy as np
 import copy
+import collections
 np.set_printoptions(suppress=True)
 
 
@@ -90,19 +91,47 @@ def compute_PR(A, i, alpha = 0.8, epsilon = 1e-9):
     
     return r
 
-def propagation_volume(g, name_att = "label"):
+def propagation_volume(g, name_att = "label", direction = "both"):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
     Args:
         g ([igraph.Graph]): The compound graph
         name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
+        direction (str, optional): The direction og random walks that will be used to compute probabilities:
+            - SFT: StartFromTarget, for each node the resulting vector contains the probabilities to be on a particular compound node during the random walk starting from the targeted node.
+            - FOT: FinishOnTarget, for each node, the resulting vector contains the probabilites that a walker on the targeted node comes from a particular node. The result of the forward propagation in used to compute the backward probabilities.
+            - both: The both matrix probabilities are computed are returned
 
     Returns:
-        [pandas.DataFrame]: A data.frame representing the probability matrix obtained after propagation. Propability vectors are stored in columns.
+        [collections.namedtuple]: A named.tuple containing pandas DataFrame representing the probability matrix using SFT and/or FOT propagation.
     """
+    # Init tuple
+    r = collections.namedtuple("propagation", ["SFT", "FOT"])
+
+    # Compute for each node SFT propagation
     A = np.array(g.get_adjacency().data)
     full = np.zeros(A.shape)
     for i in range(0, A.shape[0]):
         full[:, i] = compute_PR(A, i)[:, 0]
-    df = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
-    return df
+    
+    # If SFT direction
+    if direction == "SFT":
+        df_SFT = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
+        result = r(df_SFT, None)
+
+    # If backward direction
+    if direction == "FOT":
+        d = np.diag(1/full.sum(axis = 1))
+        bkw = (full.T) @ d
+        df_FOT = pd.DataFrame(bkw, columns=g.vs[name_att], index=g.vs[name_att])
+        
+    
+    # If both
+    if direction == "both":
+        d = np.diag(1/full.sum(axis = 1))
+        bkw = (full.T) @ d
+        df_SFT = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
+        df_FOT = pd.DataFrame(bkw, columns=g.vs[name_att], index=g.vs[name_att])
+        result = r(df_SFT, df_FOT)
+    
+    return result

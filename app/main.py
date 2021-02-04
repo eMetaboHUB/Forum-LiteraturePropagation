@@ -9,5 +9,7 @@ parser.add_argument("--graph", help="path to metabolic network compound graph", 
 args = parser.parse_args()
 g = import_metabolic_network(args.g_path)
 test = propagation_volume(g)
+test.SFT.to_csv("SFT.csv")
+test.FOT.to_csv("FOT.csv")
 
 

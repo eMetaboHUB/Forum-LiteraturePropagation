@@ -191,11 +191,11 @@ def propagation_volume(g, name_att = "label", direction = "both"):
 ####################
 ## Beta functions ##
 ####################
-
-def create_prior_beta_mix(p, cooc , corpora):
+# r = create_prior_beta_mix([0, 0.5, 0.5], [14, 1, 3], [100, 4, 4])
+def create_prior_beta_mix(weights, cooc , corpora):
     # Get parameters
-    r = collections.namedtuple("priormix", ["p", "f"])
-    l = len(p)
+    r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f"])
+    l = len(weights)
     x = np.linspace(0, 1, 1000)
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
@@ -205,11 +205,32 @@ def create_prior_beta_mix(p, cooc , corpora):
     print(beta)
     f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
     # Create Beta mix:
-    y = np.dot(p, f_i)
-    mix = r(x,y)
+    y = np.dot(weights, f_i)
+    mix = r(alpha, beta, weights, x, y)
     return mix
     
 
 
+def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior):
+    r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f"])
+    l = len(weights_pior)
+    x = np.linspace(0, 1, 1000)
 
-def create_posterior_beta_mix(k, n, p, cooc , corpora, l):
+    # Get posterior parameters
+    alpha_post = [(alpha_prior[it] + k) for it in range(0, l)]
+    beta_post = [(beta_prior[it] + (n - k)) for it in range(0, l)]
+
+    # Get Weight
+    C = [sc.beta(alpha_post[it], beta_post[it])/sc.beta(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
+    print(C)
+    W = [(weights_pior[it] * C[it]/(np.dot(weights_pior, C))) for it in range(0, l)]
+
+    # Create posterior distribution by componennts
+    f_post_i = [ss.beta.pdf(x, a = alpha_post[it], b = beta_post[it]) for it in range(0, l)]
+
+    # Get posteriors probabilities
+    y = np.dot(W, f_post_i)
+
+    mix = r(alpha_post, beta_post, W, x, y)
+    
+    return mix

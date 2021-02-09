@@ -150,7 +150,7 @@ def propagation_volume(g, name_att = "label", direction = "both"):
         name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
         direction (str, optional): The direction og random walks that will be used to compute probabilities:
             - SFT: StartFromTarget, for each node the resulting vector contains the probabilities to be on a particular compound node during the random walk starting from the targeted node.
-            - FOT: FinishOnTarget, for each node, the resulting vector contains the probabilites that a walker on the targeted node comes from a particular node. The result of the forward propagation in used to compute the backward probabilities.
+            - FOT: FinishOnTarget, for each node, the resulting vector contains the probability that a walker on the targeted node comes from a particular node. The result of the StartFromTarget propagation in used to compute the FinishOnTarget probabilities.
             - both: The both matrix probabilities are computed are returned
 
     Returns:
@@ -191,18 +191,34 @@ def propagation_volume(g, name_att = "label", direction = "both"):
 ####################
 ## Beta functions ##
 ####################
-# r = create_prior_beta_mix([0, 0.5, 0.5], [14, 1, 3], [100, 4, 4])
+
 def create_prior_beta_mix(weights, cooc , corpora):
+    """This function is used to determine values of the prior mixture distribution.
+    In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
+    Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
+
+    Args:
+        weights (list): A list of float used as weights in the mixture distribution. (Cf. propagation_volume mode FinishOnTarget)
+        cooc (list): A list of integer values representing co-occurences between species in the graph and a particular MeSH descriptor  
+        corpora (list):  A list of integer values representing copus sizes related to each compounds in the graph
+
+    Returns:
+        [collection]: A collection with:
+            - alpha (list): vector of alpha parameters related to each individual Beta distribution in the prior mixture. 
+            - beta (list): vector the beta parameters related to each individual Beta distribution in the prior mixture.
+            - weights (list): vector of weights related to each individual Beta distribution in the prior mixture.
+            - x (list): probabilities
+            - y (list): density 
+    """
     # Get parameters
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f"])
     l = len(weights)
-    x = np.linspace(0, 1, 1000)
+    x = np.arange(0, 1, 0.001).tolist()
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
     alpha = [(cooc[it] + 1) for it in range(0, l)]
     beta = [(corpora[it] - cooc[it] + 1) for it in range(0, l)]
-    print(alpha)
-    print(beta)
+
     f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
     # Create Beta mix:
     y = np.dot(weights, f_i)
@@ -212,9 +228,26 @@ def create_prior_beta_mix(weights, cooc , corpora):
 
 
 def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior):
+    """This function is used to compute the posterior mixture distribution. The prior mixture model is updated for the observation of the coocurences on the targeted specie
+
+    Args:
+        k (integer): The coocurence for the MeSH 'M' for the targeted specie (number of success)
+        n (integer): The corpus size for the targeted specie (number of trials)
+        weights_pior (list): The prior mixture distribution weights (item 'weights' in create_prior_beta_mix result)
+        alpha_prior (list): The prior mixture distribution alpha parameters (item 'alpha' in create_prior_beta_mix result)
+        beta_prior (list): The prior mixture distribution beta parameters (item 'beta' in create_prior_beta_mix result)
+
+    Returns:
+        [collection]: A collection with:
+            - alpha (list): vector of alpha parameters related to each individual Beta distribution in the posterior mixture. 
+            - beta (list): vector the beta parameters related to each individual Beta distribution in the posterior mixture.
+            - weights (list): vector of weights related to each individual Beta distribution in the posterior mixture.
+            - x (list): probabilities
+            - y (list): density 
+    """
     r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f"])
     l = len(weights_pior)
-    x = np.linspace(0, 1, 1000)
+    x = np.arange(0, 1, 0.001).tolist()
 
     # Get posterior parameters
     alpha_post = [(alpha_prior[it] + k) for it in range(0, l)]

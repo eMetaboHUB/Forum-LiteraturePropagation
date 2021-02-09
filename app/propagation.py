@@ -8,6 +8,11 @@ import collections
 np.set_printoptions(suppress=True)
 
 
+
+###################
+###### Utils ######
+###################
+
 def import_metabolic_network(path, undirected = True, format = "gml"):
     """This function is used to import an metabolic network, by default as undirected
 
@@ -15,6 +20,9 @@ def import_metabolic_network(path, undirected = True, format = "gml"):
         path (str): path to the metabolic
         undirected (bool, optional): Graph directed or undirected. Defaults to True.
         format (str, optional): Graph format. Defaults to gml.
+
+    Returns:
+        [igraph.Graph]: The compound graph
     """
     if not os.path.isfile(path):
         print("Error: Can't find a file at " + path)
@@ -31,6 +39,38 @@ def import_metabolic_network(path, undirected = True, format = "gml"):
     if undirected:
         g.to_undirected()
     return g
+
+def import_corpora_sizes(path, g, name_att = "label"):
+    """This function is used to import specie corpora sizes. The file containing corpora sizes must contains two columns: SPECIE (specie label) and TOTAL_PMID_SPECIE (corpus size)
+
+    Args:
+        path (tring): path to the species corpus size file
+        g (igraph.Graph): the compound graph, imported using import_metabolic_network
+        name_att (str, optional):  The name of the vertex attribute containing names. Defaults to "label".
+
+    Returns:
+        [pandas DataFrame]: a DataFrame containg: index of species in the compound grand (col index), specie label (SPECIE) and specie corpus size (TOTAL_PMID_SPECIE)
+    """
+    # Get label to index from graph 
+    label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
+    # Read data
+    if not os.path.isfile(path):
+        print("Error: Can't find a file at " + path)
+        return None
+    try:
+        data = pd.read_csv(path)
+    except Exception as e:
+        print("Error while reading graph file at " + path)
+        print(e)
+        return None
+    if "SPECIE" not in data:
+        print("Error: missing column 'specie' in " + path)
+        return None
+    if "TOTAL_PMID_SPECIE" not in data:
+        print("Error: missing column 'TOTAL_PMID_SPECIE' in " + path)
+        return None
+    corpora_sizes = pd.merge(label_to_index, data)
+    return corpora_sizes
 
 
 
@@ -95,7 +135,7 @@ def propagation_volume(g, name_att = "label", direction = "both"):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
     Args:
-        g ([igraph.Graph]): The compound graph
+        g (igraph.Graph): The compound graph
         name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
         direction (str, optional): The direction og random walks that will be used to compute probabilities:
             - SFT: StartFromTarget, for each node the resulting vector contains the probabilities to be on a particular compound node during the random walk starting from the targeted node.
@@ -103,7 +143,7 @@ def propagation_volume(g, name_att = "label", direction = "both"):
             - both: The both matrix probabilities are computed are returned
 
     Returns:
-        [collections.namedtuple]: A named.tuple containing pandas DataFrame representing the probability matrix using SFT and/or FOT propagation.
+        collections.namedtuple: A named.tuple containing pandas DataFrame representing the probability matrix using SFT and/or FOT propagation.
     """
     # Init tuple
     r = collections.namedtuple("propagation", ["SFT", "FOT"])
@@ -135,3 +175,7 @@ def propagation_volume(g, name_att = "label", direction = "both"):
         result = r(df_SFT, df_FOT)
     
     return result
+
+
+
+

@@ -40,7 +40,7 @@ def import_metabolic_network(path, undirected = True, format = "gml"):
         g.to_undirected()
     return g
 
-def import_corpora_sizes(path, g, name_att = "label"):
+def import_species_corpora_sizes(path, g, cols, name_att = "label"):
     """This function is used to import specie corpora sizes. The file containing corpora sizes must contains two columns: SPECIE (specie label) and TOTAL_PMID_SPECIE (corpus size)
 
     Args:
@@ -53,7 +53,7 @@ def import_corpora_sizes(path, g, name_att = "label"):
     """
     # Get label to index from graph 
     label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
-    # Read data
+    # Read and test data
     if not os.path.isfile(path):
         print("Error: Can't find a file at " + path)
         return None
@@ -63,16 +63,57 @@ def import_corpora_sizes(path, g, name_att = "label"):
         print("Error while reading graph file at " + path)
         print(e)
         return None
-    if "SPECIE" not in data:
-        print("Error: missing column 'specie' in " + path)
-        return None
-    if "TOTAL_PMID_SPECIE" not in data:
-        print("Error: missing column 'TOTAL_PMID_SPECIE' in " + path)
-        return None
-    corpora_sizes = pd.merge(label_to_index, data)
-    return corpora_sizes
+    for col in cols:
+        if col not in data:
+            print("Error: missing column '" + col + "' in " + path)
+            return None
+    # Merging
+    merged = pd.merge(label_to_index, data)
+    # Export
+    return merged
 
 
+def import_table(path):
+    """This function is a method to read a table. It check if the file exists, and handle exceptions while importing it with pandas.
+
+    Args:
+        path (string): path to the table
+
+    Returns:
+        (pandas.DataFrame): The imported table
+    """
+    # Test if file exists
+    if not os.path.isfile(path):
+        print("Error: Can't find a file at " + path)
+        return None
+    # Read table
+    try:
+        data = pd.read_csv(path)
+    except Exception as e:
+        print("Error while reading graph file at " + path)
+        print(e)
+        return None
+    
+    return data
+
+def import_and_map_indexes(path, g, name_att = "label"):
+    """This function is used to import tables related to species. It also add a new column containing the species index in the graph g.
+    Args:
+        path (string): path to the table to import
+        g (igraph.Graph): The compound graph
+        name_att (str, optional): The name of the vertex attribute containing names in the graph. Defaults to "label".
+
+    Returns:
+        (pandas.DataFrame): The imported table with a new column, index, indicating the species index in the graph
+    """
+    # Create a table to map species labels (SPECIE column) to indexes in the graph
+    label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
+    data = import_table(path)
+
+    # Merge
+    coocurences = pd.merge(label_to_index, data)
+    
+    return coocurences
 
 ###################
 ### Propagation ###

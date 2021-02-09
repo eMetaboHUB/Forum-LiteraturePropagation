@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 import copy
 import collections
+import scipy.special as sc
+import scipy.stats as ss
+import matplotlib.pyplot as plt
 np.set_printoptions(suppress=True)
 
 
@@ -39,39 +42,6 @@ def import_metabolic_network(path, undirected = True, format = "gml"):
     if undirected:
         g.to_undirected()
     return g
-
-def import_species_corpora_sizes(path, g, cols, name_att = "label"):
-    """This function is used to import specie corpora sizes. The file containing corpora sizes must contains two columns: SPECIE (specie label) and TOTAL_PMID_SPECIE (corpus size)
-
-    Args:
-        path (tring): path to the species corpus size file
-        g (igraph.Graph): the compound graph, imported using import_metabolic_network
-        name_att (str, optional):  The name of the vertex attribute containing names. Defaults to "label".
-
-    Returns:
-        [pandas DataFrame]: a DataFrame containg: index of species in the compound grand (col index), specie label (SPECIE) and specie corpus size (TOTAL_PMID_SPECIE)
-    """
-    # Get label to index from graph 
-    label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
-    # Read and test data
-    if not os.path.isfile(path):
-        print("Error: Can't find a file at " + path)
-        return None
-    try:
-        data = pd.read_csv(path)
-    except Exception as e:
-        print("Error while reading graph file at " + path)
-        print(e)
-        return None
-    for col in cols:
-        if col not in data:
-            print("Error: missing column '" + col + "' in " + path)
-            return None
-    # Merging
-    merged = pd.merge(label_to_index, data)
-    # Export
-    return merged
-
 
 def import_table(path):
     """This function is a method to read a table. It check if the file exists, and handle exceptions while importing it with pandas.
@@ -218,5 +188,28 @@ def propagation_volume(g, name_att = "label", direction = "both"):
     return result
 
 
+####################
+## Beta functions ##
+####################
+
+def create_prior_beta_mix(p, cooc , corpora):
+    # Get parameters
+    r = collections.namedtuple("priormix", ["p", "f"])
+    l = len(p)
+    x = np.linspace(0, 1, 1000)
+
+    # Get beta component paremeters for each compounds, using a posterior with uniformative prior
+    alpha = [(cooc[it] + 1) for it in range(0, l)]
+    beta = [(corpora[it] - cooc[it] + 1) for it in range(0, l)]
+    print(alpha)
+    print(beta)
+    f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
+    # Create Beta mix:
+    y = np.dot(p, f_i)
+    mix = r(x,y)
+    return mix
+    
 
 
+
+def create_posterior_beta_mix(k, n, p, cooc , corpora, l):

@@ -81,7 +81,7 @@ def import_and_map_indexes(path, g, name_att = "label"):
     data = import_table(path)
 
     # Merge
-    coocurences = pd.merge(label_to_index, data)
+    coocurences = pd.merge(label_to_index, data, on = "SPECIE", how = "left")
     
     return coocurences
 
@@ -192,7 +192,7 @@ def propagation_volume(g, name_att = "label", direction = "both"):
 ## Beta functions ##
 ####################
 
-def create_prior_beta_mix(weights, cooc , corpora):
+def create_prior_beta_mix(index, weights, cooc , corpora):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
     Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
@@ -212,22 +212,27 @@ def create_prior_beta_mix(weights, cooc , corpora):
     """
     # Get parameters
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f"])
-    l = len(weights)
     x = np.arange(0, 1, 0.001).tolist()
+    l = len(weights)
+    # Remove values at index to build the prior mix
+    used_weights = [weights[i] for i in range(0, l) if i != index]
+    used_cooc = [cooc[i] for i in range(0, l) if i != index]
+    used_corpora = [corpora[i] for i in range(0, l) if i != index]
+    l = l - 1
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
-    alpha = [(cooc[it] + 1) for it in range(0, l)]
-    beta = [(corpora[it] - cooc[it] + 1) for it in range(0, l)]
+    alpha = [(used_cooc[it] + 1) for it in range(0, l)]
+    beta = [(used_corpora[it] - used_cooc[it] + 1) for it in range(0, l)]
 
     f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
     # Create Beta mix:
-    y = np.dot(weights, f_i)
-    mix = r(alpha, beta, weights, x, y)
+    y = np.dot(used_weights, f_i)
+    mix = r(alpha, beta, used_weights, x, y)
     return mix
     
 
 
-def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior):
+def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_log = True):
     """This function is used to compute the posterior mixture distribution. The prior mixture model is updated for the observation of the coocurences on the targeted specie
 
     Args:
@@ -254,9 +259,14 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior):
     beta_post = [(beta_prior[it] + (n - k)) for it in range(0, l)]
 
     # Get Weight
-    C = [sc.beta(alpha_post[it], beta_post[it])/sc.beta(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
-    print(C)
-    W = [(weights_pior[it] * C[it]/(np.dot(weights_pior, C))) for it in range(0, l)]
+    if use_log:
+        # Compute log of W_i :
+        C = [sc.betaln(alpha_post[it], beta_post[it]) - sc.betaln(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
+        Z = [np.log(weights_pior[it]) + C[it] for it in range(0, l)]
+        W = [np.exp(Z[it] - (sc.logsumexp(Z))) for it in range(0, l)]
+    else:    
+        C = [sc.beta(alpha_post[it], beta_post[it])/sc.beta(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
+        W = [(weights_pior[it] * C[it]/(np.dot(weights_pior, C))) for it in range(0, l)]
 
     # Create posterior distribution by componennts
     f_post_i = [ss.beta.pdf(x, a = alpha_post[it], b = beta_post[it]) for it in range(0, l)]
@@ -267,3 +277,18 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior):
     mix = r(alpha_post, beta_post, W, x, y)
     
     return mix
+
+
+
+####################
+### Computations ###
+####################
+
+def get_prior(specie, mesh, table_cooc, table_corpora, matrix_proba):
+    # Get cooc vector. It only contains species that have at least one article, need to left join.
+    cooc =  table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+
+    # Create table to resume needed data
+    table = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
+    table["weights"] = matrix_proba[specie].tolist()
+    return(table)

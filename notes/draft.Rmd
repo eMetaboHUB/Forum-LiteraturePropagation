@@ -584,3 +584,20 @@ Ensuite on fait simplement $log(k_i C_i) - log(\sum_{i}^{n} k _i C_i)$
 
 Ensuite on a juste à repasser à l'exponentielle ! Étant une proportion, il est beaucoup plus facile de revenir à ce moment là
 
+
+
+
+Pour la CDF (Cumulative Distribution Function) c'est aussi très simple:
+
+Si $f(x; \theta_{1}, \theta_{2}, ..., \theta_{n}) = \sum_i k_{i}f(x; \theta_i)$ alors on cherche : $P(x \le z)$
+
+$P(x \le z) = \int_{0}^{z} f(x; \theta_{1}, \theta_{2}, ..., \theta_{n}) dx = \int_{0}^{z} \sum_i k_{i}f(x; \theta_i) dx$
+
+Or l'intégrale d'une somme étant la somme des intégrale et $k_i$ ne dépendant pas de $x$, on a :
+
+$$P(x \le z) = \sum_i k_{i} \int_{0}^{z}f(x; \theta_i) dx$$
+
+Ainsi, on pour obtenir la CDF d'une distribution de mélange , il suffit de combiner les CDF des composantes du modèles par rapport aux poids $k_i$, en gros: 
+
+$$P(x \le z) = \sum_i k_{i} P_{i}(x \le z)$$
+

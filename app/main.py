@@ -28,7 +28,7 @@ print("Ok")
 probabilities = propagation_volume(g)
 
 mesh = "D056806"
-specie = "M_CE1939"
+specie = "M_urea"
 
 table_test = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT)
 

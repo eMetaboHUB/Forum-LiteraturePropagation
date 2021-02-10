@@ -210,7 +210,7 @@ def observation_uninformative_prior(k, n):
     """
     # Posterior using unformative prior:
     r = collections.namedtuple("uninformativeprior", ["alpha", "beta", "x", "f", "mu"])
-    x = np.arange(0, 1, 0.0001).tolist()
+    x = np.arange(0, 1, 0.001).tolist()
     # Get distribution using uniformative prior: Beta(1,1)
     alpha = k + 1
     beta = (n - k) + 1
@@ -242,8 +242,8 @@ def create_prior_beta_mix(weights, cooc , corpora):
             - y (list): density 
     """
     # Get parameters
-    r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f"])
-    x = np.arange(0, 1, 0.0001).tolist()
+    r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f", "mu"])
+    x = np.arange(0, 1, 0.001).tolist()
     l = len(weights)
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
@@ -253,7 +253,13 @@ def create_prior_beta_mix(weights, cooc , corpora):
     f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
     # Create Beta mix:
     y = np.dot(weights, f_i)
-    mix = r(alpha, beta, weights, x, y)
+
+    # Get mean
+    mu_i = [(alpha[it]/(alpha[it] + beta[it])) for it in range(0, l)]
+    mu = np.dot(weights, mu_i)
+
+    mix = r(alpha, beta, weights, x, y, mu)
+
     return mix
     
 
@@ -277,9 +283,9 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
             - x (list): probabilities
             - y (list): density 
     """
-    r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f"])
+    r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu"])
     l = len(weights_pior)
-    x = np.arange(0, 1, 0.0001).tolist()
+    x = np.arange(0, 1, 0.001).tolist()
 
     # Get posterior parameters
     alpha_post = [(alpha_prior[it] + k) for it in range(0, l)]
@@ -301,7 +307,11 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
     # Get posteriors probabilities
     y = np.dot(W, f_post_i)
 
-    mix = r(alpha_post, beta_post, W, x, y)
+    # Get mean
+    mu_i = [(alpha_post[it]/(alpha_post[it] + beta_post[it])) for it in range(0, l)]
+    mu = np.dot(W, mu_i)
+
+    mix = r(alpha_post, beta_post, W, x, y, mu)
     
     return mix
 
@@ -339,12 +349,16 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba):
 
     # Uninformative
     obs = observation_uninformative_prior(k, n)
-    print(obs.mu)
     # Prior mix:
     prior_mix = create_prior_beta_mix(weights, cooc, corpora)
 
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
 
+    print("> Mean uninformative: " + str(obs.mu))
+    print("> Mean prior mix: " + str(prior_mix.mu))
+    print("> Mean posterior_mix: " + str(posterior_mix.mu))
+
     plot_distributions(obs, prior_mix, posterior_mix)
+    
     return data

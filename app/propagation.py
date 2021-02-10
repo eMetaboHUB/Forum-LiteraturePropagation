@@ -89,13 +89,13 @@ def import_and_map_indexes(path, g, name_att = "label"):
 ### Propagation ###
 ###################
 
-def compute_PR(A, i, alpha = 0.8, epsilon = 1e-9):
+def compute_PR(A, i, alpha, epsilon = 1e-9):
     """
     This function is used to determine the vector probability using a PPR approach applied on the graph without the targeted node, only considering its neighbours.
     Args:
         A ([numpy.ndarray]): Graph adjacency matrix
         i ([int]): Index of the target node
-        alpha (float, optional): The damping factor. Defaults to 0.8.
+        alpha (float): The damping factor.
         epsilon ([float], optional): Tolerance for convergence. Defaults to 1e-9.
 
     Returns:
@@ -142,11 +142,12 @@ def compute_PR(A, i, alpha = 0.8, epsilon = 1e-9):
     
     return r
 
-def propagation_volume(g, name_att = "label", direction = "both"):
+def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
     Args:
         g (igraph.Graph): The compound graph
+        alpha (float, optional): The damping factor. Defaults to 0.8.
         name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
         direction (str, optional): The direction og random walks that will be used to compute probabilities:
             - SFT: StartFromTarget, for each node the resulting vector contains the probabilities to be on a particular compound node during the random walk starting from the targeted node.
@@ -158,12 +159,11 @@ def propagation_volume(g, name_att = "label", direction = "both"):
     """
     # Init tuple
     r = collections.namedtuple("propagation", ["SFT", "FOT"])
-
     # Compute for each node SFT propagation
     A = np.array(g.get_adjacency().data)
     full = np.zeros(A.shape)
     for i in range(0, A.shape[0]):
-        full[:, i] = compute_PR(A, i)[:, 0]
+        full[:, i] = compute_PR(A, i, alpha)[:, 0]
     
     # If SFT direction
     if direction == "SFT":

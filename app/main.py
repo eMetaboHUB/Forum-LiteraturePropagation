@@ -25,12 +25,18 @@ table_mesh_corpora = import_table(args.mesh_corpora_path)
 print("Ok")
 print(table_mesh_corpora)
 
-probabilities = propagation_volume(g)
 N = 8877780
 mesh = "D022124"
-specie = "M_HC00591"
+specie = "M_gudac"
+alpha = 0.5
 
-table_test = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora, N)
+probabilities = propagation_volume(g, alpha = alpha)
+
+cc = 100 * probabilities.FOT
+cc.to_csv("FOT_" + str(alpha) + ".csv")
+
+
+# table_test = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora, N)
 
 
 

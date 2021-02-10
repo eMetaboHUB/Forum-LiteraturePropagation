@@ -198,6 +198,7 @@ def create_prior_beta_mix(index, weights, cooc , corpora):
     Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
 
     Args:
+        index (integer): the index of the targeted compound.
         weights (list): A list of float used as weights in the mixture distribution. (Cf. propagation_volume mode FinishOnTarget)
         cooc (list): A list of integer values representing co-occurences between species in the graph and a particular MeSH descriptor  
         corpora (list):  A list of integer values representing copus sizes related to each compounds in the graph
@@ -214,7 +215,7 @@ def create_prior_beta_mix(index, weights, cooc , corpora):
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f"])
     x = np.arange(0, 1, 0.001).tolist()
     l = len(weights)
-    # Remove values at index to build the prior mix
+    # Remove values at index to build the prior mix because it will not be involved (weights[index] == 0). But it is convinient to directly remove it, especially if we used the log method
     used_weights = [weights[i] for i in range(0, l) if i != index]
     used_cooc = [cooc[i] for i in range(0, l) if i != index]
     used_corpora = [corpora[i] for i in range(0, l) if i != index]
@@ -241,6 +242,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
         weights_pior (list): The prior mixture distribution weights (item 'weights' in create_prior_beta_mix result)
         alpha_prior (list): The prior mixture distribution alpha parameters (item 'alpha' in create_prior_beta_mix result)
         beta_prior (list): The prior mixture distribution beta parameters (item 'beta' in create_prior_beta_mix result)
+        use_log (bool): A boolean telling if the computation of the weights W have to be achieve using classic formula or using logs (As alpha and beta values are often large, log method is prefered)
 
     Returns:
         [collection]: A collection with:
@@ -260,10 +262,10 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
 
     # Get Weight
     if use_log:
-        # Compute log of W_i :
+        # Compute log of W_i. Indeed sc.beta goes to 0 when alpha and beta are large which lead to a 0 division. use Log(Beta(a,b)) allow to compute W in thoose cases
         C = [sc.betaln(alpha_post[it], beta_post[it]) - sc.betaln(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
         Z = [np.log(weights_pior[it]) + C[it] for it in range(0, l)]
-        W = [np.exp(Z[it] - (sc.logsumexp(Z))) for it in range(0, l)]
+        W = [np.exp((Z[it] - (sc.logsumexp(Z)))) for it in range(0, l)]
     else:    
         C = [sc.beta(alpha_post[it], beta_post[it])/sc.beta(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
         W = [(weights_pior[it] * C[it]/(np.dot(weights_pior, C))) for it in range(0, l)]

@@ -8,7 +8,7 @@ class TestPropagationMethods(unittest.TestCase):
     def setUpClass(cls):
         cls.g = import_metabolic_network("tests/data/test_urea.gml")
         cls.propagation_volume = propagation_volume(cls.g)
-        cls.prior_mix = create_prior_beta_mix(0, [0, 0.5, 0.5], [100, 1, 3], [100, 4, 4])
+        cls.prior_mix = create_prior_beta_mix([0.5, 0.5], [1, 3], [4, 4])
         cls.posterior_mix = create_posterior_beta_mix(k = 8, n = 10, weights_pior = cls.prior_mix.weights, alpha_prior = cls.prior_mix.alpha, beta_prior = cls.prior_mix.beta)
 
     def test_import(self):

@@ -192,13 +192,12 @@ def propagation_volume(g, name_att = "label", direction = "both"):
 ## Beta functions ##
 ####################
 
-def create_prior_beta_mix(index, weights, cooc , corpora):
+def create_prior_beta_mix(weights, cooc , corpora):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
     Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
 
     Args:
-        index (integer): the index of the targeted compound.
         weights (list): A list of float used as weights in the mixture distribution. (Cf. propagation_volume mode FinishOnTarget)
         cooc (list): A list of integer values representing co-occurences between species in the graph and a particular MeSH descriptor  
         corpora (list):  A list of integer values representing copus sizes related to each compounds in the graph
@@ -215,20 +214,15 @@ def create_prior_beta_mix(index, weights, cooc , corpora):
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f"])
     x = np.arange(0, 1, 0.001).tolist()
     l = len(weights)
-    # Remove values at index to build the prior mix because it will not be involved (weights[index] == 0). But it is convinient to directly remove it, especially if we used the log method
-    used_weights = [weights[i] for i in range(0, l) if i != index]
-    used_cooc = [cooc[i] for i in range(0, l) if i != index]
-    used_corpora = [corpora[i] for i in range(0, l) if i != index]
-    l = l - 1
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
-    alpha = [(used_cooc[it] + 1) for it in range(0, l)]
-    beta = [(used_corpora[it] - used_cooc[it] + 1) for it in range(0, l)]
+    alpha = [(cooc[it] + 1) for it in range(0, l)]
+    beta = [(corpora[it] - cooc[it] + 1) for it in range(0, l)]
 
     f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
     # Create Beta mix:
-    y = np.dot(used_weights, f_i)
-    mix = r(alpha, beta, used_weights, x, y)
+    y = np.dot(weights, f_i)
+    mix = r(alpha, beta, weights, x, y)
     return mix
     
 
@@ -242,7 +236,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
         weights_pior (list): The prior mixture distribution weights (item 'weights' in create_prior_beta_mix result)
         alpha_prior (list): The prior mixture distribution alpha parameters (item 'alpha' in create_prior_beta_mix result)
         beta_prior (list): The prior mixture distribution beta parameters (item 'beta' in create_prior_beta_mix result)
-        use_log (bool): A boolean telling if the computation of the weights W have to be achieve using classic formula or using logs (As alpha and beta values are often large, log method is prefered)
+        use_log (boolean, optional): A boolean telling if the computation of the weights W have to be achieve using classic formula or using logs (As alpha and beta values are often large, log method is prefered). Default = True
 
     Returns:
         [collection]: A collection with:
@@ -286,11 +280,32 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
 ### Computations ###
 ####################
 
-def get_prior(specie, mesh, table_cooc, table_corpora, matrix_proba):
+
+
+def computation(specie, mesh, table_cooc, table_corpora, matrix_proba):
     # Get cooc vector. It only contains species that have at least one article, need to left join.
-    cooc =  table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+    cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
 
     # Create table to resume needed data
-    table = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
-    table["weights"] = matrix_proba[specie].tolist()
-    return(table)
+    data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
+    data["weights"] = matrix_proba[specie].tolist()
+
+    # Remove values for targeted index
+    index = int(data[data["SPECIE"] == specie]["index"])
+    weights = data["weights"].tolist()
+    del weights[index]
+    cooc = data["COOC"].tolist()
+    k = cooc.pop(index)
+    corpora = data["TOTAL_PMID_SPECIE"].tolist()
+    n = corpora.pop(index)
+
+    # Prior mix:
+    prior_mix = create_prior_beta_mix(index, weights, cooc, corpora)
+
+    print(prior_mix.alpha)
+    print(prior_mix.beta)    
+    # Posterior mix:
+    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
+    plt.plot(posterior_mix.x, posterior_mix.f)
+    plt.show()
+    return data

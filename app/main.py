@@ -30,17 +30,10 @@ probabilities = propagation_volume(g)
 mesh = "D056806"
 specie = "M_HC00591"
 
-table_test = get_prior(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT)
-print(table_test)
+table_test = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT)
 
-prior_test = create_prior_beta_mix(18, table_test["weights"], table_test["COOC"] , table_test["TOTAL_PMID_SPECIE"])
-print(prior_test.alpha[4])
-print(prior_test.beta[4])
-print(prior_test)
-plt.plot(prior_test.x, prior_test.f)
-plt.show()
 
-posterior_test = create_posterior_beta_mix(2, 18, prior_test.weights, prior_test.alpha, prior_test.beta)
-print(posterior_test)
-plt.plot(prior_test.x, posterior_test.f)
-plt.show()
+
+# plt.plot(prior_test.x, prior_test.f)
+# plt.show()
+

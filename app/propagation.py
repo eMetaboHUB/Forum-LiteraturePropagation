@@ -192,6 +192,37 @@ def propagation_volume(g, name_att = "label", direction = "both"):
 ## Beta functions ##
 ####################
 
+
+def observation_uninformative_prior(k, n):
+    """This function is used to build the posterior distribution using just an uninformative prior Beta(1,1)
+
+    Args:
+        k (integer): The coocurence for the MeSH 'M' for the targeted specie (number of success)
+        n (integer): The corpus size for the targeted specie (number of trials)
+    
+    Returns:
+    [collection]: A collection with:
+        - alpha (int): alpha parameter related to the posterior Beta distribution: k + 1
+        - beta (int): beta parameters related to the posterior Beta distribution: (n - k) + 1
+        - x (list): probabilities
+        - y (list): density 
+        - mu (float): mean of the posterior distribution
+    """
+    # Posterior using unformative prior:
+    r = collections.namedtuple("uninformativeprior", ["alpha", "beta", "x", "f", "mu"])
+    x = np.arange(0, 1, 0.0001).tolist()
+    # Get distribution using uniformative prior: Beta(1,1)
+    alpha = k + 1
+    beta = (n - k) + 1
+    y = ss.beta.pdf(x, a = alpha, b = beta)
+
+    # Get mean of the distribution (Bayes estimator of p)
+    mu = (k + 1)/(n + 2)
+
+    res = r(alpha, beta, x, y, mu)
+
+    return res
+
 def create_prior_beta_mix(weights, cooc , corpora):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
@@ -212,7 +243,7 @@ def create_prior_beta_mix(weights, cooc , corpora):
     """
     # Get parameters
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f"])
-    x = np.arange(0, 1, 0.001).tolist()
+    x = np.arange(0, 1, 0.0001).tolist()
     l = len(weights)
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
@@ -248,7 +279,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
     """
     r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f"])
     l = len(weights_pior)
-    x = np.arange(0, 1, 0.001).tolist()
+    x = np.arange(0, 1, 0.0001).tolist()
 
     # Get posterior parameters
     alpha_post = [(alpha_prior[it] + k) for it in range(0, l)]
@@ -280,7 +311,13 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
 ### Computations ###
 ####################
 
-
+def plot_distributions(uninformative, prior_mix, posterior_mix):
+    plt.plot(uninformative.x, uninformative.f, label = "Posterior with uninformative prior")
+    plt.plot(prior_mix.x, prior_mix.f, label = "prior mix")
+    plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior with prior mix")
+    plt.title('Differences between Uninformative, mix prior and posterior mix distribution ')
+    plt.legend()
+    plt.show()
 
 def computation(specie, mesh, table_cooc, table_corpora, matrix_proba):
     # Get cooc vector. It only contains species that have at least one article, need to left join.
@@ -289,6 +326,7 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba):
     # Create table to resume needed data
     data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
     data["weights"] = matrix_proba[specie].tolist()
+    print(data)
 
     # Remove values for targeted index
     index = int(data[data["SPECIE"] == specie]["index"])
@@ -299,13 +337,14 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba):
     corpora = data["TOTAL_PMID_SPECIE"].tolist()
     n = corpora.pop(index)
 
+    # Uninformative
+    obs = observation_uninformative_prior(k, n)
+    print(obs.mu)
     # Prior mix:
-    prior_mix = create_prior_beta_mix(index, weights, cooc, corpora)
+    prior_mix = create_prior_beta_mix(weights, cooc, corpora)
 
-    print(prior_mix.alpha)
-    print(prior_mix.beta)    
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
-    plt.plot(posterior_mix.x, posterior_mix.f)
-    plt.show()
+
+    plot_distributions(obs, prior_mix, posterior_mix)
     return data

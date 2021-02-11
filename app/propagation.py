@@ -356,6 +356,21 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mes
     corpora = data["TOTAL_PMID_SPECIE"].tolist()
     n = corpora.pop(index)
     
+    # Check for other null weights, in cas of low alpha (damping) for instance
+    if 0 in weights:
+        labels = data["SPECIE"]
+        to_remove = list()
+        for it in range(0, len(weights)):
+            # Check if weights == 0
+            if not weights[it]:
+                print("Warning: weight at index " + str(it) + " is null: " + labels[it] + " Low damping factor used ?")
+                to_remove.append(it)
+        
+        # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
+        for rmv in sorted(to_remove, reverse=True):
+            del weights[rmv]
+            del cooc[rmv]
+            del corpora[rmv]
     # Uninformative
     obs = observation_uninformative_prior(k, n)
     # Prior mix:

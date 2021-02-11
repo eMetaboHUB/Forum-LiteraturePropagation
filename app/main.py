@@ -28,7 +28,7 @@ print(table_mesh_corpora)
 N = 8877780
 mesh = "D022124"
 specie = "M_acorn"
-alpha = 0
+alpha = 0.5
 
 probabilities = propagation_volume(g, alpha = alpha)
 

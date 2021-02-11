@@ -193,12 +193,13 @@ def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
 ####################
 
 
-def observation_uninformative_prior(k, n):
+def observation_uninformative_prior(k, n, seq):
     """This function is used to build the posterior distribution using just an uninformative prior Beta(1,1)
 
     Args:
         k (integer): The coocurence for the MeSH 'M' for the targeted specie (number of success)
         n (integer): The corpus size for the targeted specie (number of trials)
+        seq (float): the step used in np.arange to create the x vector of probabilities.
     
     Returns:
     [collection]: A collection with:
@@ -210,7 +211,7 @@ def observation_uninformative_prior(k, n):
     """
     # Posterior using unformative prior:
     r = collections.namedtuple("uninformativeprior", ["alpha", "beta", "x", "f", "mu"])
-    x = np.arange(0, 1, 0.0001).tolist()
+    x = np.arange(0, 1 + seq, seq).tolist()
     # Get distribution using uniformative prior: Beta(1,1)
     alpha = k + 1
     beta = (n - k) + 1
@@ -223,7 +224,7 @@ def observation_uninformative_prior(k, n):
 
     return res
 
-def create_prior_beta_mix(weights, cooc , corpora):
+def create_prior_beta_mix(weights, cooc , corpora, seq):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
     Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
@@ -232,6 +233,7 @@ def create_prior_beta_mix(weights, cooc , corpora):
         weights (list): A list of float used as weights in the mixture distribution. (Cf. propagation_volume mode FinishOnTarget)
         cooc (list): A list of integer values representing co-occurences between species in the graph and a particular MeSH descriptor  
         corpora (list):  A list of integer values representing copus sizes related to each compounds in the graph
+        seq (float): the step used in np.arange to create the x vector of probabilities.
 
     Returns:
         [collection]: A collection with:
@@ -243,7 +245,7 @@ def create_prior_beta_mix(weights, cooc , corpora):
     """
     # Get parameters
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f", "mu"])
-    x = np.arange(0, 1, 0.0001).tolist()
+    x = np.arange(0, 1 + seq, seq).tolist()
     l = len(weights)
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
@@ -264,7 +266,7 @@ def create_prior_beta_mix(weights, cooc , corpora):
     
 
 
-def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_log = True):
+def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, use_log = True):
     """This function is used to compute the posterior mixture distribution. The prior mixture model is updated for the observation of the coocurences on the targeted specie
 
     Args:
@@ -273,6 +275,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
         weights_pior (list): The prior mixture distribution weights (item 'weights' in create_prior_beta_mix result)
         alpha_prior (list): The prior mixture distribution alpha parameters (item 'alpha' in create_prior_beta_mix result)
         beta_prior (list): The prior mixture distribution beta parameters (item 'beta' in create_prior_beta_mix result)
+        seq (float): the step used in np.arange to create the x vector of probabilities.
         use_log (boolean, optional): A boolean telling if the computation of the weights W have to be achieve using classic formula or using logs (As alpha and beta values are often large, log method is prefered). Default = True
 
     Returns:
@@ -285,7 +288,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
     """
     r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu"])
     l = len(weights_pior)
-    x = np.arange(0, 1, 0.0001).tolist()
+    x = np.arange(0, 1 + seq, seq).tolist()
 
     # Get posterior parameters
     alpha_post = [(alpha_prior[it] + k) for it in range(0, l)]
@@ -334,7 +337,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mesh, N):
+def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mesh, N, seq = 0.0001):
     
     # Get MeSH corpus
     M = int(table_mesh[table_mesh["MESH"] == mesh]["TOTAL_PMID_MESH"])
@@ -372,12 +375,12 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mes
             del cooc[rmv]
             del corpora[rmv]
     # Uninformative
-    obs = observation_uninformative_prior(k, n)
+    obs = observation_uninformative_prior(k, n, seq)
     # Prior mix:
-    prior_mix = create_prior_beta_mix(weights, cooc, corpora)
+    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq)
 
     # Posterior mix:
-    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
+    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq)
 
     print("> Mean uninformative: " + str(obs.mu))
     print("> Mean prior mix: " + str(prior_mix.mu))

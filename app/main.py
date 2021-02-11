@@ -42,9 +42,10 @@ probabilities = propagation_volume(g, alpha = alpha)
 # cc.to_csv("FOT_" + str(alpha) + ".csv")
 
 
-table_test = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora, P)
+# r = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora, P)
+r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
 
-
+print(r2)
 
 # plt.plot(prior_test.x, prior_test.f)
 # plt.show()

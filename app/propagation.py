@@ -337,19 +337,11 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mesh, p, seq = 0.0001):
+def computation(index, data, p, seq = 0.0001):
     
+    # Out
+    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC"])
 
-    # Get cooc vector. It only contains species that have at least one article, need to left join.
-    cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
-
-    # Create table to resume needed data
-    data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
-    data["weights"] = matrix_proba[specie].tolist()
-    print(data)
-
-    # Remove values for targeted index
-    index = int(data[data["SPECIE"] == specie]["index"])
     weights = data["weights"].tolist()
     del weights[index]
     cooc = data["COOC"].tolist()
@@ -380,18 +372,25 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mes
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq)
 
-    print("> Mean uninformative: " + str(obs.mu))
-    print("> Mean prior mix: " + str(prior_mix.mu))
-    print("> Mean posterior_mix: " + str(posterior_mix.mu))
-
-    print("> Compute CDF based on MeSH (" + mesh + ") proba: " + str(p))
-    cdf_uninformative = compute_mix_CDF(p, [1], [obs.alpha], [obs.beta])
-    cdf_prior_mix = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
+    Log2numFC = np.log2(posterior_mix.mu/p)
+    # plot_distributions(obs, prior_mix, posterior_mix)
 
-    print("CDF uninformative: " + str(cdf_uninformative))
-    print("CDF prior mix: " + str(cdf_prior_mix))
-    print("CDF posterior mix " + str(cdf_posterior_mix))
-    plot_distributions(obs, prior_mix, posterior_mix)
+    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC)
+    print(resultat)
+    return resultat
+
+
+def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
     
-    return data
+    table_corpora.insert(2, "weights", matrix_proba.iloc[:, index].tolist())
+
+    for mesh in ["D022124"]:
+        # Get cooc vector. It only contains species that have at least one article, need to left join.
+        cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+        # Get data
+        data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
+        p = float(table_mesh[table_mesh["MESH"] == mesh]["P"])
+        r = computation(index, data, p, seq = 0.0001)
+        return(r)
+        

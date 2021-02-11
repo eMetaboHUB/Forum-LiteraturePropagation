@@ -10,6 +10,9 @@ parser.add_argument("--specie.cooc", help="path to the species MeSH co-occurence
 parser.add_argument("--mesh.corpora", help="path to the MeSH corpus size file ", type = str, required = True, dest = 'mesh_corpora_path')
 
 args = parser.parse_args()
+
+N = 8877780
+
 g = import_metabolic_network(args.g_path)
 
 print("> Import species corpora sizes ... ", end = '')
@@ -22,11 +25,14 @@ print("Ok")
 
 print("> Import MeSH corpora sizes ... ", end = '')
 table_mesh_corpora = import_table(args.mesh_corpora_path)
-print("Ok")
-print(table_mesh_corpora)
 
-N = 8877780
+# Compute MeSH probabilities
+table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_PMID_MESH"]/N 
+print("Ok")
+
+
 mesh = "D022124"
+P = float(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["P"])
 specie = "M_acorn"
 alpha = 0.5
 
@@ -36,7 +42,7 @@ probabilities = propagation_volume(g, alpha = alpha)
 # cc.to_csv("FOT_" + str(alpha) + ".csv")
 
 
-table_test = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora, N)
+table_test = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora, P)
 
 
 

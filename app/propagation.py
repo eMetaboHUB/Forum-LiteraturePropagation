@@ -337,10 +337,8 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mesh, N, seq = 0.0001):
+def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mesh, p, seq = 0.0001):
     
-    # Get MeSH corpus
-    M = int(table_mesh[table_mesh["MESH"] == mesh]["TOTAL_PMID_MESH"])
 
     # Get cooc vector. It only contains species that have at least one article, need to left join.
     cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
@@ -386,7 +384,6 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mes
     print("> Mean prior mix: " + str(prior_mix.mu))
     print("> Mean posterior_mix: " + str(posterior_mix.mu))
 
-    p = M/N
     print("> Compute CDF based on MeSH (" + mesh + ") proba: " + str(p))
     cdf_uninformative = compute_mix_CDF(p, [1], [obs.alpha], [obs.beta])
     cdf_prior_mix = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)

@@ -23,10 +23,10 @@ class TestPropagationMethods(unittest.TestCase):
         pd.testing.assert_frame_equal(self.propagation_volume.FOT, FOT_ref)
     
     def test_prior_mix(self):
-        self.assertEqual(round(self.prior_mix.f[775], 5), 1.13562)
+        self.assertEqual(round(self.prior_mix.f[7750], 5), 1.13562)
     
     def test_posterior(self):
-        self.assertEqual(round(self.posterior_mix.f[775], 5), 3.45663)
+        self.assertEqual(round(self.posterior_mix.f[7750], 5), 3.45663)
 
 
 if __name__ == '__main__':

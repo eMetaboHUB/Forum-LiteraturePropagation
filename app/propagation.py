@@ -210,7 +210,7 @@ def observation_uninformative_prior(k, n):
     """
     # Posterior using unformative prior:
     r = collections.namedtuple("uninformativeprior", ["alpha", "beta", "x", "f", "mu"])
-    x = np.arange(0, 1, 0.001).tolist()
+    x = np.arange(0, 1, 0.0001).tolist()
     # Get distribution using uniformative prior: Beta(1,1)
     alpha = k + 1
     beta = (n - k) + 1
@@ -243,7 +243,7 @@ def create_prior_beta_mix(weights, cooc , corpora):
     """
     # Get parameters
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f", "mu"])
-    x = np.arange(0, 1, 0.001).tolist()
+    x = np.arange(0, 1, 0.0001).tolist()
     l = len(weights)
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
@@ -285,7 +285,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, use_l
     """
     r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu"])
     l = len(weights_pior)
-    x = np.arange(0, 1, 0.001).tolist()
+    x = np.arange(0, 1, 0.0001).tolist()
 
     # Get posterior parameters
     alpha_post = [(alpha_prior[it] + k) for it in range(0, l)]
@@ -355,7 +355,7 @@ def computation(specie, mesh, table_cooc, table_corpora, matrix_proba, table_mes
     k = cooc.pop(index)
     corpora = data["TOTAL_PMID_SPECIE"].tolist()
     n = corpora.pop(index)
-
+    
     # Uninformative
     obs = observation_uninformative_prior(k, n)
     # Prior mix:

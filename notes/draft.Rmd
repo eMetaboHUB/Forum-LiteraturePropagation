@@ -601,3 +601,21 @@ Ainsi, on pour obtenir la CDF d'une distribution de mélange , il suffit de comb
 
 $$P(x \le z) = \sum_i k_{i} P_{i}(x \le z)$$
 
+
+## Précisions (2)
+
+Dans notre cas on cherche à déterminer $f_{post}(p|k, n)$ doit la distribution du paramètre $p$ en fonction de nos données observée. Mais en réalité ces données sont observées sur un composé particulier, pour lequel on va disposer d'un prior spécifique de ce composé. Donc, si on voulait être complètement rijgoureux, il faudrait également préciser que l'on conditionne par rapport à la specie considéré $S_i$, on se place dans la condition particulière ou l'on étudie $S_i$. Heureusement Grâce au théroême des probabilité conditionnelle, ça ne change rien à la formule ! En effet, si on note $Q_i(p|k,n)$ la distribution de probabilité de $p$ par rapport à nos observations $k,n$ et conditionné par rapoort au fait que l'on observe la specie $S_i$, on a que :
+
+
+Pour simplifier l'écriture on dégage le $n$. En fait, même dans les formule du haut, je suis pas sur que pour faire propre il faille écrire le $n$ dans la formule... Car même si c'est un paramètre de la loi Binomiale, il est fixé et n'a pas de 'proba' derrière ... Car au final le vrai paramètre de la loi Binomiale c'est surtout $p$ Enfin bon c'est du détail ^^
+
+$Q_i(p|k) = \frac{Q_i(k|p)Q_i(p)}{Q_i(k)} = \frac{p(k|p \cap S_i) p(p| S_i)}{p(k|S_i)} = \frac{p(k|p \cap S_i) \frac{p(p \cap S_i)}{p(S_i)}}{p(k|S_i)} = \frac{p(k \cap p \cap S_i)/p(S_i)}{p(k|S_i)}$
+
+$p(k|S_i)$ est bien sur donc égal à $p(k|S_i) = \int p(k|p \cap S_i) p(p| S_i) dp$, masi on garde la forme comptacte pour simplifier !
+
+Donc $Q_i(p|k) = \frac{p(k \cap p \cap S_i)/p(S_i)}{p(k|S_i)} = \frac{p(k \cap p \cap S_i)/p(S_i)}{p(p \cap S_i)/p(S_i)} = \frac{p(k \cap p \cap S_i)}{p(p \cap S_i)} = p(p | k, S_i)$
+
+Et donc on retrouve bien que l'on cherche la distibution de $p$ par rapport aux comptages observée sachant qe l'on étudie $S_i$. Tout cela est garanti par le théorême des probabilités conditionnelles.
+
+
+

@@ -377,20 +377,30 @@ def computation(index, data, p, seq = 0.0001):
     # plot_distributions(obs, prior_mix, posterior_mix)
 
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC)
-    print(resultat)
+    
     return resultat
 
 
 def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
     
     table_corpora.insert(2, "weights", matrix_proba.iloc[:, index].tolist())
-
-    for mesh in ["D022124"]:
+    
+    for mesh in (table_mesh["MESH"].tolist()):
         # Get cooc vector. It only contains species that have at least one article, need to left join.
         cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
         # Get data
         data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
+        #TODO remove
+        if data["COOC"][index] > 0:
+            continue
         p = float(table_mesh[table_mesh["MESH"] == mesh]["P"])
-        r = computation(index, data, p, seq = 0.0001)
-        return(r)
+        # Test of interest (mean raw Log2FC neighboors > 1):
+        testFC = np.dot(data[data["TOTAL_PMID_SPECIE"] != 0]["weights"], ((data[data["TOTAL_PMID_SPECIE"] != 0]["COOC"]/data[data["TOTAL_PMID_SPECIE"] != 0]["TOTAL_PMID_SPECIE"])/p))
+        #TODO remove, peut être que l'on peut garder le test du Log2FC aussi
+        if testFC != 0 and np.log2(testFC) > 1 :
+            r = computation(index, data, p, seq = 0.0001)
+            if r.CDF <= 0.05:
+                print("==============" + mesh + "==============")
+                print(data)
+                print(r)
         

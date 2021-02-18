@@ -32,8 +32,8 @@ print("Ok")
 
 
 mesh = "D022124"
-P = float(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["P"])
-specie = "M_acorn"
+# specie = "M_acorn"
+index = 42
 alpha = 0.5
 
 probabilities = propagation_volume(g, alpha = alpha)
@@ -42,10 +42,18 @@ probabilities = propagation_volume(g, alpha = alpha)
 # cc.to_csv("FOT_" + str(alpha) + ".csv")
 
 
-# r = computation(specie, mesh, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora, P)
-r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
+# START TEST
+table_species_corpora.insert(2, "weights", probabilities.FOT.iloc[:, index].tolist())
+cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
+data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+p = float(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["P"])
+r = computation(index, data, p, seq = 0.0001)
+print(r)
+# END TEST
 
-print(r2)
+# r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
+
+
 
 # plt.plot(prior_test.x, prior_test.f)
 # plt.show()

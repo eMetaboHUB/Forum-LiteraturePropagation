@@ -224,8 +224,15 @@ def observation_uninformative_prior(k, n, seq):
 
     return res
 
-def estimate_prior_distribution_glm(mesh_corpora):
+def estimate_prior_distribution_mesh(mesh_corpora):
     
+    r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
+    
+    if not mesh_corpora:
+        print("Use uninformative prior")
+        result = r(1, 1)
+        return result
+    print("Use prior from model")
     # Model parameters: 
     mu_intercept = -14.2634974
     mu_factor = 0.8363094
@@ -240,9 +247,10 @@ def estimate_prior_distribution_glm(mesh_corpora):
     alpha = mu/sigma
     beta = (1 - mu)/sigma
 
-    return alpha, beta
+    result = r(alpha, beta)
+    return result
 
-def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior = 1.0, beta_prior = 1.0):
+def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
     Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
@@ -252,8 +260,8 @@ def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior = 1.0, beta_
         cooc (list): A list of integer values representing co-occurences between species in the graph and a particular MeSH descriptor  
         corpora (list):  A list of integer values representing copus sizes related to each compounds in the graph
         seq (float): the step used in np.arange to create the x vector of probabilities.
-        alpha_prior(float, optional): the alpha parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S), default to 1 for uninformative prior.
-        beta_prior: the beta parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S), default to 1 for uninformative prior.
+        alpha_prior (float): the alpha parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S). Default to 1 for uninformative prior.
+        beta_prior (float): the beta parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S). Default to 1 for uninformative prior.
 
     Returns:
         [collection]: A collection with:
@@ -344,6 +352,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ### Computations ###
 ####################
 
+
 def plot_distributions(uninformative, prior_mix, posterior_mix):
     plt.plot(uninformative.x, uninformative.f, label = "Posterior with uninformative prior")
     plt.plot(prior_mix.x, prior_mix.f, label = "prior mix")
@@ -360,7 +369,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
 def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
     
     # Out
-    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC"])
+    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
 
     weights = data["weights"].tolist()
     del weights[index]
@@ -386,16 +395,13 @@ def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
             del corpora[rmv]
     # Uninformative
     obs = observation_uninformative_prior(k, n, seq)
+
     # Prior mix:
-    if not MeSH_corpora:
-        # Use uninformative prior
-        print("Use Uninformative prior")
-        prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq)
-    else:
-        # Use prior from model
-        print("Use prior from model")
-        alpha_prior, beta_prior = estimate_prior_distribution_glm(MeSH_corpora)
-        prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior = alpha_prior, beta_prior = beta_prior)
+    prior_mesh = estimate_prior_distribution_mesh(MeSH_corpora)
+    # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
+    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, prior_mesh.alpha, prior_mesh.beta)
+    # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
+    prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [prior_mesh.alpha], [prior_mesh.beta])/compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta))
     
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq)
@@ -405,7 +411,7 @@ def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
     Log2numFC = np.log2(posterior_mix.mu/p)
     # plot_distributions(obs, prior_mix, posterior_mix)
 
-    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC)
+    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)
     
     return resultat
 

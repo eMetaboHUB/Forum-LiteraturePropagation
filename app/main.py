@@ -43,15 +43,17 @@ probabilities = propagation_volume(g, alpha = alpha)
 
 
 # START TEST
-table_species_corpora.insert(2, "weights", probabilities.FOT.iloc[:, index].tolist())
-cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
-data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
-p = float(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["P"])
-r = computation(index, data, p, seq = 0.0001)
-print(r)
+# table_species_corpora.insert(2, "weights", probabilities.FOT.iloc[:, index].tolist())
+# cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
+# data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+# p = float(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["P"])
+# MeSH_corpora = int(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["TOTAL_PMID_MESH"])
+# print(MeSH_corpora)
+# r = computation(index, data, p, MeSH_corpora = MeSH_corpora, seq = 0.0001)
+# print(r)
 # END TEST
 
-# r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
+r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
 
 
 

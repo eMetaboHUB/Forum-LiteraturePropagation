@@ -224,7 +224,28 @@ def observation_uninformative_prior(k, n, seq):
 
     return res
 
-def create_prior_beta_mix(weights, cooc , corpora, seq):
+def estimate_prior_distribution_glm(mesh_corpora):
+    
+    # Model parameters: 
+    mu_intercept = -14.2634974
+    mu_factor = 0.8363094
+    sigma_intercept = -13.1256575
+    sigma_factor = 0.7598162
+    
+    # Compute estimates:
+    mu = sc.expit(mu_intercept + mu_factor * np.log(mesh_corpora))
+    sigma = np.exp(sigma_intercept + sigma_factor * np.log(mesh_corpora))
+
+    # Return parameters:
+    alpha = mu/sigma
+    beta = (1 - mu)/sigma
+
+    print(alpha)
+    print(beta)
+
+    return alpha, beta
+
+def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior = 1.0, beta_prior = 1.0):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
     Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
@@ -234,6 +255,8 @@ def create_prior_beta_mix(weights, cooc , corpora, seq):
         cooc (list): A list of integer values representing co-occurences between species in the graph and a particular MeSH descriptor  
         corpora (list):  A list of integer values representing copus sizes related to each compounds in the graph
         seq (float): the step used in np.arange to create the x vector of probabilities.
+        alpha_prior(float, optional): the alpha parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S), default to 1 for uninformative prior.
+        beta_prior: the beta parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S), default to 1 for uninformative prior.
 
     Returns:
         [collection]: A collection with:
@@ -249,8 +272,8 @@ def create_prior_beta_mix(weights, cooc , corpora, seq):
     l = len(weights)
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
-    alpha = [(cooc[it] + 1) for it in range(0, l)]
-    beta = [(corpora[it] - cooc[it] + 1) for it in range(0, l)]
+    alpha = [(cooc[it] + alpha_prior) for it in range(0, l)]
+    beta = [(corpora[it] - cooc[it] + beta_prior) for it in range(0, l)]
 
     f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
     # Create Beta mix:
@@ -337,7 +360,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, seq = 0.0001):
+def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
     
     # Out
     r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC"])
@@ -367,8 +390,18 @@ def computation(index, data, p, seq = 0.0001):
     # Uninformative
     obs = observation_uninformative_prior(k, n, seq)
     # Prior mix:
-    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq)
-
+    if not MeSH_corpora:
+        # Use uninformative prior
+        print("Use Uninformative prior")
+        prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq)
+    else:
+        # Use prior from model
+        print("Use prior from model")
+        alpha_prior, beta_prior = estimate_prior_distribution_glm(MeSH_corpora)
+        prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior = alpha_prior, beta_prior = beta_prior)
+    
+    # print(prior_mix.alpha)
+    # print(prior_mix.beta)
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq)
 
@@ -390,6 +423,7 @@ def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
         cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
         # Get data
         data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
+        MeSH_corpora = int(table_mesh[table_mesh["MESH"] == mesh]["TOTAL_PMID_MESH"])
         #TODO remove
         if data["COOC"][index] > 0:
             continue
@@ -398,7 +432,7 @@ def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
         testFC = np.dot(data[data["TOTAL_PMID_SPECIE"] != 0]["weights"], ((data[data["TOTAL_PMID_SPECIE"] != 0]["COOC"]/data[data["TOTAL_PMID_SPECIE"] != 0]["TOTAL_PMID_SPECIE"])/p))
         #TODO remove, peut être que l'on peut garder le test du Log2FC aussi
         if testFC != 0 and np.log2(testFC) > 1 :
-            r = computation(index, data, p, seq = 0.0001)
+            r = computation(index, data, p, MeSH_corpora = MeSH_corpora, seq = 0.0001)
             if r.CDF <= 0.05:
                 print("==============" + mesh + "==============")
                 print(data)

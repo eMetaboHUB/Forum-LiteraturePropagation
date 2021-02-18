@@ -240,9 +240,6 @@ def estimate_prior_distribution_glm(mesh_corpora):
     alpha = mu/sigma
     beta = (1 - mu)/sigma
 
-    print(alpha)
-    print(beta)
-
     return alpha, beta
 
 def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior = 1.0, beta_prior = 1.0):
@@ -371,7 +368,7 @@ def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
     k = cooc.pop(index)
     corpora = data["TOTAL_PMID_SPECIE"].tolist()
     n = corpora.pop(index)
-    
+
     # Check for other null weights, in cas of low alpha (damping) for instance
     if 0 in weights:
         labels = data["SPECIE"]
@@ -379,7 +376,7 @@ def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
         for it in range(0, len(weights)):
             # Check if weights == 0
             if not weights[it]:
-                print("Warning: weight at index " + str(it) + " is null: " + labels[it] + " Low damping factor used ?")
+                # print("Warning: weight at index " + str(it) + " is null: " + labels[it] + " Low damping factor used ?")
                 to_remove.append(it)
         
         # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
@@ -400,12 +397,11 @@ def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
         alpha_prior, beta_prior = estimate_prior_distribution_glm(MeSH_corpora)
         prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior = alpha_prior, beta_prior = beta_prior)
     
-    # print(prior_mix.alpha)
-    # print(prior_mix.beta)
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq)
 
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
+
     Log2numFC = np.log2(posterior_mix.mu/p)
     # plot_distributions(obs, prior_mix, posterior_mix)
 

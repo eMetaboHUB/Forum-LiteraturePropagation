@@ -229,10 +229,8 @@ def estimate_prior_distribution_mesh(mesh_corpora):
     r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
     
     if not mesh_corpora:
-        print("Use uninformative prior")
         result = r(1, 1)
         return result
-    print("Use prior from model")
     # Model parameters: 
     mu_intercept = -14.2634974
     mu_factor = 0.8363094
@@ -366,7 +364,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001):
     
     # Out
     r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
@@ -396,23 +394,19 @@ def computation(index, data, p, MeSH_corpora = None, seq = 0.0001):
     # Uninformative
     obs = observation_uninformative_prior(k, n, seq)
 
-    # Prior mix:
-    prior_mesh = estimate_prior_distribution_mesh(MeSH_corpora)
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
-    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, prior_mesh.alpha, prior_mesh.beta)
+    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
-    prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [prior_mesh.alpha], [prior_mesh.beta])/compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta))
+    prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta))
     
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq)
-
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
 
     Log2numFC = np.log2(posterior_mix.mu/p)
     # plot_distributions(obs, prior_mix, posterior_mix)
-
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)
-    
+
     return resultat
 
 
@@ -425,17 +419,16 @@ def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
         cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
         # Get data
         data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
-        MeSH_corpora = int(table_mesh[table_mesh["MESH"] == mesh]["TOTAL_PMID_MESH"])
-        #TODO remove
+        MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
         if data["COOC"][index] > 0:
             continue
-        p = float(table_mesh[table_mesh["MESH"] == mesh]["P"])
+        p = float(MeSH_info["P"])
         # Test of interest (mean raw Log2FC neighboors > 1):
         testFC = np.dot(data[data["TOTAL_PMID_SPECIE"] != 0]["weights"], ((data[data["TOTAL_PMID_SPECIE"] != 0]["COOC"]/data[data["TOTAL_PMID_SPECIE"] != 0]["TOTAL_PMID_SPECIE"])/p))
         #TODO remove, peut être que l'on peut garder le test du Log2FC aussi
         if testFC != 0 and np.log2(testFC) > 1 :
-            r = computation(index, data, p, MeSH_corpora = MeSH_corpora, seq = 0.0001)
-            if r.CDF <= 0.05:
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+            if r.CDF <= 0.001:
                 print("==============" + mesh + "==============")
                 print(data)
                 print(r)

@@ -27,11 +27,17 @@ print("> Import MeSH corpora sizes ... ", end = '')
 table_mesh_corpora = import_table(args.mesh_corpora_path)
 
 # Compute MeSH probabilities
-table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_PMID_MESH"]/N 
+table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_PMID_MESH"]/N
+
+# Compute prior parameters:
+mesh_priors = table_mesh_corpora["TOTAL_PMID_MESH"].apply(estimate_prior_distribution_mesh)
+mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
+table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
+
 print("Ok")
 
 
-mesh = "D022124"
+mesh = "D000138"
 # specie = "M_acorn"
 index = 42
 alpha = 0
@@ -47,9 +53,9 @@ if False:
     table_species_corpora.insert(2, "weights", probabilities.FOT.iloc[:, index].tolist())
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
-    p = float(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["P"])
-    MeSH_corpora = int(table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]["TOTAL_PMID_MESH"])
-    r = computation(index, data, p, MeSH_corpora = MeSH_corpora, seq = 0.0001)
+    MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
+    p = float(MeSH_info["P"])
+    r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
     print(r)
 # END TEST
 

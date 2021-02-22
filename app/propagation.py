@@ -412,24 +412,34 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001):
 
 def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
     
+    # Create result Dataframe from MeSH list
+    mesh_list = table_mesh["MESH"].tolist()
+    indexes = range(0, len(mesh_list))
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
+
+    # Prepare data table
     table_corpora.insert(2, "weights", matrix_proba.iloc[:, index].tolist())
     
-    for mesh in (table_mesh["MESH"].tolist()):
+    for i in indexes:
+        mesh = mesh_list[i]
         # Get cooc vector. It only contains species that have at least one article, need to left join.
         cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
         # Get data
         data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
         MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
-        if data["COOC"][index] > 0:
-            continue
         p = float(MeSH_info["P"])
-        # Test of interest (mean raw Log2FC neighboors > 1):
-        testFC = np.dot(data[data["TOTAL_PMID_SPECIE"] != 0]["weights"], ((data[data["TOTAL_PMID_SPECIE"] != 0]["COOC"]/data[data["TOTAL_PMID_SPECIE"] != 0]["TOTAL_PMID_SPECIE"])/p))
-        #TODO remove, peut être que l'on peut garder le test du Log2FC aussi
-        if testFC != 0 and np.log2(testFC) > 1 :
-            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
-            if r.CDF <= 0.001:
-                print("==============" + mesh + "==============")
-                print(data)
-                print(r)
+        r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+        df_.loc[i] = r
+    
+    df_.insert(0, "MESH", mesh_list)
+    return(df_)
         
+
+# if data["COOC"][index] > 0:
+# Test of interest (mean raw Log2FC neighboors > 1):
+# testFC = np.dot(data[data["TOTAL_PMID_SPECIE"] != 0]["weights"], ((data[data["TOTAL_PMID_SPECIE"] != 0]["COOC"]/data[data["TOTAL_PMID_SPECIE"] != 0]["TOTAL_PMID_SPECIE"])/p))
+# if testFC != 0 and np.log2(testFC) > 1 :
+# if r.CDF <= 0.001:
+
+
+

@@ -33,7 +33,7 @@ table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_PMID_MESH"]/N
 mesh_priors = table_mesh_corpora["TOTAL_PMID_MESH"].apply(estimate_prior_distribution_mesh)
 mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
 table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
-
+# table_mesh_corpora = table_mesh_corpora.head(100)
 print("Ok")
 
 
@@ -61,7 +61,7 @@ if False:
 
 if True:
     r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
-
+    r2.to_csv("test.csv", index = False)
 
 
 # plt.plot(prior_test.x, prior_test.f)

@@ -672,7 +672,7 @@ On pourrait imaginer poser un prior non-informatif, mais ce serait sur-estimé l
 
 Néanmoins, on peut observer une hypothèse assez simple: Plus un MeSH possède un fort corpus, plus les probabilités $p(m|s)$ qui lui sont associées auront tendance a être élevé. En effet, si mon MeSH est annotés sur 100000 articles il très peu probable que ces articles soient distribués de manièrement individuelle sur 100000 composés, mais plutôt que certains composés auront de très forte probabilité de les observer et aussi que de manière générale les composés auront plus de chance de discutter de ce MeSH que d'un autre MeSh plus rare. Pour visualiser cela on peut par exemple regarder l'évolution des proba $p(m|s)$ par rapport à la taille du corpus des MeSH $m$: 
 
-![Évolution des proba p(m|s) par rapport à la taille de corpus des MeSH m](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/plot_proba_vs_corpus_mesh.png)
+![Évolution des proba p(m|s) par rapport à la taille de corpus des MeSH m](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/Fig/plot_proba_vs_corpus_mesh.png)
 
 Comme on peut le voir il semble y avoir une dépendance linéaire par rapport au log de la taille du corpus. Cette hypothèse est assez vraisemblable, plus mon MeSH est annoté dans un grand nombre d'article, plus la probabilité d'en discutter quand je parle d'un composé est élevé.
 

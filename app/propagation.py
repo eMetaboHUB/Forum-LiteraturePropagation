@@ -197,7 +197,7 @@ def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
 ####################
 
 
-def observation_uninformative_prior(k, n, seq):
+def observation_uninformative_prior(k, n, seq, sampling = True):
     """This function is used to build the posterior distribution using just an uninformative prior Beta(1,1)
 
     Args:
@@ -215,12 +215,15 @@ def observation_uninformative_prior(k, n, seq):
     """
     # Posterior using unformative prior:
     r = collections.namedtuple("uninformativeprior", ["alpha", "beta", "x", "f", "mu"])
-    x = np.arange(0, 1 + seq, seq).tolist()
+    x = None
+    y = None
+
     # Get distribution using uniformative prior: Beta(1,1)
     alpha = k + 1
     beta = (n - k) + 1
-    y = ss.beta.pdf(x, a = alpha, b = beta)
-
+    if sampling:
+        x = np.arange(0, 1 + seq, seq).tolist()
+        y = ss.beta.pdf(x, a = alpha, b = beta)
     # Get mean of the distribution (Bayes estimator of p)
     mu = (k + 1)/(n + 2)
 
@@ -252,7 +255,7 @@ def estimate_prior_distribution_mesh(mesh_corpora):
     result = r(alpha, beta)
     return result
 
-def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior):
+def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior, sampling = True):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
     Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
@@ -275,16 +278,20 @@ def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior)
     """
     # Get parameters
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f", "mu"])
-    x = np.arange(0, 1 + seq, seq).tolist()
+    x = None
+    y = None
+
     l = len(weights)
 
     # Get beta component paremeters for each compounds, using a posterior with uniformative prior
     alpha = [(cooc[it] + alpha_prior) for it in range(0, l)]
     beta = [(corpora[it] - cooc[it] + beta_prior) for it in range(0, l)]
 
-    f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
-    # Create Beta mix:
-    y = np.dot(weights, f_i)
+    if sampling:
+        x = np.arange(0, 1 + seq, seq).tolist()
+        f_i = [ss.beta.pdf(x, a = alpha[it], b = beta[it]) for it in range(0, l)]
+        # Create Beta mix:
+        y = np.dot(weights, f_i)
 
     # Get mean
     mu_i = [(alpha[it]/(alpha[it] + beta[it])) for it in range(0, l)]
@@ -296,7 +303,7 @@ def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior)
     
 
 
-def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, use_log = True):
+def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, use_log = True, sampling = True):
     """This function is used to compute the posterior mixture distribution. The prior mixture model is updated for the observation of the coocurences on the targeted specie
 
     Args:
@@ -318,7 +325,8 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
     """
     r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu"])
     l = len(weights_pior)
-    x = np.arange(0, 1 + seq, seq).tolist()
+    x = None
+    y = None
 
     # Get posterior parameters
     alpha_post = [(alpha_prior[it] + k) for it in range(0, l)]
@@ -334,11 +342,12 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
         C = [sc.beta(alpha_post[it], beta_post[it])/sc.beta(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
         W = [(weights_pior[it] * C[it]/(np.dot(weights_pior, C))) for it in range(0, l)]
 
-    # Create posterior distribution by componennts
-    f_post_i = [ss.beta.pdf(x, a = alpha_post[it], b = beta_post[it]) for it in range(0, l)]
-
-    # Get posteriors probabilities
-    y = np.dot(W, f_post_i)
+    if sampling:
+        x = np.arange(0, 1 + seq, seq).tolist()
+        # Create posterior distribution by componennts
+        f_post_i = [ss.beta.pdf(x, a = alpha_post[it], b = beta_post[it]) for it in range(0, l)]
+        # Get posteriors probabilities
+        y = np.dot(W, f_post_i)
 
     # Get mean
     mu_i = [(alpha_post[it]/(alpha_post[it] + beta_post[it])) for it in range(0, l)]
@@ -396,15 +405,15 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
             del cooc[rmv]
             del corpora[rmv]
     # Uninformative
-    obs = observation_uninformative_prior(k, n, seq)
+    obs = observation_uninformative_prior(k, n, seq, sampling = plot)
 
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
-    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior)
+    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
     prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta))
     
     # Posterior mix:
-    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq)
+    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
 
     Log2numFC = np.log2(posterior_mix.mu/p)
@@ -419,6 +428,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
 
 def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
     
+    print("Treat index: " + str(index))
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
@@ -428,6 +438,7 @@ def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
     table_corpora.insert(2, "weights", matrix_proba.iloc[:, index].tolist())
     
     for i in indexes:
+        print(str(i) + "/" + str(len(indexes)))
         mesh = mesh_list[i]
         # Get cooc vector. It only contains species that have at least one article, need to left join.
         cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]

@@ -364,7 +364,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001):
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False):
     
     # Out
     r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
@@ -404,7 +404,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001):
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
 
     Log2numFC = np.log2(posterior_mix.mu/p)
-    # plot_distributions(obs, prior_mix, posterior_mix)
+    
+    if plot: 
+        plot_distributions(obs, prior_mix, posterior_mix)
+    
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)
 
     return resultat

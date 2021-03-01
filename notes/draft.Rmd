@@ -663,7 +663,7 @@ Notre modèle de mélange se décompose en plusieurs étapes:
 
 On étudie une association entre une specie $s$ et un MeSH $m$
 
-**L'hypothèse de base: On suppose que tous les composés discuttent de tous les MeSH ! On fait ainsi l'hypothèse que toutes probabilité ** $p(m|s) > 0$**. Récipriquement, la probabilité qu'un composé (ou specie) ne discutte pas d'un MeSH est nulle, un composé discutte de tous les MeSH. Néanmoins ces probabilités peuvent être extrêment faibles pour certains MeSH, on en discutte jamais et très grande pour d'autres: dès que je parle de mon composé j'ai de grande chance de parler également de mon mesh. On suppose ainsi que toutes les fois où l'on observe une coocurence à 0 entre un composé et un MeSH, c'est simplement car on a pas assez d'échantillons d'articles pour représente notre composé. On imagine que si je piochais 1 millions de nouveaux articles discuttant de mon composé, je verrai enfin une coocurence avec mon MeSH. Elle sera très très rare et non significative, mais sa probabilité sera > 0**
+**L'hypothèse de base: On suppose que tous les composés discuttent de tous les MeSH ! On fait ainsi l'hypothèse que toutes probabilité ** $p(m|s) > 0$**, c'est à dire pour tout composé, la probabilité qu'un de ces articles mentionnent n'importe quel MeSH est strictement postive. Récipriquement, on dit que la probabilité qu'un article parlant d'un composé, ne metionne JAMAIS un terme MeSH quelconque est nulle. Néanmoins ces probabilités peuvent être extrêment faibles pour certains MeSH, on en discutte jamais et très grande pour d'autres: dès que je parle de mon composé j'ai de grande chance de parler également de mon mesh. On suppose ainsi que toutes les fois où l'on observe une coocurence à 0 entre un composé et un MeSH, c'est simplement car on a pas assez d'échantillons d'articles pour représente notre composé. On imagine que si je piochais 1 millions de nouveaux articles discuttant de mon composé, je verrai enfin une coocurence avec mon MeSH. Elle sera très très rare et non significative, mais sa probabilité sera > 0**
 
 Étape 1: Poser une distribution à priori pour les MeSH :
 
@@ -733,6 +733,11 @@ $\iff  p(Y_i = y_i) = \binom{n}{y_i}  \frac{B(\alpha_i + y_i, \beta_i + (n - y_i
 
 On modélise ainsi les comptages de succès $Y_i$ par rapport à $\alpha_i$ et $\beta_i$. Grâce à $\alpha_i$ et $\beta_i$, on va pouvoir estimé la probabilité attendu $\hat{p_i}$, à partir de laquelle on pourra alors déterminer le nombre de succès attendu $E[Y]$ avec $n \hat{p_i}$
 
+**Attention:** On ne pourrait **pas** utiliser les probabilité calculées pour essayer de poser une distribution Beta dessus. En effet :
+- Nos observations sont discrêtes ce sont des comptages
+- La distribution Beta est une variables continue, OR, créer des probabilité à partir de nos observations (discrètes) ne rend pas notre variables continue pour autant !! En effet, j'aurait toujours un certain set déterminé de valeurs possible que peuvent prendre mes probabilités, elle ne sont pas continues, ce sera toujours discret. Je pourrais par exemple calculer la proba que P(p = 1/2) si j'ai observer x fois le nombre de cooc égal à la moitié de mon corpus. Or ceci est impossible pour une variable continue. 
+
+Ainsi, il faut  
 
 
 Lorsque l'on pose notre modèle, on va effectué une reparamétrisation de la distribution beta, en terme de moyenne $\mu$ et de sur-dispersion (la variabilité derrière $p$) $\sigma$. On pose alors $\mu$, la probabilité moyenne de succès, $\mu = \frac{\alpha}{\alpha + \beta}$ et $\sigma = \frac{1}{\alpha + \beta}$. On peut donc re-paramétrer notre $Beta$ pour un MeSH $i$ tel que $p_i \sim Beta(\frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$. Même si cela semble compliqué les choses, en fait lorsque l'on veut poser des prior ou autre c'est plus facile de réfléchir en terme de probabilité moyenne et dispersion qu'en terme de $\alpha$ et de $\beta$. Donc par défaut on transforme nos paramètres avant de les mettre dans le modèle.
@@ -744,6 +749,11 @@ Dès lors, $p_i$ étant une variable aléatoire, ce n'est plus $p_i$ que l'on ch
 
 
 Donc comme on l'a vue précédemment on voit qu'il semble que notre probabilié $p_i$ soit linéairement reliée à la taille du corpus du MeSH étudié, que l'on va noter $M_i$. Aussi, même si ça ne se voit pas très bien sur la Figure la variabilité semble également être linéairement relié à la taille du corpus MeSH. Vu que c'est en échelle log, là où la variabilité du nuage de points nous semble constante en réalité elle augmente !
+
+Ainsi, on souhaite modéliser les **2** paramètres de notre distribution en fonction de la variable explicative. Pour cela, on va devoir utilisé des méthodes de style VGAM ou GAMLSS. Dans les modèle de glm 'classique', on ne peut pas estimer $\sigma$ en fonction d'une variable, seul la moyenne $\mu$ peut être fonction des variables. Les modèles de types GAMLSS ou VGAM permettent de relaxer cette restriction. C'est pour cela que l'on va utiliser GAMLSS.
+
+(https://stats.stackexchange.com/questions/312434/how-can-gamlss-relax-the-glm-exponential-family-assumption)
+
 Si on bin, on le voit bien :  
 
 ```{r}
@@ -856,6 +866,41 @@ On peut également regarder les résidus par index :
 ![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_by_index.png)
 
 pareil, on observe rien de particulier.
+
+
+Pour la qualitée de fit du modèle :
+
+On peut voir avec les histogrammes ou accentuer les différences en regardant à l'échelle log:
+Pour les données observée, on a réalisé une représentation des distribution de proba par bins :
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/data_disribution_by_bin.png)
+
+Pour les données prédites, on a réalisé un échantillonage en fonction de la moyenne des taille de MeSH par bin et on a refait cette distribution :
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/predictions_disribution_by_bin.png)
+
+
+On peut comparer les deux: 
+
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/comparison_disribution_by_bin.png)
+
+
+Plusieurs choses à noter :
+- Pour toutes nos distribution prédites on a $\alpha$ < 1 ce qui signifie que notre distribution n'a pas une courbe en cloche, possède une densité infinue en 0.
+En fait, il se trouve que c'est la distribution qui fit le mieux nos données. Ce sont notamment les données significative, généralement des fortes probabilité, qui forment la longue tail de la distribution des porba observées tendant vers 1. On a une distribution qui suivrait presque une loi de puissance en quelque sorte. Pour notre fit beta, la distribution qui correspond le mieux a ces données là est une distribution avec $\alpha$ < 1. Exemple de la tail :
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/dist_full_data/Dist_MeSH_450000_550000.png)
+
+La distribution qui fit le mieux cette distribution semble devoir adopté une densité infinie en 0. On peut atteindre une courbe en cloche si jamais on supprime toutes ces données significatives mais ce ne sont **pas** des fausses données, ces observations font vraiment partie de notre distribution il faut donc les conservées.
+
+Voilà pourquoi sur nos distribution on observe une tail vers de faibles valeurs de $p$, c'est car la densité tend vers l'infini à mesure que $p$ se rapproce de 0. Cet effet est fort pour de faible valeur de taille de corpus comme on peut le constater, et assez faible, tend même à une courbe en cloche pour les fortes valeurs de taille de corpus. Le fait que cet effet soit d'autant plus important avec la taille de corpus ne contredit pas notre hypothèse, où on s'attend effectivement que les vrais probabilités soient plus faible que celle que l'on a observéees.
+
+Deplus nos distributions semblent légèrement décalées vers la droites par rapport aux distribution observées. Ceci en aussi du aux valeurs de probabilité très fortes qui vont avoir un fort *leverage*, c'est à dire qu'elle vont faire levier pour tirer la courbe vers elle et ainsi rapprocher leur fitted-value de leur vrai valeur pour ces points. Ce sont ainsi des points qui ont une forte influence potentielle sur la slope de la courbe, et qui vont avoir tendance à tirer la distribution vers le haut. Néanmoins comme précedement, ce sont de vrais observations donc il faut les prendre en compte. C'est donc ces points qui font que notre distribution tend vers la droite par rapport à la distribution observée, ils tirent la courbe vers eux. Cependant, même si nos distribution tendent plus vers des valeurs élevées, du à notre tail, la moyenne est cependant toujours plus faible dans nos prédictions (Cf. ggridges) 
+Mais globalement pour notre prior c'est pas trop mal on arrive tout de même à représenter la tendance qu'il y a sur les probabiltiés. 
+
+En utilisant le package VGAM, on a calculé les hat-values correspondantes pour visualiser le leverage :
+
+
 
 
 J'ai aussi fait des graphs pour représenter les distributions observées et prédites à différentes taille de corpus. (Cf dist_dull_data)

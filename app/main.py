@@ -40,7 +40,7 @@ print("Ok")
 mesh = "D000138"
 # specie = "M_acorn"
 index = 42
-alpha = 0
+alpha = 0.2
 
 probabilities = propagation_volume(g, alpha = alpha)
 
@@ -55,13 +55,13 @@ if False:
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
     MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
     p = float(MeSH_info["P"])
-    r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+    r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
     print(r)
 # END TEST
 
 if True:
     r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
-    r2.to_csv("test.csv", index = False)
+    r2.to_csv("test3.csv", index = False)
 
 
 # plt.plot(prior_test.x, prior_test.f)

@@ -40,12 +40,12 @@ print("Ok")
 mesh = "D000138"
 # specie = "M_acorn"
 index = 42
-alpha = 0.2
+alpha = 0.8
 
 probabilities = propagation_volume(g, alpha = alpha)
 
-# cc = (100 * probabilities.FOT).round(3)
-# cc.to_csv("FOT_" + str(alpha) + ".csv")
+cc = (100 * probabilities.FOT).round(3)
+cc.to_csv("FOT_" + str(alpha) + ".csv")
 
 
 # START TEST
@@ -59,7 +59,7 @@ if False:
     print(r)
 # END TEST
 
-if True:
+if False:
     r2 = specie_mesh(42, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
     r2.to_csv("test3.csv", index = False)
 

@@ -16,7 +16,7 @@ np.set_printoptions(suppress=True)
 ###### Utils ######
 ###################
 
-def import_metabolic_network(path, undirected = True, format = "gml"):
+def import_metabolic_network(path, undirected = True, format = "gml", largest_comp = True):
     """This function is used to import an metabolic network, by default as undirected
 
     Args:
@@ -40,7 +40,11 @@ def import_metabolic_network(path, undirected = True, format = "gml"):
     print("> Number of vertices: " + str(g.vcount()))
     print("> Number of edges: " + str(g.ecount()))
     if undirected:
+        print("> Used as undirected")
         g.to_undirected()
+    if largest_comp:
+        print("> Extract largest component")
+        g = g.clusters().giant()
     return g
 
 def import_table(path):
@@ -139,7 +143,7 @@ def compute_PR(A, i, alpha, epsilon = 1e-9):
     # Float are basically imprecise and so after several matrix multiplications, the sum of probabilities in the vector may not equal to 1, but 0.9999999999999999 or 1.0000000000000001 for example. 
     if np.sum(r, axis = 0, dtype = np.float16) != 1:
         print("Warning at index " + str(i) + ": the final probability vector does not sum to 1. This may be due to float approximation errors")
-    
+
     return r
 
 def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):

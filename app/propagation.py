@@ -136,7 +136,7 @@ def compute_PR(A, i, alpha, epsilon = 1e-9):
         pi = new_pi
         new_pi = M @ pi
         c += 1
-    print(str(c) + " iterations to convergence.")
+    # print(str(c) + " iterations to convergence.")
 
     # Insert 0 at targeted index
     r = np.insert(new_pi, i, 0, axis = 0)
@@ -410,7 +410,13 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
-    prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta))
+    prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
+    # If prior mix CDF is already estimated to 0, set log2FC to infinite
+    if not prior_mix_CDF:
+        print("Warning: prior mix CDF is estimated to 0. The value of the CDF ratio between MeSH prior and prior mix is set to Inf.")
+        prior_cdf_ratios = np.Inf
+    else:
+        prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/prior_mix_CDF)
     
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)

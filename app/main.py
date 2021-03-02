@@ -37,19 +37,44 @@ table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
 print("Ok")
 
 
-mesh = "D022124"
-# specie = "M_acorn"
-index = 1115
-alpha = 0.1
+mesh = "D001847"
+specie = "M_25hvitd3"
+# index = 1115
+alpha = 0
 
 probabilities = propagation_volume(g, alpha = alpha)
 
 # cc = (100 * probabilities.FOT).round(3)
 # cc.to_csv("FOT_" + str(alpha) + ".csv")
 
+if True:
+    validation_set = pd.read_csv("data/validation_set_associations.csv")
+    # add results columns
+    validation_set = pd.concat([validation_set, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
+    # Iter over associations
+    for i in range(0, len(validation_set.index)):
+        # get row info
+        specie = str(validation_set.iloc[[i], 0].item())
+        mesh = str(validation_set.iloc[[i], 1].item())
+        index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
+        # Create association table
+        # Prepare data
+        table_species_corpora["weights"] = probabilities.FOT.iloc[:, index].tolist()
+        cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
+        data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+        # Forget data
+        data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+        # Launch analysis
+        MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
+        p = float(MeSH_info["P"])
+        r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
+        # fill with results
+        validation_set.iloc[i, 2:6] = list(r)
+    validation_set.to_csv("data/validation_out.csv", index = False)
 
 # START TEST
-if True:
+if False:
+    index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
     table_species_corpora.insert(2, "weights", probabilities.FOT.iloc[:, index].tolist())
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)

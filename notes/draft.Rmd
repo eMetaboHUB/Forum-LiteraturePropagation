@@ -900,8 +900,13 @@ Mais globalement pour notre prior c'est pas trop mal on arrive tout de même à 
 
 En utilisant le package VGAM, on a calculé les hat-values correspondantes pour visualiser le leverage :
 
+Exemple pour mu
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/Fig/mu_hat_values.png)
 
 
+Comme on peut le voir, les valeur de hat values pour $\mu$ les plus élevé se situe pour les point aux extrême de la taille de corpus avec les proba les plus hautes. Même si on supprimait ces points pour le fit, les autres points dans cette direction prennent le relais et on a toujours cet effet de leverage. Si on supprime carrément tout les point au dela de 100.000 de taille de corpus par exemple c'est sur ces éléments que l'on aura un décalage à la fin. Après cela peut être une solution mais c'est difficile de justifier que l'on sort ces données pour le fit ...
+
+**A tester lorsque l'on aura une méthode de validation pour la precision/recall des données -> tester le modèle qui permet d'obtenir les meilleurs résultats 
 
 J'ai aussi fait des graphs pour représenter les distributions observées et prédites à différentes taille de corpus. (Cf dist_dull_data)
 

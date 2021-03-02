@@ -1,0 +1,947 @@
+---
+title: "Draft"
+author: "Delmas Maxime"
+date: "20/01/2021"
+output: html_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(ggplot2)
+library(tidyverse)
+library(DT)
+```
+
+## La distribution Beta 
+
+Pour la loi Beta, la densité de probabilité est définie lorsque $\alpha, \beta > 0$ et $x \in [0,1]$ par: $$f(x; \alpha, \beta) = \frac{x^{\alpha - 1}(1 - x)^{\beta - 1}}{B(\alpha, \beta)}$$
+
+$B(\alpha, \beta)$ est la constante de normalisation pour que la probabilité totale soit 1, ainsi $B(\alpha, \beta) = \int_{0}^{1} u^{\alpha - 1} (1 - u)^{\beta - 1} du$. 
+
+One note ainsi $X \sim Beta(\alpha, \beta)$
+
+La loi beta est donc très pratique lorsqu'il s'agit de modéliser des probabilités puisqu'elle est définit entre $[0,1]$
+
+## La binomiale 
+
+La loi binomiale est notamment utilisé pour représenter la probabilité d'observer un nombre $k$ de succès sur une série de $n$ tentatives.
+$X \sim Bin(n,p)$
+$P(X = k) = \binom{n}{k} p^k (1 - p)^{n - k}$
+
+## Lien entre la beta et la loi binomiale
+
+Comme on peut le constater, le numérateur de la loi Beta est similaire à ce que l'on peut retrouver dans la loi Binomiale: $x^{\alpha - 1}(1 - x)^{\beta - 1}$ ressemble à $p^k (1 - p)^{n - k}$.
+Si on considère que $x$ dans la loi beta est l'équivelent de $p$ dans la loi binomiale, en considérant aussi que $\alpha - 1$ est le nombre de succès $k$ et $\beta - 1$ le nombre d'échec $n - k$, les deux tendent à représenter la probabilité d'observer $k$ succès sur $n$ tentatives. Bien sur les deux ne représentent pas exactement la même chose, mais l'inuition est là.
+
+De même, dans le calcul de $P(X = k)$, c'est la partie $p^k (1 - p)^{n - k}$ qui est véritavblement essentielle, $\binom{n}{k}$ étant simplement une constante lorsqu'on observe une expérience.
+
+La moyenne d'une variable suivant une loi beta est $E[X] = \frac{\alpha}{\alpha + \beta}$. Toujours en imaginant que $\alpha$ et $\beta$ représente respectivement le nombre de succès et d'échec, l'espérance d'une variable suivant une $Beta$ peut s'interpréter comme la moyenne de succès. Une autre manière de voir la fonction Beta est aussi en reparamétrant la fonction avec les paramètres $\mu$ et $\sigma$ tel que: $\mu = \frac{\alpha}{\alpha + \beta}$ et $\sigma = \frac{1}{\alpha + \beta}$. Ainsi, $\alpha$, le nombre de succès vaut $\frac{\mu}{\sigma}$ et $\beta$ le nombre d'échec vaut  $\frac{(1 - \mu)}{\sigma}$.
+
+On peut retrouver dans la literature une autre manière, simplement $\sigma = (\alpha + \beta)$, et donc $\alpha = \mu \sigma$ et $\beta = (1 - \mu) \sigma$
+
+L'idée avec cette re-paramétrisation c'est que $\mu$ représente la probabilié moyenne de succès (l'espérance moyenne de succès) et $\sigma$ est appelé le paramètre de surdispersion, qui va nous permettre de gérer la variabilité, l'incertitude, que l'on a autour de cette moyenne. En constatant que $\sigma$ est directement fonction de $\alpha + \beta$, on voit que l'on exprime notre variabilité autour de cette moyenne en fonction du nombre d'expériences totales réalisées : nb.succès + nb.échecs. Plus le nombre d'expériences est élevé, plus la variabilité est faible. 
+
+## Petit exemples
+
+Si je sais que ma *vrai* probabilité $p = 0.2$, et que je fais $n = 100$ tentatives, la moyenne de mes comptages observée sera donc $np$ soit ici 20. 
+Mais cependant, je ne vais pas toujours observée 20 ! Certaines fois j'aurais de la chance et je vais observée 25 succès et d'autres fois peut être moins de chance et observer seulement 15 succès. Ainsi, si avec ces comptages j'essaye de re-estimé ma probabilité, je sais que je ne vais pas toujours dire que $p = 0.2$, je l'estimerait certaines fois un peu plus haute car j'aurais eu de la chance sur mon tirage et certaines fois un peu plus faible. 
+
+On fait donc l'expérience, on réalise 10000 fois l'expérience binomiale avec $p = 0.2$ et $n = 100$. 
+A partir du nombre de succès observé, on ré-estime la probabilité $p$
+On regarde ensuite la distribution de ces probabilité et on y superpose la densité d'une loi Beta. On sait notamment que la probabilité moyenne obervé, sera 0.2.
+
+Comme on peut le constater, la loi Beta(20,80) définit parfaitement la distribution de mon paramètre $p$.
+
+```{r bintest1}
+x <- rbinom(10000, 100, 0.2)/100
+ggplot(data.frame(x = x), aes(x = x)) + 
+  theme_classic() +
+  geom_histogram(aes(y = ..density..), binwidth = 0.01, color="black", fill="white") +
+  stat_function(fun = dbeta, args = list(shape1 = 20, shape2 = 80), aes(colour = "Beta(20,80)"))
+```
+
+
+Mais dans cet exemple, j'ai créer mes comptages en connaissant à l'avance mon paramètre $p$. Or dans 'la vraie vie', c'est l'inverse, on observe des données et on veut en déduire le paramètre p.
+
+## Les estimateurs
+
+### Estimateurs du Maximum de Vraisemblance (MLE)
+
+La manière classique d'estimé notre paramètre $p$, est d'utilisé l'estimateur du maximum de vraisemblance (**MLE**), avec $p = \frac{k}{n}$
+
+Proof: 
+On a observé $k$ succès et $n$ échec, on cherche la valeur de $p$ qui maximise la vraisemblance. 
+
+La fonction de vraisemblance de la loi binomiale étant $L(k; n, p) = \binom{n}{k} p^k (1 - p)^{n - k}$, on cherche donc $p$ tel qu'il maximise la probabilité d'observer $k$ succès parmis $n$ tirages:
+
+$$\hat{p}_{MLE} = \underset{p}{\operatorname{argmax}} L(k; n, p)$$
+$\hat{p}_{MLE} = \underset{p}{\operatorname{argmax}} \binom{n}{k} p^k (1 - p)^{n - k}$
+
+On va étudier la log-vraisemblance qui sera plus pratique pour dérivé:
+
+$\hat{p}_{MLE} = \underset{p}{\operatorname{argmax}} \ln{\binom{n}{k}} + \ln{p^k} + \ln{(1 - p)^{n - k}}$
+
+Pour trouver le maximum, par rapport à $p$, il suffit de regarder lorsque que la dérivé s'annule par rapport à $p$:
+
+$\frac{d \ln L(k; n, p)}{dp} = 0$
+
+$k \frac{1}{p} - \frac{1}{(1 - p)} (n - k) = 0$
+
+On multiplie tout par $p(1 - p)$ pour simplifier :
+
+$k \frac{p(1 - p)}{p} - \frac{p(1 - p)}{(1 - p)} (n - k) = 0$
+
+$k (1 - p) - p(n - k) = 0$
+
+$k - pk - pn + pk = 0$
+
+$k - pn = 0$
+
+$p = \frac{k}{n}$
+
+On voit retrouve bien l'estimateur MLE !
+
+L'estimateur du maximum de vraisemblance est donc une valeur fixé, calculé en considérant le résultat observée de l'expérience. Ici, on considère les données comme étant un tirage aléatoire à partir de la population totale. L'incertitude sur cet estimateur peut être calculé à partir de l'erreur d'échantillonnage: Si je refaisait plein de fois l'expérience, qu'elle serait la variabilité que j'observerai sur mon paramètre $\hat{p}_{MLE}$ ?
+Intuitivement, on peut voir que plus la taille de mon échantillon $n$ est grand, plus je m'attend à ce que mon paramètre estimé soit proche de la vraie valeur de se paramètre dans la population.
+
+
+### Bayesian estimator
+
+L'estimateur Bayesien est une autre façon de voir les choses. On va considérer que le paramètre que l'on cherche à estimer $\hat{\theta}$ est une variable aléatoire, et on cherche à étudier la distribution de ce paramètre au vue des données observées. On définit un prior sur la distribution de ce paramètre, c'est à dire une idée de sa distribution sans avoir vue les données. Ensuite, à partir des données, on va mettre à jour notre prior en utilisant la fonction de vraisemblance des données par rapport à notre paramètre. Ce que l'on appelle l'estimateur Bayesien de notre paramètre est alors simplement la moyenne de la distribution **à posteriori** de notre paramètre:
+
+$\hat{\theta} = E[\theta|x] = \int \theta p(\theta|x) d\theta$
+ 
+Ce qu'on cherche c'est donc notre distribution à posteriori $p(\theta|x)$. C'est là que rentre en compte le théorême de Bayes, où :
+
+ $p(\theta|x) = \frac{p(x|\theta)p(\theta)}{\int p(x|\theta)p(\theta) d \theta}$
+
+Ici $p(\theta)$ est notre prior, il représente la distribution de $\theta$ a priori, sans connaissance des données. 
+
+$p(x|\theta)$ représente alors la vraisemblance, la proabilité d'observer nos données $x$ sachant le paramètre $\theta$. Au dénominateur, on a l'intégrale sur toutes les valeurs de $\theta$ afin d'obtenir une densité de probabilité (on 'normalise').
+
+Dans le cas de notre expérience binomiale, on connait notre fonction de vraissemblance, c'est: $L(k; n, p) = P(X = k) = \binom{n}{k} p^k (1 - p)^{n - k}$ c'est la probabilité d'observer $k$ succès sur $n$ tentatives avec un certain paramètre $p$
+
+Une propriété importante est celle des prior conjugués: 
+Dans la théorie bayésienne des probabilités, si la distribution postérieure $p(\theta|x)$ est de la même famille de distribution de probabilités que la distribution à priori $p(\theta)$, les distributions **a priori** et **postérieure** sont alors appelées **distributions conjuguées**, et la distribution **a priori** est appelée le **prior conjugué** pour la fonction de vraisemblance $p(x | \theta)$.
+
+Dans le cas de la distribution binomiale, le prior conjugué est la loi Beta ! Ainsi en posant un prior suivant une distribution $Beta$ et en calculant la vraisemblance avec une binomiale, la distribution de porbabilité postérieure suit une loi $Beta$
+
+
+Ainsi pour le paramètre $p$ de notre binomiale, on a : $p(p = x|k, n) = \frac{p(k|p = x, n) p(p = x)}{\int p(k|p = y, n) p(p = y) dy}$, avec  :
+
+$p(k|p = x, n) =  \binom{n}{k} x^k (1 - x)^{n - k}$
+
+$p(p = x) = \frac{x^{\alpha - 1}(1 - x)^{\beta - 1}}{B(\alpha, \beta)}$
+
+Schématiquement cela représente $p(\theta = x| data) = \frac{p(data | \theta = x) p(\theta = x)}{p(data)}$
+
+Étant un prior conjugué, le résultat est : $p(p = x|k, n) = \frac{p(k|p = x, n) p(p = x)}{\int p(k|p = y, n) p(p = y) dy} = \frac{x^{k + \alpha - 1}(1 - x)^{(n - k) + \beta - 1}}{B(k + \alpha, (n - k) + \beta)}$ 
+
+Où la distribution beta étant un prior conjugué de la binomiale, on retrouve une distribtion a posteriori $Beta$ de paramètre $Beta(k + \alpha, (n - k) + \beta)$
+
+On peut donc dire que: $p(p = x|k, n, \alpha, \beta) \sim Beta(k + \alpha, (n - k) + \beta)$
+
+Voir https://en.wikipedia.org/wiki/Conjugate_prior pour les details
+
+Connaissance notre distribution à posteriori et sachant que notre estimateur Bayesien est simplement l'espérance de cette distribution, dans le cas d'une binomiale, notre estimateur est donc simpelment l'espérance de la distribution Beta à posteriori :
+$$\hat{p}_{Bayes} = E[p|k,n] = \frac{\alpha + k}{\alpha + \beta + n}$$
+
+En effet $\frac{\alpha + k}{\alpha + \beta + n}$ étant l'espérance d'une distribution $Beta(k + \alpha, (n - k) + \beta)$$
+
+### Lien avec l'estimateur MLE
+
+Comme on peut le voir, $\hat{p}_{Bayes} = \frac{\alpha + k}{\alpha + \beta + n}$ et  $\hat{p}_{MLE} = \frac{k}{n}$, on peut constater qu'en réalité ces deux estimateur sont très proches ! En effet, lorsque le nombre de tentative $n$ va augmenter, les paramètre du prior $\alpha$ et $\beta$ n'auront plus trop d'influence sur l'espérance calculée. Ex: si $\alpha = \beta = 1$ et $k = 100$ et $n = 1000$: 
+
+$\frac{1 + 100}{1 + 1 + 1000} \approx \frac{100}{1000}$
+
+Ainsi nos deux estimateur tendent vers la même chose !!
+
+Une autre propriété qui est très intéressante, est lorsque l'on utilise une loi uniforme comme prior. Pour définir une loi Uniforme avec une Beta, c'est très simple c'est simplement $Beta(1,1)$. Comme on va le voir, en utilisant un prior uniforme, le **MAP** (Maximum a posteriori probability), soit la valeur de notre paramètre la plus probable à posteriori, correspond à l'estimateur MLE ! Attention, on parle du MAP, pas de la moyenne de la distribution car l'estimateur bayesien est différent du MLE. Néanmoins, dans notre distribution à posteriori, la valeur la plus probable est l'estimateur du MLE:
+
+$\hat{\theta}_{MAP} = \underset{\theta}{\operatorname{argmax}} p(\theta|x)$, soit le $\theta$ qui maximise les proba à posteriori.
+
+$$\hat{\theta}_{MAP} = \underset{\theta}{\operatorname{argmax}} p(\theta|x) = \underset{\theta}{\operatorname{argmax}} \frac{p(x|\theta)p(\theta)}{\int p(x|\theta)p(\theta) d \theta} = \underset{\theta}{\operatorname{argmax}} p(x|\theta)p(\theta)$$
+
+En effet, le dénominateur dans l'équation du posteriori est seulement un facteur de normalisation, mais il n'influe pas sur le maximum.
+Deplus, la distribution $Beta(1,1)$ étant complètement uniforme, le facteur $p(\theta)$ est également complètement inutile car il vaut toujours $1$. 
+
+```{r bintest2}
+p = seq(0,1, length=100)
+plot(p, dbeta(p, 1, 1), ylab="density", type ="l", col=4)
+```
+
+Ainsi on se retrouve avec 
+$$\hat{\theta}_{MAP} = \underset{\theta}{\operatorname{argmax}} p(x|\theta)$$
+
+Or $p(x|\theta)$ c'est ma fonction de vraisemblance, donc dans le cas de la loi binomiale, on a que $\hat{\theta}_{MAP} = \underset{\theta}{\operatorname{argmax}} L(k; n, p)$ ce qui est exactement la définition de mon estimateur du maximum de vraisemblance **MLE**
+
+## Improper priors
+
+Comme on le voit en utilisant une distribution Uniforme (ex $Beta(1,1)$), le MAP de la distribution à posteriori correspond au MLE. Mais il y a d'autres propriété intéressantes. 
+On appelle improper prior une distribution à priori qui n'intègre pas à 1. Dans notre exemple, tout va bien $Beta(1,1)$ intègre bien à 1, c'est d'ailleurs simplement un carré de 1 de coté si on simplifie. Mais d'autres distributions comme beta(0,0), ou, plus simplement dans le cas d'une loi normale, si on imagine un prior qui définis une probabilité équivalente pour toutes les valeurs de $\mu$, ceci n'intègre pas à 1 ...
+
+Mais normalement ce n'est pas vraiment un problème. Comme on peut le voir dans la règle de Bayes, en fait, la likehood ($p(x|\theta)$) est pondéré par le prior ($p(\theta)$), c'est un poids. La fonction de likehood, quant à elle, n'est généralement pas positive pour dans tout l'espace, elle atteint un maximum pour une certaine valeur et tend vers 0 lors que l'on s'éloigne de cette valeur. Ainsi en réalité même si on multiplie par le prior, l'intégrale au dénominateur est finie car la likehood tendra vers 0 pour des valeurs éloignés de $\theta$. Ainsi, même si le prior n'est pas une vrai distribution, on va quand même faire une pondération entre de numérateur à certain $\theta$ et le dénominateur. Ainsi même en utilisant un prior improper, la distribution à posteriori peut être une bonne distribution.
+
+### Using Beta(1,1)
+
+Lorsque l'on utilise la $Beta(1,1)$, en plus que le MAP soit équivalent au MLE, il y a une autre propriété: Notre distribution a posteriori est proportionnelle à la vraisemblance.
+
+En effet, si on a $p(p = x|k, n) = \frac{p(k|p = x, n) p(p = x)}{\int p(k|p = y, n) p(p = y) dy}$, avec notre prior $p(p = x)$ issue d'une $Beta(1,1)$, c 'est donc que pour tout $x \in [0,1]$, $p(x) = 1$. Ainsi ce facteur est complètement annecdotique dans notre évaluation de la propriété à posteriori, qui équivaut donc à : 
+
+$$p(p = x|k, n) = \frac{p(k|p = x, n)}{\int p(k|p = y, n) dy}$$ 
+
+On voit bien que notre distribtion à posteriori est donc complètelement proportionnelle à la vraisemblance $p(k|p = x, n)$. Lorsque l'on utilise un prior non-informatif ($Beta(1,1)$), la distribution à posteriori est uniquement influé par les données, donc la vraisemblance, car notre prior ne donne aucune indication particulière ! Ainsi en choisissant un prior non-informatif on utilise uniquement l'information des données et notre distribution à postériori suit la distribution de notre vraisemblance !
+
+
+
+## En conclusion: 
+
+- L'estimateur Bayesien de mon paramètre $p$ est $\hat{p}_{Bayes} = \frac{\alpha + k}{\alpha + \beta + n}$. Il s'agit de la moyenne de la distribution à posteriori de $p$, soit $E[p|k,n]$ obtenu en utilisant le prior conjugué $Beta(\alpha, \beta)$. Où d'après la règle de Bayes: 
+$$p(p = x|k, n) = \frac{p(k|p = x, n) p(p = x)}{\int p(k|p = y, n) p(p = y) dy}$$
+
+$p(k|p = x, n)$ étant ma fonction de vraisemblance (Likehood), la probabilité d'observée mon nombre de succès $k$ sachant que $p=x$ ($n$ étant fixé). Cela suit donc une binomiale et ainsi: $p(k|p = x, n) =\binom{n}{k} x^k (1 - x)^{n - k}$
+
+$p(p = x)$ est mon prior, c'est à dire la distribution que j'ai de $p$ sans avoir obervé de données. Il suit une distribution $Beta(\alpha, \beta)$ et donc $p(p = x) = \frac{x^{\alpha - 1}(1 - x)^{\beta - 1}}{B(\alpha, \beta)}$
+
+- L'estimateur du MLE et l'estimateur Bayesienne converge vers la même valeur à mesure que le nombre de tentative augmente -> Quand la taille des échantillons considéré augmente, on est naturellement plus précis sur le paramètre estimé et donc les deux tendent vers la même valeur.
+
+- En utilisant un prior non-informatif: La valeur la plus probable dans la distribution a posteriori (MAP) est équivalent à l'estimateur du MLE ! ET la distribution à posteriori est directement proportionnelle à la vraisemblance ! Ce sont nos données qui donne la distribution à posteriori sans aucune influence du prior.
+
+
+
+## Exemple des propriétés:
+
+On va reprendre l'idée du premier exemple, mais cette fois on va se placer dans une situation réelle. On observe nos données et on va chercher à estimer $p$
+
+- On observer $k = 20$ succès parmis $n = 100$ tentatives.
+Trouver $p$ en ulisant l'estimateur du maximum de vraisemblance, consiste à trouver $p$ tel qu'il maximise $P(X = 20) = \binom{100}{20} p^{20} (1 - p)^{100 - 20}$
+
+L'estimateur du maximum de vraisemblance est donc $\hat{p}_{MLE} = \frac{k}{n} = \frac{20}{100} = 0.2$
+
+En effet, si on cherche à ploter comment varie la vraisemblance ($P(X = 20)$) en fonction de p, voilà ce que l'on obtient :
+
+```{r bintest3}
+p.test <- seq(0,1,0.0001) 
+v.vrais <- dbinom(x = 20, size = 100, prob = p.test)
+max <- p.test[which(v.vrais == max(v.vrais))]
+surf.inf <- sum(v.vrais[0:(which(v.vrais == max(v.vrais)) - 1)])
+surf.sup <- sum(v.vrais[(which(v.vrais == max(v.vrais)) + 1):length(v.vrais)])
+ggplot(data.frame(proba = p.test, Likehood = v.vrais), aes(x = proba, y = Likehood)) +
+  geom_line() + 
+  theme_classic() + 
+  geom_vline(xintercept = max, 
+                color = "red", size=1) +
+  geom_point(data=data.frame(proba = max, Likehood = max(v.vrais)), 
+             aes(x=proba,y=Likehood), 
+             color='red',
+             size=3) +
+  geom_text(aes(x = max + 0.1, label=paste("MLE = ", max), y=0.11), colour="red")
+```
+Sur cette figure, on cherche le point avec la vraisemblance la plus élevé.Comme prédit par le MLE, on trouve $p = 0.2$, notre estimateur MLE désigne bien le *maximum* de vraisemblance
+
+Ce que l'on visualise ici c'est la vraisemblance par rapport au paramètre $p$. Attention, ce c'est pas une distribution de probabilité ! c'est simplement la vraisemblance ..
+
+Quelques petites remarques importante: On voit que la distribution de la vraisemblance atteint un maximum à $p = 0.2$, mais sa distribution n'est pas symétrique autour de cette valeur. Si on essaye d'estimer l'aire (en sommant les valeurs à gauche ou à droite de la ligne) à gauche du MLE, on à ~ `round(surf.inf, 2) ` et à droite on a `round(surf.sup, 2) `. 
+
+Si on utilise un estimateur Bayesien avec un prior uniforme, $beta(1,1)$, alors notre distribution à postériori srea proportionnelle à la vraisemblance, elle aura la même forme, la moyenne que l'on va estimer sera intuitivement légère supérieure au MLE observée du fait de la non-symétrie dans l'exemple.
+
+Pour pouvoir visualiser correctement notre esimtateur Bayesien, on va transformé le graph ci-dessus en un histograme. Pour se faire, pour chaque valeur de p, on va généré 1000 tirages aléatoires suivant une binomiale avec ce paramètre $p$ et $n = 100$. Ensuite on va construire l'histogramme de la distribution des probabilités $p$ lorsque le $k$ obtenu égal 20 pour visualisé leur distribution. On replot également une ligne vertical à 0.2
+
+```{r bintest4}
+v.p <- seq(0,1,0.001)
+data <- data.frame(X = c(), p = c())
+for(p in v.p){
+  sampling <- rbinom(n = 1000, size = 100, prob = p)
+  data <- rbind(data, data.frame(X = sampling, p = rep(p, 1000)))
+}
+data <- data %>% filter(X == 20)
+ggplot(data, aes(x = p)) + 
+  theme_classic() +
+  geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
+  xlim(0,1) +
+    geom_vline(xintercept = 0.2, 
+                color = "red", size=1)
+```
+
+
+On voit que cela suit la même allure que la distribution des vraisemblances construite précedement.
+
+Connaissant les propriétés évoqués précedemment, on sait qu'en utilisant un prior non-informatif $B(1,1)$, notre distribution à posteriori sera proportionnelle à la vraisemblance, et, son MAP sera équivalent au MLE. 
+Sachant que $k = 20$ et $n = 80$, en utilisant un prior $B(1,1)$, on sait que notre distribution de $p$ à posteriori:
+
+$p(p = x|k, n, \alpha, \beta) \sim Beta(k + \alpha, (n - k) + \beta)$
+
+et donc
+
+$p(p = x|20, 100, 1, 1) \sim Beta(20 + 1, (100 - 20) + 1)$
+
+$$p(p = x|data) \sim Beta(21, 81)$$
+Donc on refait le même plot en superposant :
+
+```{r bintest5}
+ggplot(data, aes(x = p)) + 
+  theme_classic() +
+  geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
+  xlim(0,1) +
+  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(colour = "Beta(21,81)"), size=1)
+```
+
+Comme on peut le voir notre distribution $Beta(21,81)$ fit parfaitement la distribution de nos probabilité $p$ lorsque $k = 20$, correspondant à la distribution de la vraisemblance par rapport à $p$. 
+
+Notre distribution à posteriori est bien proportionnelle à la vraisemblance, elle a la même allure. Elle est en quelque sorte sa version normalisée, nous donnant une distribution de probabilité.
+
+Si on cherche le MAP associé, que l'on peut trouver en calculant le mode associé à cette distribution $Beta$, on obtient que:
+
+$MAP = \frac{\alpha - 1}{\alpha + \beta - 2} = \frac{21 - 1}{21 + 81 - 2} = \frac{20}{100} = 0.2$
+
+Ce qui correpond effectivement à notre MLE !
+
+On peut donc calculer la valeur de notre estimateur bayesien: $\hat{p}_{Bayes} = E[p|k, n, \alpha, \beta)]$, soit l'espérance de notre distribution à posteriori
+
+On calcule donc l'espérance de notre distribution $Beta(21,81)$
+
+$\hat{p}_{Bayes} = E[p|k, n, \alpha, \beta)] = \frac{21}{21 + 81} \approx 0.2059$
+
+
+Maintenant on va tout ploter en même temps :
+
+```{r bintest6}
+map = 0.2
+ggplot(data, aes(x = p)) + 
+  theme_classic() +
+  geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
+  xlim(0,1) +
+  geom_point(data=data.frame(proba = map, Likehood = dbeta(map,21,81)), 
+             aes(x=proba,y=Likehood), 
+             color='red',
+             size=3) +
+  annotate(geom = "text", x= map + 0.1, y = dbeta(map,21,81) + 0.1, label="MAP <-> MLE ") +
+  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(color = "Beta(21,81)"), size = 1) +
+  geom_vline(aes(xintercept = map, 
+                color = "MLE"), size = 0.5) + 
+  geom_vline(aes(xintercept = (21/(21+81)), 
+                color = "BAYES"), size = 0.5) +
+  scale_color_manual(name = "Estimators", values = c(MLE = "red", BAYES = "green", "Beta(21,81)" = "blue"))
+
+```
+
+
+Comme attendu, l'estimateur Bayesien est légèrement supérieur à l'estimateur MLE. Cela est notamment due au fait qu'avec l'estimateur Bayesien on estime l'espérance de la distribution, où comme on l'a vue, celle ci n'est pas symétrique. L'intégrale est plus grande à droite du MAP qu'a gauche, ainsi, on voit que la moyenne estimé va être légère supérieure au MAP avec l'estimateur bayesien. Néanmoins c'est un bon estimateur de la moyenne de la distribution observée, puisque effectivement si on cherche à calculer la moyenne derrière cet histogramme on obtient `r mean(data$p)` ce qui est proche du $\hat{p}_{Bayes} \approx 0.2059$
+
+
+Aussi, on a évoqué que cette différence disparaissait à mesure que le nombre de tentatives observées augmente.
+Si on refait le même calcul est prenant en compte dix fois plus d'observations, voilà ce que l'on obtient:
+
+```{r bintest7}
+v.p <- seq(0,1,0.001)
+data <- data.frame(X = c(), p = c())
+for(p in v.p){
+  sampling <- rbinom(n = 1000, size = 1000, prob = p)
+  data <- rbind(data, data.frame(X = sampling, p = rep(p, 1000)))
+}
+data <- data %>% filter(X == 200)
+map = 0.2
+ggplot(data, aes(x = p)) + 
+  theme_classic() +
+  geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
+  xlim(0,1) +
+  geom_point(data=data.frame(proba = map, Likehood = dbeta(map,201,801)), 
+             aes(x=proba,y=Likehood), 
+             color='red',
+             size=3) +
+  annotate(geom = "text", x= map + 0.1, y = dbeta(map,201,801) + 0.1, label="MAP <-> MLE ") +
+  stat_function(fun = dbeta, args = list(shape1 = 201, shape2 = 801), aes(color = "Beta(201,801)"), size = 1) +
+  geom_vline(aes(xintercept = map, 
+                color = "MLE"), size = 0.5) + 
+  geom_vline(aes(xintercept = (201/(201+801)), 
+                color = "BAYES"), size = 0.5) +
+  scale_color_manual(name = "Estimators", values = c(MLE = "red", BAYES = "green", "Beta(201,801)" = "blue"))
+
+```
+
+On observe $k = 200$ succès pour $n = 1000$ tentatives
+
+L'estimateur MLE est toujours égal à 0.2: $\hat{p}_{Bayes} = 0.2$
+
+On utilise toujours un prior non-informatif $Beta(1,1)$, mais cette fois notre distribution posterireure suit donc une $Beta(201, 801)$
+
+Le MAP $\frac{201 - 1}{201 + 801 - 2} = \frac{200}{1000} = 0.2 = \hat{p}_{Bayes}$ est toujours équivalent au MLE
+
+Mon estimateur bayesien vaut désormais: $\frac{201}{201 + 801} \approx 0.2006$ ce qui se rapporche beaucoup donc du MLE. Comme vue précédemment, à mesure que $k$ et $n$ sont grand, notre prior définit par notre $Beta(\alpha, \beta)$ devient de plus en plus négligeable, on beaucoup croire les données !
+
+
+
+## Les modèles de mélanges :
+
+La fonction de densité de proababilité d'un modèle de mélange peut être définis tel que: $f(x; \theta_{1}, \theta_{2}, ..., \theta_{n}) = \sum_i k_{i}f(x; \theta_i)$ avec $\sum_i k_i = 1$
+
+-  Les poids $k_i$ représente la proportion de chaque distribution dans la distribution totale
+
+Dans un modèle de mélange, c'est comme si chaque $x$ avec une probabilité $k_i$ d'être tiré depuis la ième distribution $f_i$, et dans chaque distribution $f_i$, la proabilité d'observer $x$ est donnée par $f(x, \theta_i)$
+
+
+Si on étudie un modèle de mélange de distibution Beta, on a donc $$f(x; \alpha_1, \beta_1, \alpha_2, \beta_2, ..., \alpha_n, \beta_n = \sum_{i}^{n} k_i f(x; \alpha_i, \beta_i)$$
+
+Calculer les probabilité à posteriori sur un modèle de mélange Beta est assez similaire au cas classique. C'est  assez rapide à calculer notamment grâce au fait que la loi Beta est le prior conjugué de la binomiale !
+
+Dans le cas classique on utilisait la règle de Bayes avec :
+
+$p(p = x|k, n) = \frac{p(k|p = x, n) p(p = x)}{\int p(k|p = y, n) p(p = y) dy}$
+
+$n$ étant fixé, on pourrait même le retiré du "sachant que"
+
+Maintenant on va utiliser une écriture plus rigoureuse et définir les $p(...)$ avec les fonction de densité $f$, plus correcte pour écrire des modèles de mélange. On reformule donc notre règle de bayes en : $f_{post}(p|k, n) = \frac{f_{bin}(k|p, n) f_{prior}(p)}{\int f_{bin}(k|p, n) f_{prior}(p) dp}$
+
+$f_{bin}(k|p, n)$ étant notre fonctione likehood
+
+Ainsi, la seule différence par rapport à ce qui a été présenté précédemment, est que $f_{prior}(p)$ est maintenant une distribution formée d'un mélange de $Beta$.
+
+$f_{prior}(p;  \alpha_1, \beta_1, \alpha_2, \beta_2, ..., \alpha_n, \beta_n) = \sum_{i}^{n} k_i f(p; \alpha_i, \beta_i)$
+
+On a donc que : 
+
+$$f_{post}(p|k, n) = \frac{f_{bin}(k|p, n) f_{prior}(p)}{\int_{0}^{1} f_{bin}(k|p, n) f_{prior}(p) dp}$$
+$$f_{post}(p|k, n) = \frac{\sum_{i}^{n} k_i f_{bin}(k|p, n) f(p; \alpha_i, \beta_i)}{\int_{0}^{1} \sum_{i}^{n} k_i  f_{bin}(k|p, n) f(p; \alpha_i, \beta_i) dp}$$
+On va noter $C_i = \int_{0}^{1} f_{bin}(k|p, n) f(p; \alpha_i, \beta_i) dp$
+
+On va utiliser $C_i$ pour simplifier l'expression. Au dénominateur, on remarque que l'on fait l'intégrale d'une somme. Grâce à la *sum rule*, on sait que l'intégrale d'une somme, c'est la somme des intégrales, donc va va pouvoir simplifier en utilisant $C_j$, le $k_j$ pouvant sortir de l'expression car c'est une constante. Pour le dénominateur on a donc que $\int_{0}^{1} \sum_{i}^{n} k_i  f_{bin}(k|p, n) f(p; \alpha_i, \beta_i)(p) dp  = \sum_{i}^{n} k _i \int_{0}^{1} f_{bin}(k|p, n) f(p; \alpha_i, \beta_i) dp = \sum_{i}^{n} k _i C_i$
+
+$$f_{post}(p|k, n) = \frac{\sum_{i}^{n} k_i f_{bin}(k|p, n) f(p; \alpha_i, \beta_i)}{\sum_{i}^{n} k _i C_i}$$
+On voit qu'au numérator on a une somme de $f_{bin}(k|p, n) f(p; \alpha_i, \beta_i)$ pondérés par les $k_i$. Or c'est exactement le numérator des probabilités à postériori indépendament pour chaque $i$. Ainsi, si on divise par $C_i$, on va obtenir $\frac{f_{bin}(k|p, n) f(p; \alpha_i, \beta_i)}{\int_{0}^{1} f_{bin}(k|p, n) f(p; \alpha_i, \beta_i) dp}$, ce qui est notre probabilité à posteriori pour la compodante $i$ ! Vue que la $Beta$ est un prior conjugué de la binomiale, on sait que cette distribution est très facile a calculé, on va donc faire apparaitre à nouveau des $C_i$ pour pouvoir simpliquer notre expression avec les probabilité à posteriori de chaque composante $i$ :
+$$f_{post}(p|k, n) = \frac{\sum_{i}^{n} (k_i f_{bin}(k|p, n) f(p; \alpha_i, \beta_i) C_i)/C_i}{\sum_{i}^{n} k _i C_i}$$
+
+On peut donc simplifier en :
+
+$$f_{post}(p|k, n) = \frac{\sum_{i}^{n} k_i C_i f_i^{(0)}(p|k, n))}{\sum_{i}^{n} k _i C_i}$$
+On note ainsi $f_{i}^{(0)}(p|k, n)$ la distribution à posteriori de la ième composante, afin de la distinguer de la distribution à psoteriori globale du moldèle de mélange.
+
+
+Maintenant on va à nouveau simplifier l'écriture de cette expression afin de retrouver une expression qui ressemble à un modèle de mélange. On va poster $W_i = \frac{k_i C_i}{\sum_{i}^{n} k _i C_i}$ et on reformule :
+
+$$f_{post}(p|k, n) = \sum_{i}^{n} W_i f_i^{(0)}(p|k, n)$$
+On retrouve ainsi une expression dans laquelle la distribution à posteriori de notre modèle de mélange est une somme pondéré par des poids $W_i$ des distribution à posteriori de chacune des $i$ distribution formant ce mélange. Avec :
+
+$W_i = \frac{k_i C_i}{\sum_{i}^{n} k _i C_i}$, 
+
+$f_i^{(0)}(p|k, n) = \frac{f_{bin}(k|p, n) f(p; \alpha_i, \beta_i)}{C_i}$, 
+
+$C_i = \int_{0}^{1} f_{bin}(k|p, n) f(p; \alpha_i, \beta_i) dp$
+
+
+Alors, $f_i^{(0)}(p|k, n)$ étant simplement la distribution à posteriori pour la composante $i$, on sait que :
+
+$$f_i^{(0)}(p|k, n) = Beta(\alpha_i + k, \beta_i + (n - k))$$ 
+
+
+Ne reste plus qu'a déterminer $W_i$ !
+
+Pour simplifier $W_i$, le mieux est de commencer par simplifier $C_i$
+
+$C_i = \int_{0}^{1} f_{bin}(k|p, n) f(p; \alpha_i, \beta_i) dp$
+
+On peut aussi remarque que $C_i$ définit une distribution Beta binomiale ! $C_i = f_{BetaBin}(k; \alpha_i, \beta_i, n)$
+
+$C_i = \int_{0}^{1}  \binom{n}{k} p^k (1 - p)^{n - k} \times \frac{p^{\alpha_i - 1}(1 - p)^{\beta_i - 1}}{B(\alpha_i, \beta_i)} dp$
+
+$\iff C_i = \int_{0}^{1}  \binom{n}{k}  \frac{1}{B(\alpha_i, \beta_i)}  p^{k + \alpha_i - 1} (1 - p)^{n - k + \beta_i - 1}dp$
+
+On peut aussi sortir les constantes de l'intégrale 
+
+$C_i = \binom{n}{k}  \frac{1}{B(\alpha_i, \beta_i)} \int_{0}^{1} p^{k + \alpha_i - 1} (1 - p)^{n - k + \beta_i - 1}dp$
+
+La fonction bêta $B(x,y) = \int_{0}^{1} p^{x - 1} (1 - p)^{y - 1} dp$, on a donc :
+
+$C_i = \binom{n}{k}  \frac{1}{B(\alpha_i, \beta_i)} \times  B(k + \alpha_i, n - k + \beta_i)$
+
+$\iff  \binom{n}{k}  \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}$
+
+Alors pour savoir comment calculer ça, il faut retourner à l'équivalence numérique de la fonction bêta, avec : 
+
+$B(x,y) = \frac{(x + y)}{xy}\frac{x! y!}{(x + y)!}$, alors :
+
+$C_i = \binom{n}{k} \times \frac{k + \alpha_i + n - k + \beta_i}{(k + \alpha_i)(n - k + \beta_i)} \frac{(k + \alpha_i)! (n - k + \beta_i)!}{(k + \alpha_i + n - k + \beta_i)!} \times \frac{\alpha_i \beta_i}{(\alpha_i + \beta_i)}\frac{(\alpha_i + \beta_i)!}{\alpha_i ! \beta_i !}$
+
+Ce qu'il faut voir ici c'est que les factorielle au numérateur et au dénominateur dans les deux partie de l'expression vont se simplifier en utilisant les autres facteurs. Par exemple la partie $\frac{k + \alpha_i + n - k + \beta_i}{1} \frac{1}{(k + \alpha_i + n - k + \beta_i)!} $ va se simplifier car le dénominateur de la partie de gauche représente le premier élément de la factorielle, ce qui va donc donner la factorielle à une valeur en dessous, soit $\frac{k + \alpha_i + n - k + \beta_i}{1} \frac{1}{(k + \alpha_i + n - k + \beta_i)!} = (k + \alpha_i + n - k + \beta_i - 1)!$
+
+On a donc finalement : 
+$C_i = \binom{n}{k} \times \frac{k + \alpha_i + n - k + \beta_i}{(k + \alpha_i)(n - k + \beta_i)} \frac{(k + \alpha_i)! (n - k + \beta_i)!}{(k + \alpha_i + n - k + \beta_i)!} \times \frac{\alpha_i \beta_i}{(\alpha_i + \beta_i)} \frac{(\alpha_i + \beta_i)!}{\alpha_i ! \beta_i !} = \binom{n}{k} \frac{(k + \alpha_i - 1)! (n - k + \beta_i - 1)!}{(k + \alpha_i + n - k + \beta_i - 1)!} \times \frac{(\alpha_i + \beta_i - 1)!}{(\alpha_i - 1)! (\beta_i - 1)!}$
+
+$$C_i = \binom{n}{k}  \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)} = \binom{n}{k} \frac{(k + \alpha_i - 1)! (n - k + \beta_i - 1)!}{(k + \alpha_i + n - k + \beta_i - 1)!} \times \frac{(\alpha_i + \beta_i - 1)!}{(\alpha_i - 1)! (\beta_i - 1)!}$$
+
+
+L'expression $C_i = \binom{n}{k}  \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}$ est plus concise est facile à écrire. A voir si on peut le calculer directement avec des fonctions prédéfinis, sinon on connait donc la formule pour le déterminer à la main.
+
+On peut donc donner une expression générale de $W_i$: 
+
+$$W_i = \frac{k_i C_i}{\sum_{i}^{n} k _i C_i} = \frac{k_i \binom{n}{k}  \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}}{\sum_{i}^{n} k _i \binom{n}{k}  \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}} = \frac{\binom{n}{k} k_i \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}}{\binom{n}{k}  \sum_{i}^{n} k _i \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}} = \frac{k_i \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}}{\sum_{i}^{n} k _i \frac{B(k + \alpha_i, n - k + \beta_i)}{B(\alpha_i, \beta_i)}}$$
+
+En résumé :
+
+$$W_i = \frac{k_i B(k + \alpha_i, n - k + \beta_i) / B(\alpha_i, \beta_i)}{\sum_{i}^{n} k _i B(k + \alpha_i, n - k + \beta_i) / B(\alpha_i, \beta_i)}$$
+
+$$f_i^{(0)}(p|k, n) =  Beta(\alpha_i + k, \beta_i + (n - k))$$
+
+$$f_{post}(p|k, n) = \sum_{i}^{n} W_i f_i^{(0)}(p|k, n)$$
+
+Pour les propriétés associés aux modèles de mélange, tel que l'espérance et la variance, se référer à https://en.wikipedia.org/wiki/Mixture_distribution
+
+Par exemple dans un modèle de mélange de la forme $f(x; \theta_{1}, \theta_{2}, ..., \theta_{n}) = \sum_i k_{i}f(x; \theta_i)$
+
+$E[x] = \sum_{i}^{n} k_i \mu_i$, avec $\mu_i$ l'espérance de la ième composante $f(x; \theta_i)$ On fait donc ici simplement la moyenne des moyennes ! Dans le cas d'une distribution $Beta(\alpha, \beta)$, l'espérance étant simplement $\frac{\alpha}{\alpha + \beta}$, l'espérance d'un modèle de mélange est très rapide à calculer.
+
+
+
+On prend comme exemple un modèle de mélange initial : $f(p) = 0.5 f(p; 2,4) + 0.5 f(p; 4,2)$ qui constitue notre distribution à priori sur notre paramètre $p$
+
+Pour notre distribution on a donc une espérance de $p$, $E[p]_{prior} = 0.5\frac{2}{2+4} + 0.5 \frac{4}{4 + 2} = 0.5$
+
+Là dessus on réalise une observation, on observe  $k = 8$ succès sur $n = 10$ tentatives
+
+On plot cette distribution du prior:
+
+```{r}
+p <- seq(0, 1, 0.01)
+f <- 0.5 * dbeta(p, 2, 4) + 0.5 * dbeta(p, 4, 2)
+
+plot(dbeta(p, 2, 4), type = 'l', col = 'blue')
+lines(dbeta(p, 4, 2), col = 'green')
+lines(f, col = 'red')
+legend("topleft", legend=c("Beta(2,4)", "Beta(4,2)", "Mix"),
+       col=c("blue", "green", "red"), lty = 1:2, cex=0.8)
+```
+
+On va donc calculer les distrution à posteriori :
+
+$$W_i = \frac{k_i C_i}{\sum_{i}^{n} k _i C_i} = \frac{k_i B(k + \alpha_i, n - k + \beta_i) / B(\alpha_i, \beta_i)}{\sum_{i}^{n} k _i B(k + \alpha_i, n - k + \beta_i) / B(\alpha_i, \beta_i)}$$
+
+Donc 
+
+$W_1  = \frac{0.5\times B(8 + 2, 10 - 8 + 4)/Beta(2,4)}{0.5\times B(8 + 2, 10 - 8 + 4)/Beta(2,4) + 0.5\times B(8 + 4, 10 - 8 + 2)/Beta(4,2)}$
+
+$W_2 \frac{0.5\times B(8 + 4, 10 - 8 + 2)/Beta(4,2)}{0.5\times B(8 + 2, 10 - 8 + 4)/Beta(2,4) + 0.5\times B(8 + 4, 10 - 8 + 2)/Beta(4,2)}$
+
+$f_1^{(0)}(p|k, n) =  Beta(2 + 8, 4 + (10 - 8))$
+
+$f_2^{(0)}(p|k, n) =  Beta(4 + 8, 2 + (10 - 8))$
+
+
+On calcule :
+
+```{r, echo = TRUE}
+# On commence par calculer C1 et C2 se sera plus pratique :
+
+C.1 <- beta(8 + 2, 10 - 8 + 4)/beta(2,4)
+C.2 <- beta(8 + 4, 10 - 8 + 2)/beta(4,2)
+
+W.1 <- 0.5 * C.1/(0.5 * C.1 + 0.5 * C.2)
+W.2 <- 0.5 * C.2/(0.5 * C.1 + 0.5 * C.2)
+
+p <- seq(0, 1, 0.01)
+f.1 <- dbeta(p, 2 + 8, 4 + (10 - 8))
+f.2 <- dbeta(p, 4 + 8, 2 + (10 - 8))
+```
+
+On a W.1 = `r W.1` et W.2 = `r W.2`
+
+On plot :
+```{r}
+
+f.post <- W.1 * f.1 + W.2 * f.2
+
+plot(f.post, type = 'l', col = 'purple')
+lines(f, col = 'red')
+
+legend("topleft", legend=c("Mix.prior", "Mix.posterior"),
+       col=c("red", "purple"), lty = 1:2, cex=0.8)
+```
+
+
+
+
+## Précisions 
+Petites remarques sur le calcul des $W_i$: 
+On sait que $$W_i = \frac{k_i B(k + \alpha_i, n - k + \beta_i) / B(\alpha_i, \beta_i)}{\sum_{i}^{n} k _i B(k + \alpha_i, n - k + \beta_i) / B(\alpha_i, \beta_i)}$$
+
+Or, pour de grande valeur de $\alpha_i$ et $\beta_i$, ce qui est souvent le cas avec des composés, $B(\alpha_i, \beta_i)$ tend facilement vers 0. En effet la valeur devient tellement faible, que l'on ne peut pas la calculer précisément ...
+Cela entraine une division par 0 et les calculs sont faussés. 
+On propose ainsi de passer par le log pour pouvoir calculer complètement $W_i$. En effet, même si $C_i$ est donc difficile à calculer, on peut calculer $log(C_i)$ qui lui sera plus facilement calculable. Il suffit d'utiliser une fonction $logBeta(a,b)$. La fonction $Beta$ classique impliquant des factorielles et des puissances, en calculant le log, cela facilite grandement les calculs ! 
+Aussi, on sait que $W_i$ sera entre 0 et 1 et sera une propotion donc il sera relativement facile de retrouver sa valeur, et c'est donc à cette étape là qu'il faut repasser à l'échelle classique avec l'exponetiellee
+
+Ainsi on va dire que $W_i = exp(log(W_i))$ on cherche doc $log(W_i)$
+
+$log(W_i) = log(\frac{k_i C_i}{\sum_{i}^{n} k _i C_i}) = log(k_i C_i) - log(\sum_{i}^{n} k _i C_i)$
+
+Or $log(k_i C_i) = log(k_i) + log(C_i)$ avec $k_i$ étant une proba, il faut juste s'assure de ne pas considérer les éléments où $k_i = 0$, mais de toutes manière il n'influe pas la distribution, on peut les écarter sans soucis.
+
+Ensuites: $log(C_i) = Log(B(k + \alpha_i, n - k + \beta_i) / B(\alpha_i, \beta_i)) = log(B(k + \alpha_i, n - k + \beta_i)) - log( B(\alpha_i, \beta_i)) = LogBeta(k + \alpha_i, n - k + \beta_i)) - LogBeta(\alpha_i, \beta_i))$ En python on a par exemple utiliser la fonction scipy.special.betaln pour calculer la fonction LogBeta.
+
+L'utilisation du log nous permet de calculer des très faible valeurs ! C'est comme quand on utilise la LogVraisemblance au lieu de la vraisemblance classique car sinon le prosuit des proba sera trop faible et serait estimé à 0. En utilisant le log du produit des proba on arrive à l'estimer, nous c'est pareil !
+
+Une fois que l'on a calculer tout les $log(k_i C_i)$ il faut calculer leur somme pour ensuite normaliser et obtenir $W_i$, on cherche donc $log(\sum_{i}^{n} k _i C_i)$ Attention: Le log d'une somme n'est pas la somme des Log !!
+Heuresement il existe une technique pour calculer cela, en passant notamment par l'exponontielle à l'interieur de la somme :
+$log(\sum_{i}^{n} k _i C_i) = log(\sum_{i}^{n} exp(log(k_iC_i)))$. On connsait en effet $log(k_i C_i)$, et en utilisant par exemple la fonction scipy.special.logsumexp on va pouvoir calculer le log de la somme: $log(\sum_{i}^{n} k _i C_i)$ :)
+Ensuite on fait simplement $log(k_i C_i) - log(\sum_{i}^{n} k _i C_i)$
+
+Ensuite on a juste à repasser à l'exponentielle ! Étant une proportion, il est beaucoup plus facile de revenir à ce moment là
+
+
+
+
+Pour la CDF (Cumulative Distribution Function) c'est aussi très simple:
+
+Si $f(x; \theta_{1}, \theta_{2}, ..., \theta_{n}) = \sum_i k_{i}f(x; \theta_i)$ alors on cherche : $P(x \le z)$
+
+$P(x \le z) = \int_{0}^{z} f(x; \theta_{1}, \theta_{2}, ..., \theta_{n}) dx = \int_{0}^{z} \sum_i k_{i}f(x; \theta_i) dx$
+
+Or l'intégrale d'une somme étant la somme des intégrale et $k_i$ ne dépendant pas de $x$, on a :
+
+$$P(x \le z) = \sum_i k_{i} \int_{0}^{z}f(x; \theta_i) dx$$
+
+Ainsi, on pour obtenir la CDF d'une distribution de mélange , il suffit de combiner les CDF des composantes du modèles par rapport aux poids $k_i$, en gros: 
+
+$$P(x \le z) = \sum_i k_{i} P_{i}(x \le z)$$
+
+
+## Précisions (2)
+
+Dans notre cas on cherche à déterminer $f_{post}(p|k, n)$ doit la distribution du paramètre $p$ en fonction de nos données observée. Mais en réalité ces données sont observées sur un composé particulier, pour lequel on va disposer d'un prior spécifique de ce composé. Donc, si on voulait être complètement rijgoureux, il faudrait également préciser que l'on conditionne par rapport à la specie considéré $S_i$, on se place dans la condition particulière ou l'on étudie $S_i$. Heureusement Grâce au théroême des probabilité conditionnelle, ça ne change rien à la formule ! En effet, si on note $Q_i(p|k,n)$ la distribution de probabilité de $p$ par rapport à nos observations $k,n$ et conditionné par rapoort au fait que l'on observe la specie $S_i$, on a que :
+
+
+Pour simplifier l'écriture on dégage le $n$. En fait, même dans les formule du haut, je suis pas sur que pour faire propre il faille écrire le $n$ dans la formule... Car même si c'est un paramètre de la loi Binomiale, il est fixé et n'a pas de 'proba' derrière ... Car au final le vrai paramètre de la loi Binomiale c'est surtout $p$ Enfin bon c'est du détail ^^
+
+$Q_i(p|k) = \frac{Q_i(k|p)Q_i(p)}{Q_i(k)} = \frac{p(k|p \cap S_i) p(p| S_i)}{p(k|S_i)} = \frac{p(k|p \cap S_i) \frac{p(p \cap S_i)}{p(S_i)}}{p(k|S_i)} = \frac{p(k \cap p \cap S_i)/p(S_i)}{p(k|S_i)}$
+
+$p(k|S_i)$ est bien sur donc égal à $p(k|S_i) = \int p(k|p \cap S_i) p(p| S_i) dp$, masi on garde la forme comptacte pour simplifier !
+
+Donc $Q_i(p|k) = \frac{p(k \cap p \cap S_i)/p(S_i)}{p(k|S_i)} = \frac{p(k \cap p \cap S_i)/p(S_i)}{p(p \cap S_i)/p(S_i)} = \frac{p(k \cap p \cap S_i)}{p(p \cap S_i)} = p(p | k, S_i)$
+
+Et donc on retrouve bien que l'on cherche la distibution de $p$ par rapport aux comptages observée sachant qe l'on étudie $S_i$. Tout cela est garanti par le théorême des probabilités conditionnelles.
+
+
+
+
+## Donc en résumé notre approche :
+
+1- Déterminer les probas de transitions: On cherche à déterminer la proportion de marcheurs partant de l’ensemble des autres métabolites z, qui arrivent sur notre métabolites cible x. Pour la calculer, on chercher premièrement à déterminer pour chaque métabolites son PPR, sans considérer le métabolites en lui même. 
+Pour cela, on travaille, sur un réseau modifié, dans lequel le métabolite cible a été retiré. Le vecteur de restart de notre PPR va alors être composé des voisins directs de notre mlétabolites cible. De cette manière, a chaque restart, on va recommencer à partir de l'un des voisins de notre noeud cible, ce qui est comme si on était reparti de notre noeud cible et que l'on avait directement emprunté une transition vers l'un de ces voisins. L'important est que l'on ai une probabilié à 0 pour notre noeud cible car pour la suite on ne souhaite pas qu'il est d'influence sur notre prior.
+
+Donc on pose :
+
+$$M = \alpha P + (\alpha* a + (1 - \alpha) e)v^\intercal$$
+Tout les vecteurs sont des vecteurs colonnes.
+- $P$ est notre matrice de probabilité obtenue en ayant préalablement supprimé la colonnes et la ligne correspond à l'index de notre noeud cible
+- $\alpha$ est le damping factor: la probabilité de transité vers un voisin. $(1 - \alpha)$ est la probabilité de restart
+- $a$ est un vecteur colonne égal à 1 pour les noeuds puits (sink nodes)
+- $e$ est un vecteur colonne de $1$
+- $v$ est le vecteur colonne contenant les probabilité de restart conduisant aux voisins du noeud cible.
+
+
+En utilisant la méthode de la puissance itérée (pas besoin de sortir des algo shiny nos graph sont suffisament petit pour que la power method s'applique)
+
+Le vecteur de probabilité obtenu s'interprête comme étant la distribution stationnaire des probabilités liée à notre marche aléatoire. On peut interpréter ce vecteur comme la proportion du temps passé sur chaque composé $i$ en réalisant une marche partant (et recommençant avec un facteur $(1-\alpha)$) des voisins de notre noeud cible. Si on imagine un cas simpliste avec un vecteur final $(0,0,0,0.5,0.3,0.2)$, on peut également imaginer que si 100 marcheurs partaient des voisins de mon noeud cible, au cours de la marche aléatoire on verrait en moyenne 50 marcheuurs sur le noeud 4, 30 sur le noeud 5 et 20 sur le noeud 6.
+
+Ainsi pour chaque noeud ce vecteur me donne les probabilitées d'une marche aléatoire partant des voisins de ce noeud. De cette manière le noeud en lui même n'est jamais visité car il est préalablement supprimer du réseau et ainsi on ne passe jamais par le noeud cible au cours de notre marche aléatoire. On simule en quelque sorte que l'on transite directement de celui-ci vers un de ces voisins en utilisant le vecteurt de restart correspondant à ces voisins.
+
+On va donc utiliser ce vecteur pour calculer le vecteur des probabilités, des proportions, des marcheurs qui se trouve sur notre noeud cible au cours d'une marche aléatoire partant des autres noeuds du réseau. Dans le cas précédent, le noeud cible était l'émetteur de l'information et les autres noeuds les récepteurs: les marcheurs partaient de notre noeuds et se diffuser dans le réseau. Maintenant, on considère que tous les autres noeuds envoient des marcheurs dans le réseau, et on veut chercher à déterminer, parmis tous ceux qui arrivent sur notre noeud cible, qu'elle proportion est originaire du noeud A, du noeud B, etc .... Ici, ce sont les autres noeuds qui émettent l'information et le noeud cible qui capte l'info des autres noeuds ! C'est beaucoup plus dans la philosophie que l'on recherche, où on souhaite construire un prior à partir de l'information des voisins du noeuds. On veut donc que ce soit les autres noeuds qui "diffuse" leur info.
+
+Pour constuire ce nouveau vecteur de probabilité, on va simplement pondéré la probabilité, le temps passé, par l'ensemble des autres noeuds sur le noeud cible $x$. En convertissant mes proba et nombre de marcheurs, si je multiplie tout les vecteurs obtenus précédement par 100 par exemple: j'obtiens pour chacun, le nombre attendu de marcheurs qui, partant des voisins de leur noeud de départ, se trouve sur le noeud $x$. Par exemple, je pourrais observer que sur ce noeud $x$, on a 40 marcheurs qui proviennent du noeud A, 20 marcheurs du neoud B, 30 de C et 10 de D. Ainsi pour ce noeud je pourrais construire le vecteur $(0.4,0.2,0.3,0.1)$. Ainsi lorsqu'un marcheur se trouve sur mon noeud, il a 40% de chance d'être originaire du noeud A, 20% de chance d'être originaire du noeud B etc ...
+Quand on dispose de notre matrice des vecteur de PPR en colonne, il s'agit simplement de calculer les proportion des valeurs sur chaque ligne !
+C'est exactemement ce que l'on veut représenter pour, l'information a priori: on veut que l'information apporté par le noeud X au prior, soit proportionnelle à la proportion de l'information arrivé sur le noeud cible qui est originaire de X. 
+Comme précédement, sachant que mes proba sont à 0 pour le noeud en lui-même, dans le calcul de ce nouveau vecteur il ne compte toujours pas ! :)
+
+Cf. figure propagation
+
+Globalement les deux approches ont des résultats proches (SFT ou FOT) mais il semble que :
+SFT soit plus sensible à ces voisins “hub” c a d ces voisins qui ont une forte connectivité (le marcheur partant du noeud cible passe effectivement plus souvent par eux)
+FOT est plus sensible à ces voisins directe et pénalise les Hubs (les marcheurs partant des voisins directs passe souvent par le noeud cible et ceux partant des noeuds ont tendance à se perdre
+
+L'idée étant d'utiliser ce vecteur FOT de probabilité comme vecteur de pondération dans notre mélange de Beta.
+
+
+Notre modèle de mélange se décompose en plusieurs étapes: 
+
+On étudie une association entre une specie $s$ et un MeSH $m$
+
+**L'hypothèse de base: On suppose que tous les composés discuttent de tous les MeSH ! On fait ainsi l'hypothèse que toutes probabilité ** $p(m|s) > 0$**, c'est à dire pour tout composé, la probabilité qu'un de ces articles mentionnent n'importe quel MeSH est strictement postive. Récipriquement, on dit que la probabilité qu'un article parlant d'un composé, ne metionne JAMAIS un terme MeSH quelconque est nulle. Néanmoins ces probabilités peuvent être extrêment faibles pour certains MeSH, on en discutte jamais et très grande pour d'autres: dès que je parle de mon composé j'ai de grande chance de parler également de mon mesh. On suppose ainsi que toutes les fois où l'on observe une coocurence à 0 entre un composé et un MeSH, c'est simplement car on a pas assez d'échantillons d'articles pour représente notre composé. On imagine que si je piochais 1 millions de nouveaux articles discuttant de mon composé, je verrai enfin une coocurence avec mon MeSH. Elle sera très très rare et non significative, mais sa probabilité sera > 0**
+
+Étape 1: Poser une distribution à priori pour les MeSH :
+
+Pour chaque MeSH, on cherche à poser une distribution à priori sur la probabilité $p(m|s)$. On peut par exemple estimé cette distribution en utilisant les probabiltié observées $p(m|s)$ pour toutes nos species, en ne considérant que celles > 0 (pas les cooc nulles), du fait de notre hypothèse. Le problème c'est que cette distribution serait facile à estimer pour des MeSH à fort corpus qui sont annotés dans beaucoup de species, mais pour des MeSh rares, annotés sur 1 ou 2 composés il va être très difficile de poser une distribution ...
+On pourrait imaginer poser un prior non-informatif, mais ce serait sur-estimé les probabilités pour les MeSH à faible corpus ...
+
+Néanmoins, on peut observer une hypothèse assez simple: Plus un MeSH possède un fort corpus, plus les probabilités $p(m|s)$ qui lui sont associées auront tendance a être élevé. En effet, si mon MeSH est annotés sur 100000 articles il très peu probable que ces articles soient distribués de manièrement individuelle sur 100000 composés, mais plutôt que certains composés auront de très forte probabilité de les observer et aussi que de manière générale les composés auront plus de chance de discutter de ce MeSH que d'un autre MeSh plus rare. Pour visualiser cela on peut par exemple regarder l'évolution des proba $p(m|s)$ par rapport à la taille du corpus des MeSH $m$: 
+
+![Évolution des proba p(m|s) par rapport à la taille de corpus des MeSH m](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/Fig/plot_proba_vs_corpus_mesh.png)
+
+Comme on peut le voir il semble y avoir une dépendance linéaire par rapport au log de la taille du corpus. Cette hypothèse est assez vraisemblable, plus mon MeSH est annoté dans un grand nombre d'article, plus la probabilité d'en discutter quand je parle d'un composé est élevé.
+
+Le fait d'utiliser une regression linéaire va nous permettre d'utiliser nos MeSH et nos species bien annotés pour construire le modèle et ensuite on pourra prédire la distribution des probabilités pour des MeSH à très faible corpus en utilisant comme estimateur leur taille de corpus et en se basant sur la linéarité du modèle.
+
+Pour poser le modèle on a besoin de données fiables. On ne va utiliser les species avec trop peu de literature associés car les probabilités que l'on estime à partir de ces species sont biaisé. Par exemple si une specie n'a que 2 article annotés, n'importe quel MeSH aura un proba de 0, 0.5 ou 1, ce qui biase complètement notre distribution. Ainsi, **on ne va considérer que les species avec plus de 500 articles annotés.**
+
+Pour les MeSH, c'est un peu le même problème finalement, si on considère des MeSh avec des corpus trop faibles, il sont annotés pour trop peu de species. Or il faut suffisament de species pour pouvoir estimer une distribution. On a donc regardé la distribution du nombre de species annotés par rapport à la taille des corpus :
+
+
+![Log MeSH corpus by nb species](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/MeSh_corpus_by_nb_species.png)
+
+
+Comme on peut le voir sur cette figure, il y a effectivement une dépendance entre la taille du corpuzs MeSH et le nombre de species annotées. Si on veut considérer les MeSH avec en moyenne au moins 100 species annotés, on va devoir filtrer nos MeSH en ne sélectionnant que ceux avec $> 1000$ articles annotés (exp(7.07))
+
+Donc nos filtre sur les données sont :
+
+- corpus species > 500 
+- corpus MeSH > 1000
+
+Voici un violin plot des data utilisées:
+
+![residuals by fitted values sigma](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/violin_plot.png)
+
+
+Après on a fait d'autres test en faisant notamment varier le filtre sur le corpus MeSH, les résultats ne varie pas beaucoup ...
+
+On utilise donc un modèle de regression beta-binomiale.
+Dans ce modèle, on dipose du nombre de succès pour chaque individus obtenus après un certain nombre de tentatives. Ce nombre de succès suit une distribution binomiale.
+Dans notre cas on note comme un succès l'évènement où un article discutant du composé cible, discute également du MeSH. On a donc que :
+
+$$y_i \sim Bin(n, p_i)$$
+
+- $y_i$ étant le nombre d'article associé au composé qui discute également du MeSH $i$, c'est **la co-occcurence**
+- $n$ c'est le nombre total d'article associé au composé étudié
+- $p_i$ c'est la probabilité de succès, c'est à dire la probabilité qu'un article discuttant de la specie étudié, discute également du MeSH $i$. On peut également noté $p_i$, $p(M_i|S)$, la probabiltié d'observer le MeSH $i$, sachant que l'on étudie la specie $S$.
+
+l'inconvénient avec $y_i$ c'est qu'il s'agit d'un comptage, d'un nombre entier (par ex: 3 succès ou 3 de cooc dans mon cas), c'est une quantité particulière, et on ne peut donc pas modéliser directement ce $y_i$ en utilisant une regression, puisque dans notre regression on va une droite ce qui implique une infinité de valeurs prédites, même des valeurs négatives, et pas uniquement des entiers, des nombre de succès. Notre variable étant particulière, ce n'est pas $y$ que l'on va chercher à prédire directement. Or, en supposant que $y$ est distribué selon une distribution binomiale, on sait que l'observation $y_i$ est plus ou moins vraisemblable en fonction du paramètre $p_i$. Par exemple $y_i=50$ quand $n=20$ est très vraisemblable pour $p_i=0.5$ et peu pour $p_i = 0.9$ Deplus, ce paramètre $p_i$ est continue, il n'est pas discret comme l'observation $y_i$, il peut prendre une infinité de valeurs entre [0,1] (Cf. fonction de lien).
+Ainsi, dans notre modèle, ce n'est pas $y_i$ que l'on va directement chercher à prédire, mais $p_i$ en supposant que $y_i \sim Bin(n, p_i)$. On va notamment se baser sur la vraisemblance des données pour prédire $p_i$
+
+**Ainsi, contrairement à une regression classique, la variable que l'on prédit avec notre modèle, n'est pas directement la variable que l'on observe, mais un paramètre de la distribution dont est issue notre variable observée.** Néanmoins, on pourra donc estimer, comme dans une regression classique, la moyenne attendue de notre variable observée connaissant le paramètre prédit de notre distribution, c'est notamment ce que l'on fera pour les résidus
+
+Dans un modèle beta-binomial, on suppose que notre paramètre $p_i$ est également une variable aléatoire qui suit une distribution $Beta(\alpha_i, \beta_i)$. Cet ajout au modèle permet notamment de représenter l'incertitude sur la probabilité $p_i$ lorsque le nombre de tentative n'est pas très grand.
+
+
+
+$$y_i \sim Bin(n, p_i)$$
+$$p_i \sim Beta(\alpha_i, \beta_i)$$
+
+On modélise donc les coocurences tel que
+
+$Y \sim BetaBin(n, \alpha_i, \beta_i)$
+
+$p(Y_i = y_i) =  \binom{n}{y_i}  \frac{1}{B(\alpha_i, \beta_i)} \times  B(\alpha_i + y_i, \beta_i + (n - y_i))$
+
+$\iff  p(Y_i = y_i) = \binom{n}{y_i}  \frac{B(\alpha_i + y_i, \beta_i + (n - y_i))}{B(\alpha_i, \beta_i)}$
+
+
+On modélise ainsi les comptages de succès $Y_i$ par rapport à $\alpha_i$ et $\beta_i$. Grâce à $\alpha_i$ et $\beta_i$, on va pouvoir estimé la probabilité attendu $\hat{p_i}$, à partir de laquelle on pourra alors déterminer le nombre de succès attendu $E[Y]$ avec $n \hat{p_i}$
+
+**Attention:** On ne pourrait **pas** utiliser les probabilité calculées pour essayer de poser une distribution Beta dessus. En effet :
+- Nos observations sont discrêtes ce sont des comptages
+- La distribution Beta est une variables continue, OR, créer des probabilité à partir de nos observations (discrètes) ne rend pas notre variables continue pour autant !! En effet, j'aurait toujours un certain set déterminé de valeurs possible que peuvent prendre mes probabilités, elle ne sont pas continues, ce sera toujours discret. Je pourrais par exemple calculer la proba que P(p = 1/2) si j'ai observer x fois le nombre de cooc égal à la moitié de mon corpus. Or ceci est impossible pour une variable continue. 
+
+Ainsi, il faut  
+
+
+Lorsque l'on pose notre modèle, on va effectué une reparamétrisation de la distribution beta, en terme de moyenne $\mu$ et de sur-dispersion (la variabilité derrière $p$) $\sigma$. On pose alors $\mu$, la probabilité moyenne de succès, $\mu = \frac{\alpha}{\alpha + \beta}$ et $\sigma = \frac{1}{\alpha + \beta}$. On peut donc re-paramétrer notre $Beta$ pour un MeSH $i$ tel que $p_i \sim Beta(\frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$. Même si cela semble compliqué les choses, en fait lorsque l'on veut poser des prior ou autre c'est plus facile de réfléchir en terme de probabilité moyenne et dispersion qu'en terme de $\alpha$ et de $\beta$. Donc par défaut on transforme nos paramètres avant de les mettre dans le modèle.
+
+Ainsi après reparamétrisation : $p_i \sim Beta(\frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$
+
+Dès lors, $p_i$ étant une variable aléatoire, ce n'est plus $p_i$ que l'on cherche à prédire avec notre modèle mais $\mu_i$ et $\sigma_i$ qui définisse la distribution de $p_i$
+
+
+
+Donc comme on l'a vue précédemment on voit qu'il semble que notre probabilié $p_i$ soit linéairement reliée à la taille du corpus du MeSH étudié, que l'on va noter $M_i$. Aussi, même si ça ne se voit pas très bien sur la Figure la variabilité semble également être linéairement relié à la taille du corpus MeSH. Vu que c'est en échelle log, là où la variabilité du nuage de points nous semble constante en réalité elle augmente !
+
+Ainsi, on souhaite modéliser les **2** paramètres de notre distribution en fonction de la variable explicative. Pour cela, on va devoir utilisé des méthodes de style VGAM ou GAMLSS. Dans les modèle de glm 'classique', on ne peut pas estimer $\sigma$ en fonction d'une variable, seul la moyenne $\mu$ peut être fonction des variables. Les modèles de types GAMLSS ou VGAM permettent de relaxer cette restriction. C'est pour cela que l'on va utiliser GAMLSS.
+
+(https://stats.stackexchange.com/questions/312434/how-can-gamlss-relax-the-glm-exponential-family-assumption)
+
+Si on bin, on le voit bien :  
+
+```{r}
+d <- data.frame(bin = c("[0,100)", "[100,500)", "[500,1e+03)", "[1e+03,5e+03)", "[5e+03,1e+04)", "[1e+04,5e+04)", "[5e+04,1e+05)", "[1e+05,5e+06]"), var = c(0.00000218, 0.0000142 ,0.00000864, 0.0000291, 0.0000517, 0.000201, 0.000476, 0.00255))
+DT::datatable(d)
+```
+
+On va donc chercher à expliquer notre moyenne de succès $\mu_i$ et notre sur-dispersion (variabilité $\sigma_i$) en fonction de la taille des corpus MeSH $M_i$ Dans notre modèle on pose donc que :
+
+$\mu_i = \beta^{(\mu)}_0 + \beta^{(\mu)}_1 \times log(M_i)$
+
+$\sigma_i = \beta^{(\sigma)}_0 + \beta^{(\sigma)}_1 \times log(M_i)$
+
+
+Or $\mu_i$ devant être compris entre [0,1] et sigma devant être supérieur à 0, pour que notre modèle prédise des valeurs adéquates, on va utiliser la fonction de lien logit pour $\mu$ (noté $g_1()$) et simplement log pour $\sigma$ (noté $g_2()$)
+
+Ainsi on a: 
+
+$g_1(\mu_i) = log(\frac{\mu_i}{(1 - \mu_i)}) = \beta^{(\mu)}_0 + \beta^{(\mu)}_1 \times log(M_i)$
+
+$g_2(\sigma_i) = log(\sigma_i) =\beta^{(\sigma)}_0 + \beta^{(\sigma)}_1 \times log(M_i)$
+
+Aussi par exemple, $\beta^{(\mu)}_0$ représente l'intercept associé à la regression de $\mu_i$ et $\beta^{(\mu)}_1$ le facteur associé au log de corpus MeSH $log(M_i)$
+
+En résumé on a donc:
+
+$Y \sim BetaBin(n, \frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$ avec 
+
+$g_1(\mu_i) = \beta^{(\mu)}_0 + \beta^{(\mu)}_1 \times log(M_i)$
+
+$g_2(\sigma_i) = \beta^{(\sigma)}_0 + \beta^{(\sigma)}_1 \times log(M_i)$
+
+Le but du modèle est donc d'estimer les paramètres $\beta^{(\mu)}_0, \beta^{(\mu)}_1,  \beta^{(\sigma)}_0, \beta^{(\sigma)}_1$ tel qu'ils prédisent les $\mu_i$ et $\sigma_i$ qui maximise la vraisemblance des données observées !!
+
+En gros pour ce faire on remplace $\mu_i$ et $\sigma_i$ dans l'équation de vraisemblance de la beta-binomiale par leur expression dans le modèle (en inversant la fonction de lien, par ex on inverse le logit pour retrouver juste $\mu_i$ et pas $g_1(\mu_i)$) Ensuite quand on a l'expression de la vraisemblance en fonction des coefficient $\beta^{\mu,\sigma}_{0,1}$ on cherche à trouver les coefficients qui maximise la vraisemblance !!
+
+Avec nos données actuellement nous avons posé le modèle et voici les résultats obtenus :
+
+Mu link function:  logit
+
+Mu Coefficients:
+                      
+Estimate Std.Error t-value Pr(>|t|)   
+
+(Intercept)          -14.263497   0.012734 -1120.1   <2e-16 ***
+
+log(TOTAL_PMID_MESH)   0.836309   0.001319   634.2   <2e-16 ***
+
+------------------------------------------------------------------
+
+Sigma link function:  log
+
+Sigma Coefficients:
+
+Estimate Std.Error t-value Pr(>|t|)    
+
+(Intercept)          -13.125658   0.018286  -717.8   <2e-16 ***
+
+log(TOTAL_PMID_MESH)   0.759816   0.001906   398.6   <2e-16 ***
+
+
+Ce modèle a donc été poser sur des données filtrées (corpus specie > 500 et corpus MeSH > 1000)
+On a donc également caclulé la vraisemblance sur les données totales, on a obtenue: -1911716. A savoir que la vraisemblance d'un modèle en utilisant toutes les données (donc la vraisemblance max) est de -1893467, donc c'est relativement très proche ! Cependant on sait que toutes les données ne sont pas bonnes a utiliser pour poser le modèle.
+
+Nous avons également étudié les résidus :
+
+Alors attention dans une regression beta-binomiale, même si ce sont $\mu_i$ et $\sigma_i$ qui sont prédits par le modèle, les résidus sont calculés par rapport à la valeur $Y_i$ observée, notre co-occurence, la beta-binomiale se définissant par rapport à $Y_i$. 
+
+$Y \sim BetaBin(n, \frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$ 
+
+De manièrement générale, on estime les résidus en comparant la valeur $Y_i$ observée par rapport à la valeur prédite par le modèle, qui est $E[Y|n,\alpha_i, \beta_i]$ (soit $\frac{n \alpha_i}{\alpha_i + \beta_i}$ ou $n \mu_i$) et l'on standardise par rapport à l'écart-type de la variabilité attendu $V[Y|n,\alpha_i, \beta_i]$.
+
+- Résiduals by fitted values :
+
+Par rapport à mu-prédit :
+![residuals by fitted values mu](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_fitted_values_mu.png)
+
+sans les signifs: 
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_fitted_values_mu_no_signif.png)
+
+Pour sigma :
+
+![residuals by fitted values sigma](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_fitted_values_sigma.png)
+
+
+sans les signifs: 
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_fitted_values_sigma_no_signif.png)
+
+On peut constater que :
+
+-  Les résidus les plus elevés sont associés à des relations significatives entre des species et des MeSH. En effet, nous modélisons la distibution globale des co-occurences associés aux MeSH ($P(Y = y_i)$) avec notre beta-binomiale, néanmoins la plupart du temps l'association entre le composé et le MeSH n'est pas significative et relativement du au hasard avec par exemple 1 ou 2 coocurences. Les co-occurences sont donc généralement faible, sauf pour les associations significatives, qui sont en quelques sortes des out-layers de nos distributions modélisé ! C'est d'ailleurs pour ça qu'ells sont considéré comme significative, car leur co-occurences est largement supérieure à la co-occurence moyenne observée chez les autres composés.
+Ainsi on voit que les associations que l'on modélise "mal" avec notre modèle sont les associations significatives, mais c'est exactement ce que l'on souhaite, puisqu'on veut modéliser la distribution générale ! Donc sur nos distribution modélisation les coocurences associés à ces associations significatives.
+
+On a aussi chercher à ploter les résidus par rapport à notre variable explicative: 
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_by_corpus_MeSH.png)
+
+Sans les signifs: 
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_by_corpus_MeSH_no_signif.png)
+
+Comme on peut le constater (on le voit aussi sur les graph précédents), il semble que nos résidus soiçent plus élevé pour les valeurs faibles de $\mu$, de $\sigma$ et même de la taille du corpus. On sait que ces éléments sont liés dans notre modèle: plus on a une taille de corpus faible, plus on attend pour ce MeSH une proba moyenne $\mu$ faible et une variabilité $\sigma$ faible. On attend donc également des coocurences moyenne faibles.
+
+En fait je pense que pour les MeSH à faible corpus, la coocurence moyenne prédite par le modèle $E[Y|n,\alpha_i, \beta_i]$ est relativement faible, voir proche de 0. Or, la valeur observée pour ces éléments est au minimum de 1 dans les données, car on a au moins observée 1 article. Ainsi, plus les taille de corpus MeSH sont faible, plus on va prédire une moyenne $\mu$ faible, plus le nombre de succès attendu $E[Y|n,\alpha_i, \beta_i]$ sera faible, mais sera toujours comparer au minimum à 1, alors que celui-ci peut tendre vers 0 ! Je pense que c'est pour cela que l'on voit que les résidus sont fort vers les faibles valeurs de $\mu$ et diminue un peu ensuite à mesure que $\mu$ ou la taille de corpus MeSH augmente. A partir de là, les valeurs prédites seront plus élevées et seront surtout comparer à des valeurs 'du même ordre'.
+
+
+On peut également regarder les résidus par index :
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/residuals_by_index.png)
+
+pareil, on observe rien de particulier.
+
+
+Pour la qualitée de fit du modèle :
+
+On peut voir avec les histogrammes ou accentuer les différences en regardant à l'échelle log:
+Pour les données observée, on a réalisé une représentation des distribution de proba par bins :
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/data_disribution_by_bin.png)
+
+Pour les données prédites, on a réalisé un échantillonage en fonction de la moyenne des taille de MeSH par bin et on a refait cette distribution :
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/predictions_disribution_by_bin.png)
+
+
+On peut comparer les deux: 
+
+
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/comparison_disribution_by_bin.png)
+
+
+Plusieurs choses à noter :
+- Pour toutes nos distribution prédites on a $\alpha$ < 1 ce qui signifie que notre distribution n'a pas une courbe en cloche, possède une densité infinue en 0.
+En fait, il se trouve que c'est la distribution qui fit le mieux nos données. Ce sont notamment les données significative, généralement des fortes probabilité, qui forment la longue tail de la distribution des porba observées tendant vers 1. On a une distribution qui suivrait presque une loi de puissance en quelque sorte. Pour notre fit beta, la distribution qui correspond le mieux a ces données là est une distribution avec $\alpha$ < 1. Exemple de la tail :
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/Specie500_MeSH_1000/dist_full_data/Dist_MeSH_450000_550000.png)
+
+La distribution qui fit le mieux cette distribution semble devoir adopté une densité infinie en 0. On peut atteindre une courbe en cloche si jamais on supprime toutes ces données significatives mais ce ne sont **pas** des fausses données, ces observations font vraiment partie de notre distribution il faut donc les conservées.
+
+Voilà pourquoi sur nos distribution on observe une tail vers de faibles valeurs de $p$, c'est car la densité tend vers l'infini à mesure que $p$ se rapproce de 0. Cet effet est fort pour de faible valeur de taille de corpus comme on peut le constater, et assez faible, tend même à une courbe en cloche pour les fortes valeurs de taille de corpus. Le fait que cet effet soit d'autant plus important avec la taille de corpus ne contredit pas notre hypothèse, où on s'attend effectivement que les vrais probabilités soient plus faible que celle que l'on a observéees.
+
+Deplus nos distributions semblent légèrement décalées vers la droites par rapport aux distribution observées. Ceci en aussi du aux valeurs de probabilité très fortes qui vont avoir un fort *leverage*, c'est à dire qu'elle vont faire levier pour tirer la courbe vers elle et ainsi rapprocher leur fitted-value de leur vrai valeur pour ces points. Ce sont ainsi des points qui ont une forte influence potentielle sur la slope de la courbe, et qui vont avoir tendance à tirer la distribution vers le haut. Néanmoins comme précedement, ce sont de vrais observations donc il faut les prendre en compte. C'est donc ces points qui font que notre distribution tend vers la droite par rapport à la distribution observée, ils tirent la courbe vers eux. Cependant, même si nos distribution tendent plus vers des valeurs élevées, du à notre tail, la moyenne est cependant toujours plus faible dans nos prédictions (Cf. ggridges) 
+Mais globalement pour notre prior c'est pas trop mal on arrive tout de même à représenter la tendance qu'il y a sur les probabiltiés. 
+
+En utilisant le package VGAM, on a calculé les hat-values correspondantes pour visualiser le leverage :
+
+Exemple pour mu
+![residuals by fitted values mu no-signif](/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/Fig/mu_hat_values.png)
+
+
+Comme on peut le voir, les valeur de hat values pour $\mu$ les plus élevé se situe pour les point aux extrême de la taille de corpus avec les proba les plus hautes. Même si on supprimait ces points pour le fit, les autres points dans cette direction prennent le relais et on a toujours cet effet de leverage. Si on supprime carrément tout les point au dela de 100.000 de taille de corpus par exemple c'est sur ces éléments que l'on aura un décalage à la fin. Après cela peut être une solution mais c'est difficile de justifier que l'on sort ces données pour le fit ...
+
+**A tester lorsque l'on aura une méthode de validation pour la precision/recall des données -> tester le modèle qui permet d'obtenir les meilleurs résultats 
+
+J'ai aussi fait des graphs pour représenter les distributions observées et prédites à différentes taille de corpus. (Cf dist_dull_data)
+
+
+Donc une fois que l'on a le modèle, on est capable de prédire pour n'importe quel MESH, connaissant la taille de son corpus, une distribution à priori des probabilités $p(m|s)$. Cette distribution indiquera une probabilité moyenne d'autant plus faible que le MeSH aura un faible corpus (MeSH rare).
+
+Pour tout MeSH $i$ que l'on étudie, on va donc prédire les valeurs de $mu_i$ et de $\sigma_i$ et en déduire les valeur de $\alpha_i$ et $\beta_i$
+
+Cette distribution représente notre première distribution à priori.
+Ainsi, pour tout les composés du réseau, à l'exception de notre composé cible, on va commencer par estimer la distribution à posteriori associé au MeSH étudié. Pour chaque composé, la distribution à posteriori est simplement donné par la beta:  $Beta(\alpha_i + COOC_i, \beta_i + (N - COOC_i))$
+
+- $COOC_i$: la co-occurence entre le composé et le MeSh $i$
+- $N$: la taille de corpus associé au composé
+
+L'avantage d'utiliser le prior de notre modèle et que :
+
+- Si le composé n'a pas beaucoup de literature associé, sa distibution suivra beaucoup la distribution à priori obtenu sur l'ensemble de composés
+
+- Si le composé a beaucoup de literature, la distribution à priori n'aura pas d'influence sur la distribution à posteriori qui suivra les observations faites pour ce composé.
+
+Ainsi, si mon composé cible est malheureusement entouré de composé sans trop de littérature, la distribution a priori que l'on utilisera pour celui-ci sera un mélange de distribution proche de mon prior d'origine, et donc c'est ~ comme si j'avais directement utilisé mon prior du modèle sur mon composé cible. En rechanche si mon composé cible est entouré de composé à fort corpus, sont prior sera un mélange de ces distribution très 'précises'
+
+Donc pour construire la distribution à priori de mon composé cible, on va simplement construire une distribution de mélange en utilisant :
+
+- Les probabilité obtenus à partir de mes marches aléatoires FOT comme facteur $k_i$
+- Les distribution à posteriori obtenus avec les observation et le prior du modèle sur mes voisins
+
+
+Ensuite on met simplement à jour cette distribution de mélange à priori, avec les observations sur mon composé cible !
+
+
+L'idée clef est simplement que les distributions à posteriori obtenus pour mes voisins, en se basant sur un prior issus du glm et de leurs comptages, vont être utilisés pour construire un modèle de mélange qui servira de distribution à priori pour mon composé cible !
+
+j'obtiens alors pour mon composé cible, une distribution de mélange à posteriori.
+On peut donc déterminer la probabilité moyenne $p(m|s)$ pour notre composé cible et chercher à la comparer avec la probabilité d'observer le MeSH de manière générale $p(m)$
+
+Ma probabilité moyenne $p(m|s)$ peut être considérer comme mon estimateur Bayesien de la moyenne ;)
+Pour estimer à quel point notre probabilité moyenne est supérieure à $p(m)$ on peut regarder la CDF par rapport à cette proba.

@@ -231,6 +231,16 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
 
     return res
 
+def estimate_prior_distribution_mesh_V2(p, sigma = 0.001):
+    
+    r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
+
+    alpha =  p/sigma
+    beta = (1 - p)/sigma
+
+    result = r(alpha, beta)
+    return result
+
 def estimate_prior_distribution_mesh(mesh_corpora):
     
     r = collections.namedtuple("prior_mesh", ["alpha", "beta"])

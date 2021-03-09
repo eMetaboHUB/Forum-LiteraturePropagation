@@ -949,3 +949,254 @@ On peut donc déterminer la probabilité moyenne $p(m|s)$ pour notre composé ci
 
 Ma probabilité moyenne $p(m|s)$ peut être considérer comme mon estimateur Bayesien de la moyenne ;)
 Pour estimer à quel point notre probabilité moyenne est supérieure à $p(m)$ on peut regarder la CDF par rapport à cette proba.
+
+
+## Nouvel estimateurs du prior :
+Ref: John_K_Kruschke-Doing_Bayesian_Data_Analysis-EN.pdf pages.129-130 
+
+Nous devons estimé les distributions à priori qu'un article discutte du MeSH pour nos composés,k mais la regression ne semble pas être la solution la plus adapté, car le modèle semble difficilement se fitter.
+
+Cependant, on peut imaginer poser un à prior théorique en formulant une hypothèse génératrice :
+- L'hypothèse la plus simple que l'on puisse formuler sur notre prior est que l'on estime, à priori, qu'il n'y a pas de liens particulier (de relation directe) entre notre composé notre MeSH. A priori on peut largement considérer que ces éléments sont indépendants et que si il y a une relation, ce sont nos données qui devront le montrer. L'apriori indiquerait donc une indépendances entre nos évènemenet "l'article parle du composé X" et "l'article parle du MeSH Y", puiqu'a priori on a aucun indice sur leur relation.
+
+Sachant cela, on s'attend donc à priori, que la probababilité $p(m|s) = p(m)$ sous l'hypothèse d'indépendance, donc on peut estimer que notre distribution à priori devrait être centré autour de la probabilité générale d'observer le MeSH, soit $p(m)$
+
+Intuitivement, on pourrait donc utiliser la moyenne par exemple, pour fixer le paramètre $\mu$ de notre distribution et ainsi posé notre prior. Cependant, les probabilités $p(m)$ d'observer les MeSH sont généralement assez faible (98\% < 0.01 par exemple) 
+Cependant, la valeur moyenne $\mu$ d'une distribution, affecte ce que l'on appelle la *skewness* de la distribution. La *skewness* représente le degré d'asymétrie de la distribution. Pour une *skewness* nulle, la distribution est symétrique, pour des positive de *skewness*, elle présente une *right tail* et pour des valeurs négatives une *left tail*
+
+Dans le cas de la distribution beta, dans le cas non-symmétrique lorsque $\alpha \neq \beta$ (ce qui est notre cas), on a que :
+$\lim_{\mu \to 0} \gamma = \infty$
+
+Dans le cas particulier où $\alpha = \beta$, la moyenne, la mediane et le mode sont égaux
+
+Ainsi, à mesure que la moyenne $\mu$ tend vers 0, notre distribution de vient de plus en plus asymétrique, ce qui est a un effet important sur  la relation entre la moyenne et le mode de la distribution. Lorsque la distribution est symétrique, la moyenne est égale au mode de la distribution, soit la valeur la plus probable. Dans le cas d'une distribution asymétrique la moyenne s'éloigne du mode et se décale vers la longue tail, c'est l'asymétrie. Quelques exemples :
+
+```{r}
+mu.1 <- 0.5
+mu.2 <- 0.05
+mu.3 <- 0.95
+o <- 100
+p <- seq(0, 1, 0.0001)
+for(mu in c(mu.1, mu.2, mu.3)){
+  alpha <- mu * o
+  beta <- (1 - mu) * o
+  mode <- (alpha - 1)/(alpha + beta - 2)
+  g <- ggplot(data.frame(proba = p, density = dbeta(p, alpha, beta)), aes(x = proba, y = density)) + 
+    geom_line() +
+    ylim(c(0,20)) +
+    theme_classic() + 
+    stat_function(fun = dbeta,
+                args = list(shape1 = alpha, shape2 = beta),
+                geom = "area",
+                fill = "#F8766D",
+                xlim = c(mu, 1)) +
+    stat_function(fun = dbeta,
+            args = list(shape1 = alpha, shape2 = beta),
+            geom = "area",
+            fill = "#619CFF",
+            xlim = c(0, mu)) +
+    geom_vline(xintercept = mu, colour = "black") +
+    annotate("text", x = mu + 0.1, label = paste0("Mean\n", "P(p < Mean) = ", round(pbeta(mu, alpha, beta), 2), "\n", "P(p > Mean) = ", round(1 - pbeta(mu, alpha, beta), 2)), y = 10, color = "black") +
+    geom_vline(xintercept = mode, colour = "blue") +
+    annotate("text", x = mu + 0.1, label = "Mode", y = 13, color = "purple")
+  plot(g)
+}
+
+```
+
+En prenant des cas plus prononcés :
+$\alpha < 1$, le mode n'est plus définis, la distribution est **J**-shaped, la densité de probabilités tend vers l'infini en se rapprochant de 0
+
+```{r}
+mu.1 <- 0.5
+mu.2 <- 0.005
+mu.3 <- 0.995
+o <- 100
+p <- seq(0, 1, 0.0001)
+for(mu in c(mu.1, mu.2, mu.3)){
+  alpha <- mu * o
+  beta <- (1 - mu) * o
+  g <- ggplot(data.frame(proba = p, density = dbeta(p, alpha, beta)), aes(x = proba, y = density)) + 
+    geom_line() +
+    ylim(c(0,100)) +
+    theme_classic() + 
+    stat_function(fun = dbeta,
+                args = list(shape1 = alpha, shape2 = beta),
+                geom = "area",
+                fill = "#F8766D",
+                xlim = c(mu, 1),
+                ylim = c(0, 100)) +
+    stat_function(fun = dbeta,
+            args = list(shape1 = alpha, shape2 = beta),
+            geom = "area",
+            fill = "#619CFF",
+            xlim = c(0, mu),
+            ylim = c(0, 100)) +
+    geom_vline(xintercept = mu, colour = "black") +
+    annotate("text", x = mu + 0.1, label = paste0("Mean\n", "P(p < Mean) = ", round(pbeta(mu, alpha, beta), 2), "\n", "P(p > Mean) = ", round(1 - pbeta(mu, alpha, beta), 2)), y = 10, color = "black") +
+    annotate("text", x = mu + 0.1, label = "Mode", y = 13, color = "purple")
+  plot(g)
+}
+
+```
+
+Comme on peut le voir à mesure de $\mu$ diminue, on a l'asymétriue de la distribution s'accentue ! 
+On passe par exemple pour 
+
+- $\mu = 0.05, s = 100$: $P(p \le \mu) = 0.56, P(p > \mu) = 0.44$
+
+- $\mu = 0.005, s = 100$: $P(p \le \mu) = 0.68, P(p > \mu) = 0.32$ (quasi 2/3 - 1/3)
+
+
+Ainsi dans notre cas, si on essaye de poser cette distribution à priori en fixant la moyenne $\mu$ comme paramètre, on risque de poser des distributions très asymétriques, généralement même avec un $\alpha < 1$. Ainsi la grande partie de la masse des probabilités se trouvera inférieure à la moyenne et cette asymétrie peut biaisé nos résultats. En effet, en voulant initialement centré à la moyenne on a pas de prior sur si les probabilité serait plutôt inférieure ou supérieure à celle-ci, on voudrait quelque chose. 
+Deplus notre 'test' final consiste à chercher pour notre distribution à posteriori, $P(p <= p(m))$, on cherche qu'elle est la probabilité qu'a posteriori notre probabilité estimé soit inférieure à celle d'observer le MeSH de manière générale, plus cette proba ($P(p <= p(m))$) est faible, plus on est sur de notre proposition. Or dans ce cas, notre prior à déjà tendance à favoriser le rejet alors qu'il n'y pas de raisons apparente de considérer cela à priori.
+
+Ainsi dans l'idée que notre distribution à priori décrive l'hypothèse d'indépendance, il semble alors plus correct d'utiliser le mode plutôt que la moyenne pour poser notre prior. Ainsi, dans l'idée du prior, on souhaite alors que la valeur $p(m)$ soit la valeur la plus probable dans notre distribution. En utilisant le mode pour construire notre distribution, on va donc poser un modèle dans lequel le pic de notre distribution sera centré autour de $p(m)$. 
+
+Aussi, le fait de poser notre modèle autour du mode, impose que notre distribution sera unimodale, avec une valeur précise du mode, ce qui n'est pas le cas quand $\alpha < 1$ par exemple, où les densités de proba tendent vers l'infini quand les probas se rapproche de 0. Utiliser le mode pour poser notre modèle, impose donc que pour notre prior: $\alpha, \beta > 1$.
+Ceci impose également que la densité sera nulle en 0 et en 1, ce qui est en accord avec notre hypothèse selon laquelle toute proba $p(m|s) > 0$.
+
+On note le mode $\omega$, $\omega = \frac{\alpha - 1}{\alpha  + \beta - 2}$.
+On pose également un second paramètre $s = \alpha + \beta$, la sample size, où *concentration* qui représente le *spread*, l'étendu de notre distribution. Plus $s$ est grand, plus la variance de la distribution sera faible, basé sur beaucoup d'observations, et quand $s$ sera faible, au contraire l'allure de la distribution sera très étendue, avec une grande variance. 
+
+On a donc :
+
+$\alpha = \omega(s - 2) + 1$ et $\beta = (1 - \omega) (s - 2) + 1$
+
+C'est une paramétrisation connue de la beta décrite dans  John_K_Kruschke-Doing_Bayesian_Data_Analysis-EN.pdf pages.129-130  et sur Wikipedia ^^
+
+Pour la paramètre $s$, la concentration, il va représenter la variance que l'on souhaite intégrée dans notre prior. Plus $s$ sera faible plus notre distribution à priori sera "large" et plus $s$ sera grand, on notre prior aura l'allure d'un pic !
+
+Pour choisir une valeur initiale, on peut utiliser la mediane des tailles de corpus de nos species, en se considérant que celles avec au moins 1 article annoté.  On trouve alors 235, on peut donc mettre 200 comme valeur intiale.
+Je pense qu'il sera intéressant de faire varier ce paramètre, car il gère la variance de notre prior
+
+
+
+**MAIS EN FAIT C'EST TOUJOURS PAS LA SOLUTION !!!** 
+
+Lors effectivement on obtinedra toujours une distribution unimodale etc ... **MAIS**, pour la répartition des probabilité on va obtenir l'effet inverse ... C'est à toujours que l'on aura tendance à favoriser les probabilité supérieure à $p(m)$ et en fait, je trouve que c'est pire que l'obtiens de la moyenne car ça augmentera le taux de Faux positif.. Ainsi, on préfère utiliser la moyenne $\mu$ qui certe va augmenter notre taux de faux négatifs, mais c'est moins grave que les faux positifs !!
+
+
+Exemple 
+
+On pose $s = 200$
+Cas où l'on utilise $\mu$ pour poser notre prior
+
+```{r}
+data <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/data_specie100_mesh100_tspvalue.csv")
+dt <- data[data$TOTAL_PMID_MESH > 9000 & data$TOTAL_PMID_MESH < 11000 & data$ts.p.value > 0.1, ]
+s <- 11028.3
+mu <- mean(dt$TOTAL_PMID_MESH)/N
+alpha <- mu * s
+beta <-  (1 - mu) * s
+
+cc <- data.frame(p = c(dt$p, rbeta(10000, alpha, beta)), Type = c(rep("Observed", nrow(dt)), rep("Sampled", 10000)))
+
+ggplot(cc, aes(x = log(p), y = 1, color = Type)) + 
+  geom_density_ridges2(aes(fill = Type), alpha = .5, color = "white") + 
+  scale_fill_cyclical(
+    values = c("#ff0000", "#0000ff"),
+    name = "Option", guide = "legend"
+  ) +
+  theme_ridges()
+```
+
+Quand on utilise le mode :
+
+```{r}
+mode <- mean(dt$TOTAL_PMID_MESH)/N
+alpha <- mode * (s - 2) + 1
+beta <-  (1 - mode) * (s - 2) + 1
+
+cc <- data.frame(p = c(dt$p, rbeta(10000, shape1 = alpha, shape2 = beta)), Type = c(rep("Observed", nrow(dt)), rep("Sampled", 10000)))
+
+ggplot(cc, aes(x = log(p), y = 1, color = Type)) + 
+  geom_density_ridges2(aes(fill = Type), alpha = .5, color = "white") + 
+  scale_fill_cyclical(
+    values = c("#ff0000", "#0000ff"),
+    name = "Option", guide = "legend"
+  ) +
+  theme_ridges()
+```
+
+
+
+Donc on utilisera $\mu$ pour poser notre distribution, avec le paramètre $s$ :
+
+- $\alpha  = \mu s$ 
+- $\beta  = (1 - \mu) s$
+
+Maintenant, est-ce qu'on peut améliorer l'estimation de $s$ ?
+Plot :
+
+```{r}
+N <- 8877780
+data_mesh <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/mesh_pmid.csv")
+cid_stats_assos <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/cid_mesh_stats_assos2.csv")
+data_specie <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/species_cid_pmid.csv")
+data_specie_mesh <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/species_cid_mesh_pmid.csv")
+data <- data_specie_mesh %>% left_join(data_mesh, by = "MESH") %>% left_join(data_specie, by = "SPECIE") %>% mutate(p = COOC/TOTAL_PMID_SPECIE)
+# On ajoute les stats sur les assos CID - MESH
+cid_stats_assos <- cid_stats_assos %>% mutate(ID = paste0(CID, MESH)) %>% dplyr::select(ID, p.value, odds_ratio, q.value)
+data <- data %>% mutate(ID = paste0(CID, MESH)) %>% left_join(cid_stats_assos, by = "ID") %>% dplyr::select(-ID)
+
+data_plot <- data %>% group_by(MESH) %>% mutate(MEDIAN = median(TOTAL_PMID_SPECIE)) %>% dplyr::select(MESH, TOTAL_PMID_MESH, MEDIAN) %>% distinct()
+ggplot(data_plot, aes(x  = log(TOTAL_PMID_MESH), y = log(MEDIAN))) + geom_point() + theme_classic()
+```
+
+En utilisant l'ensemble des associations, j'ai tracé le nuage de point montrant la mediane des tailles de corpus des composés en fonction de la taille corpus des MeSH (en log) et on voit une tendance très claire !
+Alors pour que ce soit plus évident il faut considérer les tailles de corpus de MeSH à partir de 500 par exemple car avant on voit beaucoup de variabilité, il n'y a pas becoup d'associations pour calculer cette mediane.
+À mesure que la taille du corpus augmente, et donc que l'on représente des termes de plus en plus larges (Coronary Occlusion -> Cardiovascular diseases), le corpus des composés associés médian est plus faible. En gros j'ai l'impression que ça montre que lorsque l'on parle de MeSH assez "rare", ce sont des composés avec beaucoup de literature qui arrive à les capter et que les composés "rare" ont donc tendance à rarement aborder des sujets  peu fréquement discutés. De la même manière, plus on regarde des composés avec des corpus forts, décrivant des concepts fréquents/broads, plus on va retrouver des composés peu fréquent dans les composés qui le discutte. Je pense que ça explique également pourquoi je vois beaucoup de variabilité pour les MeSH à fort corpus, ils sont dicutté par un large panel de composés avec des tailles de corpus différentes.
+
+C'est pour les associations générale c'est pas valable si on considère que les signif ou autre. Aussi, c'est pas un biais des species du réseau, j'observe le même pattern sur les composés PubChem.
+
+Ceci corrobore également l'observation que l'on avait fait précédemnt où il semblait que la variabilité de mes proba estimées était croissante par rapport à la taille de corpus :
+
+
+```{r}
+data_plot <- data %>% group_by(MESH) %>% mutate(VAR = var(p)) %>% dplyr::select(MESH, TOTAL_PMID_MESH, VAR) %>% distinct()
+ggplot(data_plot, aes(x  = log(TOTAL_PMID_MESH), y = log(VAR))) + geom_point() + theme_classic()
+
+```
+
+Or, le paramètre qui va nous permettre de régler la variabilité c'est bien $s$, la taille de sample que l'on choisit pour notre prior.
+Ce que l'on a constaté c'est que la mediane des species associées aux MeSH était décroissante par rapport à la taille du corpus MeSH. Les MeSH les plus rares sont abordés par des composés à fort corpus tandis que les MeSH fréquents, broads, sont abordés par l'ensemble des species, avec des faibles comme des forts corpus.
+
+Ainsi pour les MeSh à faible corpus, sachant que ce sont des composés très fréquent qui en parle, le paramètre $s$ derrière la distribution à priori sera plus élevé, une variabilité faible, plutôt que pour les MeSH à fort corpus pour lesquel on admettra une plus faible valeur de $s$ et donc une plus grande variabilité
+
+On va donc fitter la taille du corpus $s$ que l'on souhaite utiliser pour notre prior par rapport à la taille du corpus du MeSH. On fit en log ce sera mieux et en utilisant seulement les MeSH > 2000:
+
+```{r}
+data_fit <- data %>% filter(TOTAL_PMID_MESH > 2000) %>% group_by(MESH) %>% mutate(MEDIAN = log(median(TOTAL_PMID_SPECIE)), LOG_SIZE_MESH = log(TOTAL_PMID_MESH)) %>% dplyr::select(MESH, LOG_SIZE_MESH, MEDIAN) %>% distinct()
+fit <- lm(data = data_fit, formula = MEDIAN ~ LOG_SIZE_MESH)
+ggplot(data_fit, aes(x = LOG_SIZE_MESH, y  = MEDIAN)) + geom_point() + geom_line(data = data.frame(x = data_fit$LOG_SIZE_MESH, y = fit$fitted.values), aes(x = x, y = y, color = "red")) + theme_classic()
+```
+
+j'aime bien aussi comment ils parent de ce paramètre $s$ (appelé $k$ dans le texte suivant, traduit depuis la Ref: John_K_Kruschke-Doing_Bayesian_Data_Analysis-EN.pdf pages.129-130 ) :
+la valeur que nous choisissons pour le κ peut être pensée de cette façon : C'est le nombre de nouveaux coups de pièce de monnaie dont nous aurions besoin pour nous faire osciller entre les nouvelles données et la croyance antérieure concernant μ. Si nous n'avions besoin que de quelques nouveaux coups de pièce de monnaie pour faire osciller nos croyances, alors nos croyances antérieures devraient être représentées par un petit κ. Si nous avons besoin d'un grand nombre de nouveaux mouvements pour nous éloigner de nos convictions antérieures sur μ, alors nos convictions antérieures valent un très grand κ.
+
+Dans le cas de MeSH à faible corpus, je vois que les composés qui ont vu ces MeSH sont des composés à fort corpus, donc je sais avec sufisament de certitude qu'ils doivent être rare car même en piochant un grand nombre d'article je les voyais rarement. Ainsi je veux un prior fort, qui se base sur une forte taille de corpus. Dans le cas inverse, pour les MeSH à fort corpus, je les ai observés à la fois pour de composés à fort corpus mais aussi pour des composés à plus faible corpus sur lesquels on aura donc une plus grande variabilité, je souhaite donc avoir un prior plus faible basé sur moins d'effectifs.
+
+
+TEST :
+```{r}
+data_ts <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/data_specie100_mesh100_tspvalue.csv")
+dt <- data_ts[data_ts$TOTAL_PMID_MESH > 50000 & data_ts$TOTAL_PMID_MESH < 55000 & data_ts$ts.p.value > 0.1, ]
+s <- exp(predict.lm(fit, data.frame(LOG_SIZE_MESH = c(log(mean(dt$TOTAL_PMID_MESH))))))
+mu <- mean(dt$TOTAL_PMID_MESH)/N
+alpha <- mu * s
+beta <-  (1 - mu) * s
+
+cc <- data.frame(p = c(dt$p, rbeta(10000, alpha, beta)), Type = c(rep("Observed", nrow(dt)), rep("Sampled", 10000)))
+
+ggplot(cc, aes(x = log(p), y = 1, color = Type)) + 
+  geom_density_ridges2(aes(fill = Type), alpha = .5, color = "white") + 
+  scale_fill_cyclical(
+    values = c("#ff0000", "#0000ff"),
+    name = "Option", guide = "legend"
+  ) +
+  theme_ridges()
+
+
+
+```

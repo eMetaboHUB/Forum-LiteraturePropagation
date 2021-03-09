@@ -231,12 +231,19 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
 
     return res
 
-def estimate_prior_distribution_mesh_V2(p, sigma = 0.001):
+def estimate_prior_distribution_mesh_V2(mesh_corpora, N):
     
     r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
+    # Determine expected mu:
+    mu = mesh_corpora/N
 
-    alpha =  p/sigma
-    beta = (1 - p)/sigma
+    # Determine expected sample_size:
+    fitted_intercept = 14.552113
+    fitted_slope = -0.573877
+    sample_size = np.exp((fitted_intercept + fitted_slope * np.log(mesh_corpora)))
+
+    alpha =  mu * sample_size
+    beta = (1 - mu) * sample_size
 
     result = r(alpha, beta)
     return result
@@ -416,7 +423,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
             del corpora[rmv]
     # Uninformative
     obs = observation_uninformative_prior(k, n, seq, sampling = plot)
-
+    
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship

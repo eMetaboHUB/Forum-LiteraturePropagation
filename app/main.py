@@ -31,7 +31,7 @@ table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_PMID_MESH"]/N
 
 # Compute prior parameters:
 # mesh_priors = table_mesh_corpora["TOTAL_PMID_MESH"].apply(estimate_prior_distribution_mesh)
-mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh_V2)
+mesh_priors = table_mesh_corpora["TOTAL_PMID_MESH"].apply(estimate_prior_distribution_mesh_V2, N = N)
 mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
 print(mesh_priors)
 table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
@@ -39,8 +39,8 @@ table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
 print("Ok")
 
 
-mesh = "D022124"
-specie = "M_acorn"
+mesh = "D005322" # "D018312"
+specie = "M_prostgf2" # "M_tststerone"
 # index = 1115
 alpha = 0
 
@@ -49,7 +49,7 @@ probabilities = propagation_volume(g, alpha = alpha)
 # cc = (100 * probabilities.FOT).round(3)
 # cc.to_csv("FOT_" + str(alpha) + ".csv")
 
-if True:
+if False:
     validation_set = pd.read_csv("data/validation_set_associations.csv")
     # add results columns
     validation_set = pd.concat([validation_set, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
@@ -72,10 +72,10 @@ if True:
         r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
         # fill with results
         validation_set.iloc[i, 2:6] = list(r)
-    validation_set.to_csv("data/validation_out4.csv", index = False)
+    validation_set.to_csv("data/validation_out_new.csv", index = False)
 
 # START TEST
-if False:
+if True:
     index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
     table_species_corpora.insert(2, "weights", probabilities.FOT.iloc[:, index].tolist())
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]

@@ -231,16 +231,11 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
 
     return res
 
-def estimate_prior_distribution_mesh_V2(mesh_corpora, N):
+def estimate_prior_distribution_mesh_V2(mesh_corpora, N, sample_size):
     
     r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
     # Determine expected mu:
     mu = mesh_corpora/N
-
-    # Determine expected sample_size:
-    fitted_intercept = 14.552113
-    fitted_slope = -0.573877
-    sample_size = np.exp((fitted_intercept + fitted_slope * np.log(mesh_corpora)))
 
     alpha =  mu * sample_size
     beta = (1 - mu) * sample_size
@@ -389,6 +384,18 @@ def plot_distributions(uninformative, prior_mix, posterior_mix):
     plt.legend()
     plt.show()
 
+def plot_prior_mix_distributions(prior_mix, labels, seq):
+    x = np.arange(0, 1 + seq, seq).tolist()
+    weights = prior_mix.weights
+    for it in range(0, len(weights)):
+        f = ss.beta.pdf(x, a = prior_mix.alpha[it], b = prior_mix.beta[it])
+        y = weights[it] * f
+        plt.plot(x, y, label = labels[it])
+    plt.title('Prior decomposition')
+    plt.legend()
+    plt.show()
+
+
 def compute_mix_CDF(p, weights, alpha, beta):
     cdf_i = [ss.beta.cdf(p, alpha[it], beta[it]) for it in range(0, len(weights))]
     cdf = np.dot(weights, cdf_i)
@@ -404,11 +411,12 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     cooc = data["COOC"].tolist()
     k = cooc.pop(index)
     corpora = data["TOTAL_PMID_SPECIE"].tolist()
+    labels = data["SPECIE"].to_list()
+    del labels[index]
     n = corpora.pop(index)
 
     # Check for other null weights, in cas of low alpha (damping) for instance
     if 0 in weights:
-        labels = data["SPECIE"]
         to_remove = list()
         for it in range(0, len(weights)):
             # Check if weights == 0
@@ -421,9 +429,9 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
             del weights[rmv]
             del cooc[rmv]
             del corpora[rmv]
+            del labels[rmv]
     # Uninformative
     obs = observation_uninformative_prior(k, n, seq, sampling = plot)
-    
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
@@ -442,6 +450,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     Log2numFC = np.log2(posterior_mix.mu/p)
     
     if plot: 
+        plot_prior_mix_distributions(prior_mix, labels, seq)
         plot_distributions(obs, prior_mix, posterior_mix)
     
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)

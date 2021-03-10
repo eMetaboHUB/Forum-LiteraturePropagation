@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = FALSE)
 library(ggplot2)
 library(tidyverse)
 library(DT)
+library(ggridges)
 ```
 
 ## La distribution Beta 
@@ -1195,8 +1196,30 @@ ggplot(cc, aes(x = log(p), y = 1, color = Type)) +
     values = c("#ff0000", "#0000ff"),
     name = "Option", guide = "legend"
   ) +
-  theme_ridges()
+  theme_ridges() +
+  ggtitle(paste("MESH Aortic Stenosis, Subvalvular (D001020), taille = 3690 articles\nMoyenne observée = ", mean(dt$p), "\nMoyenne du prior = ", mu))
 
 
 
 ```
+Alors on pourrait dire qu'il est "semi-théorique" car la moyenne de la distribution est fixé théoriquement par p(M), par contre le paramètre sigma de taille de l'échantillon, j'ai fais une regression "Mediane corpus composés" ~ "Corpus MeSH" pour le déterminer.
+Vue que l'on a pas d'apriori sur le paramètre taille de l'échantillon de la distribution, on l'estime par la mediane des tailles de corpus des composés qui discuttent de MeSH avec des tailles de corpus similaires. Ainsi :
+
+    MeSH à faible corpus: On impose une grosse taille d'échantillon, comme ce que l'on voit sur nos données ce sont essentiellement des composés à fort coprus qui les observent, on a ainsi peu de variabilité attendue
+    MeSH à fort corpus: On impose une taille d'échantillon plus faible pour représenter le fait que même des composés à faibles corpus peuvent y être associé, on augmente la variabiltié attendue
+
+## Simplification du modèle :
+
+Notre modèle où l'on souhaite modéliser le paramètre *s* en fonction de la taille du corpus MeSH est peut être biaisé :
+
+D'un coté en formulant les choses de cette manière, le modèle "semble" fonctionner correctement, mais quand j'essaie de me l'expliquer, je trouve qu'il y a des éléments dont je ne suis pas certains. Est-ce qu'au final ces différences de variabilité que j'observe et que je veux représenter, est-ce que c'est pas simplement des artefacts, justement due aux différences que j'ai sur les tailles de corpus de mes MeSH. Mais, si tout mes composés était a peu près représentés de la même manière dans la litterature (le cas idéal), est-ce que je verrais également ça ? Pas sur ...
+Il y a une phrase dans un cours (Cf. Ref) que j'ai lu qui dit : "la valeur que nous choisissons pour le κ (le paramètre de taille d'échantillon) peut être pensée de cette façon : C'est le nombre de nouveaux coups de pièce de monnaie dont nous aurions besoin pour nous faire osciller entre les nouvelles données et la croyance antérieure concernant μ. Si nous n'avions besoin que de quelques nouveaux coups de pièce de monnaie pour faire osciller nos croyances, alors nos croyances antérieures devraient être représentées par un petit κ. Si nous avons besoin d'un grand nombre de nouveaux mouvements pour nous éloigner de nos convictions antérieures sur μ, alors nos convictions antérieures valent un très grand κ."
+Je vais poser s (le paramètre de taille d'échantillon) comme un hyperparamètre en disant: Je pose un prior en considérant qu'il a été construit sur la base de s articles, ainsi on peut s'attendre à ce que seul les composé avec au moins s articles seront en mesures de faire changé d'avis mon prior. C'est à dire que rajouter au moins autant d'observations qu'il en a été utilisé pour construire le prior
+De la sorte, j'impose une variabiltié sur le prior de tout les MeSH, $V(X) = \frac{\mu (1 - \mu)}{(1 + s)}$. Ainsi elle sera nécéssairement croissante en fonction de mu (jusqu'a 0.5 mais celui-ci n'est jamais atteint) et sinon sera décoissante par rapport à s
+Ça me semble relativement propre ...
+On connait facilement la moyenne et la variance de notre prior. On l'imagine donc comme étant issus de pseudo observations. On a donc un prior construit avec *\mu s* pseudo-succès et $(1 - mu)s$ pseudo échecs
+Après peut être que c'est un hyperparamètre que l'on a envie de faire varié pour rendre plus ou moins "fort" le prior ....
+
+
+
+Après comment choisir un *s* par défaut ?

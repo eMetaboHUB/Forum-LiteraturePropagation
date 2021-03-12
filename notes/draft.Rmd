@@ -47,28 +47,6 @@ Pour notre variabilité on a donc: $Var(Y) = n \mu (1 - \mu) [1 + (n - 1)\phi]$.
 
 Mais attention, ce que l'on fit avec GAMLSS c'est $\mu$ et $\sigma$, on ne fit **pas** le paramètre de sur-dispersion directement !! Par contre on voit très bien le lien entre $\sigma = \frac{1}{\alpha + \beta}$ et $\phi = \frac{1}{\alpha + \beta + 1}$, les deux sont tout de même largement corrélés quand $\sigma$ est grand, globalement $\phi$ est grand aussi. Donc les deux tendent à refléter la même chose, la dispersion, mais ne sont pas tout à fait égaux  :)
 
-## Petit exemples
-
-Si je sais que ma *vrai* probabilité $p = 0.2$, et que je fais $n = 100$ tentatives, la moyenne de mes comptages observée sera donc $np$ soit ici 20. 
-Mais cependant, je ne vais pas toujours observée 20 ! Certaines fois j'aurais de la chance et je vais observée 25 succès et d'autres fois peut être moins de chance et observer seulement 15 succès. Ainsi, si avec ces comptages j'essaye de re-estimé ma probabilité, je sais que je ne vais pas toujours dire que $p = 0.2$, je l'estimerait certaines fois un peu plus haute car j'aurais eu de la chance sur mon tirage et certaines fois un peu plus faible. 
-
-On fait donc l'expérience, on réalise 10000 fois l'expérience binomiale avec $p = 0.2$ et $n = 100$. 
-A partir du nombre de succès observé, on ré-estime la probabilité $p$
-On regarde ensuite la distribution de ces probabilité et on y superpose la densité d'une loi Beta. On sait notamment que la probabilité moyenne obervé, sera 0.2.
-
-Comme on peut le constater, la loi Beta(20,80) définit parfaitement la distribution de mon paramètre $p$.
-
-```{r bintest1}
-x <- rbinom(10000, 100, 0.2)/100
-ggplot(data.frame(x = x), aes(x = x)) + 
-  theme_classic() +
-  geom_histogram(aes(y = ..density..), binwidth = 0.01, color="black", fill="white") +
-  stat_function(fun = dbeta, args = list(shape1 = 20, shape2 = 80), aes(colour = "Beta(20,80)"))
-```
-
-
-Mais dans cet exemple, j'ai créer mes comptages en connaissant à l'avance mon paramètre $p$. Or dans 'la vraie vie', c'est l'inverse, on observe des données et on veut en déduire le paramètre p.
-
 ## Les estimateurs
 
 ### Estimateurs du Maximum de Vraisemblance (MLE)
@@ -263,6 +241,7 @@ for(p in v.p){
 data <- data %>% filter(X == 20)
 ggplot(data, aes(x = p)) + 
   theme_classic() +
+  theme(text = element_text(size = 35)) +
   geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
   xlim(0,1) +
     geom_vline(xintercept = 0.2, 
@@ -287,9 +266,10 @@ Donc on refait le même plot en superposant :
 ```{r bintest5}
 ggplot(data, aes(x = p)) + 
   theme_classic() +
+  theme(text = element_text(size = 35)) +
   geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
   xlim(0,1) +
-  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(colour = "Beta(21,81)"), size=1)
+  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(colour = "Beta(21,81)"), size=1.5, color = "red")
 ```
 
 Comme on peut le voir notre distribution $Beta(21,81)$ fit parfaitement la distribution de nos probabilité $p$ lorsque $k = 20$, correspondant à la distribution de la vraisemblance par rapport à $p$. 
@@ -315,19 +295,20 @@ Maintenant on va tout ploter en même temps :
 map = 0.2
 ggplot(data, aes(x = p)) + 
   theme_classic() +
+  theme(text = element_text(size = 35)) +
   geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
-  xlim(0,1) +
+  xlim(0,0.5) +
   geom_point(data=data.frame(proba = map, Likehood = dbeta(map,21,81)), 
              aes(x=proba,y=Likehood), 
              color='red',
              size=3) +
   annotate(geom = "text", x= map + 0.1, y = dbeta(map,21,81) + 0.1, label="MAP <-> MLE ") +
-  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(color = "Beta(21,81)"), size = 1) +
+  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(color = "Beta(21,81)"), size = 1.5, color = "red") +
   geom_vline(aes(xintercept = map, 
-                color = "MLE"), size = 0.5) + 
+                color = "MLE"), size = 2) + 
   geom_vline(aes(xintercept = (21/(21+81)), 
-                color = "BAYES"), size = 0.5) +
-  scale_color_manual(name = "Estimators", values = c(MLE = "red", BAYES = "green", "Beta(21,81)" = "blue"))
+                color = "BAYES"), size = 2) +
+  scale_color_manual(name = "Estimators", values = c(MLE = "blue", BAYES = "green", "Beta(21,81)" = "blue"))
 
 ```
 
@@ -1220,6 +1201,37 @@ De la sorte, j'impose une variabiltié sur le prior de tout les MeSH, $V(X) = \f
 On connait facilement la moyenne et la variance de notre prior. On l'imagine donc comme étant issus de pseudo observations. On a donc un prior construit avec *\mu s* pseudo-succès et $(1 - mu)s$ pseudo échecs
 Après peut être que c'est un hyperparamètre que l'on a envie de faire varié pour rendre plus ou moins "fort" le prior ....
 
+**Cependant,** vue que dans la majorité de nos cas notre alpha sera < 1, et pour la beta il semble que l'on puisse interpréter alpha - 1 en terme de pseudo count, et non alpha ! : Cf Wiki :
+In Bayesian inference, using a prior distribution Beta(αPrior,βPrior) prior to a binomial distribution is equivalent to adding (αPrior − 1) pseudo-observations of "success" and (βPrior − 1) pseudo-observations of "failure" to the actual number of successes and failures observed, then estimating the parameter p of the binomial distribution by the proportion of successes over both real- and pseudo-observations. A uniform prior Beta(1,1) does not add (or subtract) any pseudo-observations since for Beta(1,1) it follows that (αPrior − 1) = 0 and (βPrior − 1) = 0. 
+Donc en fait si mon composé n'a pas d'observations succès, son nombre de pseudo-counts success sera négatif !!!
+Peut être que dans ce cas il vaut mieux le dégager du prior ...
+Pour ré-équilibrer les weights on a juste à recalculer les proportions sans lui ... et comme ça on ne le prends plus en compte. Si aucun voisin ne reste, peut être que l'on ne peut rien faire ...
 
+A voir avec Pablo et tout !!
+
+Ce qui dis Wikipedia : 
+The Haldane prior Beta(0,0) subtracts one pseudo observation from each and Jeffreys prior Beta(1/2,1/2) subtracts 1/2 pseudo-observation of success and an equal number of failure. This subtraction has the effect of smoothing out the posterior distribution. If the proportion of successes is not 50% (s/n ≠ 1/2) values of αPrior and βPrior less than 1 (and therefore negative (αPrior − 1) and (βPrior − 1)) favor sparsity, i.e. distributions where the parameter p is closer to either 0 or 1. In effect, values of αPrior and βPrior between 0 and 1, when operating together, function as a concentration parameter. 
 
 Après comment choisir un *s* par défaut ?
+
+
+Alors j'ai peut être trouvé une méthode pas trop mal pour ce donner une idée :
+
+Je récupère des associations significatives de FORUM (q.value <= 1e-6), sans weakness et parlant de diseases, j'en échantillonnage 1 million par exemple 
+
+Vue que dans notre modèle thérorique mu est fixé par la taille du corpus du MeSH, seul s, la taille d'échantillon peut varier
+
+On sélectionne plusieurs valeurs possible de s, j'ai pris:  c(10,20,30,40,50,60,70,80,90,100,150,200,250,500,750,1000,1500,2000)
+
+Pour chaque valeur de s, on calcule la distribution à posteriori que l'on obtiendrait pour chaque observation en utilisant un prior construit avec s
+
+Pour chaque distribution à posteriori obtenu, on calcule la valeur P(p <= mu), qui est la probabiltié selon ma distribution que la valeur de p soit inférieure à la probabilité d'observer le MeSH de manière générale. Plus elle est faible plus on est certain que notre association est signficative, notre proba est très certainement supérieure à la proba d'observer le MeSH de manière générale. C'est notamment comme ça que je test l'asssociation avec le modèle de mélange à la fin.
+
+Enfin, on calcule la proportion d'associations pour lesquelles P(p <= mu) indique toujours que l'asso est significative. Cela indique que notre prior n'a pas écrasé notre observation et que ceux qui était significatif l'est toujours selon la distribution
+
+J'ai vérifié initialement et en utilisant un prior non-informatif 100% des assos sont retrouvé donc pas de biais :wink:
+
+
+Et on peut faire pareil pour els assos Négatives !!! 
+
+Ça nous donne une idée de comment notre paramètre *s* influe sur les taux de faux-positifs et négatifs ;)

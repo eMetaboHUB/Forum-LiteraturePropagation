@@ -377,11 +377,13 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 
 
 def plot_distributions(uninformative, prior_mix, posterior_mix):
-    plt.plot(uninformative.x, uninformative.f, label = "Posterior with uninformative prior")
-    plt.plot(prior_mix.x, prior_mix.f, label = "prior mix")
-    plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior with prior mix")
+    # plt.plot(uninformative.x, uninformative.f, label = "Posterior with uninformative prior")
+    plt.plot(prior_mix.x, prior_mix.f, label = "prior mix", color = "blue")
+    plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior with prior mix", color = "red")
     plt.title('Differences between Uninformative, mix prior and posterior mix distribution ')
     plt.legend()
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
     plt.show()
 
 def plot_prior_mix_distributions(prior_mix, labels, seq):
@@ -393,6 +395,8 @@ def plot_prior_mix_distributions(prior_mix, labels, seq):
         plt.plot(x, y, label = labels[it])
     plt.title('Prior decomposition')
     plt.legend()
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
     plt.show()
 
 
@@ -401,7 +405,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False):
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5):
     
     # Out
     r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
@@ -415,12 +419,12 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     del labels[index]
     n = corpora.pop(index)
 
-    # Check for other null weights, in cas of low alpha (damping) for instance
-    if 0 in weights:
+    # Check for other null weights, in cas of low alpha (damping) for instance. We consider a weight null if weight < 1e-5
+    if not all(w > weigth_limit for w in weights):
         to_remove = list()
         for it in range(0, len(weights)):
             # Check if weights == 0
-            if not weights[it]:
+            if weights[it] <= weigth_limit:
                 # print("Warning: weight at index " + str(it) + " is null: " + labels[it] + " Low damping factor used ?")
                 to_remove.append(it)
         
@@ -442,7 +446,6 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         prior_cdf_ratios = np.Inf
     else:
         prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/prior_mix_CDF)
-    
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)

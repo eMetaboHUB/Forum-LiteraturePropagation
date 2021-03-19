@@ -136,7 +136,7 @@ def compute_PR(A, i, alpha, epsilon = 1e-9):
         pi = new_pi
         new_pi = M @ pi
         c += 1
-    print(str(c) + " iterations to convergence.")
+    # print(str(c) + " iterations to convergence.")
 
     # Insert 0 at targeted index
     r = np.insert(new_pi, i, 0, axis = 0)
@@ -230,6 +230,18 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
     res = r(alpha, beta, x, y, mu)
 
     return res
+
+def estimate_prior_distribution_mesh_V2(mesh_corpora, N, sample_size):
+    
+    r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
+    # Determine expected mu:
+    mu = mesh_corpora/N
+
+    alpha =  mu * sample_size
+    beta = (1 - mu) * sample_size
+
+    result = r(alpha, beta)
+    return result
 
 def estimate_prior_distribution_mesh(mesh_corpora):
     
@@ -365,19 +377,35 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 
 
 def plot_distributions(uninformative, prior_mix, posterior_mix):
-    plt.plot(uninformative.x, uninformative.f, label = "Posterior with uninformative prior")
-    plt.plot(prior_mix.x, prior_mix.f, label = "prior mix")
-    plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior with prior mix")
+    # plt.plot(uninformative.x, uninformative.f, label = "Posterior with uninformative prior")
+    plt.plot(prior_mix.x, prior_mix.f, label = "prior mix", color = "blue")
+    plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior with prior mix", color = "red")
     plt.title('Differences between Uninformative, mix prior and posterior mix distribution ')
     plt.legend()
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
     plt.show()
+
+def plot_prior_mix_distributions(prior_mix, labels, seq):
+    x = np.arange(0, 1 + seq, seq).tolist()
+    weights = prior_mix.weights
+    for it in range(0, len(weights)):
+        f = ss.beta.pdf(x, a = prior_mix.alpha[it], b = prior_mix.beta[it])
+        y = weights[it] * f
+        plt.plot(x, y, label = labels[it])
+    plt.title('Prior decomposition')
+    plt.legend()
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.show()
+
 
 def compute_mix_CDF(p, weights, alpha, beta):
     cdf_i = [ss.beta.cdf(p, alpha[it], beta[it]) for it in range(0, len(weights))]
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False):
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5):
     
     # Out
     r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
@@ -387,15 +415,16 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     cooc = data["COOC"].tolist()
     k = cooc.pop(index)
     corpora = data["TOTAL_PMID_SPECIE"].tolist()
+    labels = data["SPECIE"].to_list()
+    del labels[index]
     n = corpora.pop(index)
 
-    # Check for other null weights, in cas of low alpha (damping) for instance
-    if 0 in weights:
-        labels = data["SPECIE"]
+    # Check for other null weights, in cas of low alpha (damping) for instance. We consider a weight null if weight < 1e-5
+    if not all(w > weigth_limit for w in weights):
         to_remove = list()
         for it in range(0, len(weights)):
             # Check if weights == 0
-            if not weights[it]:
+            if weights[it] <= weigth_limit:
                 # print("Warning: weight at index " + str(it) + " is null: " + labels[it] + " Low damping factor used ?")
                 to_remove.append(it)
         
@@ -404,14 +433,19 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
             del weights[rmv]
             del cooc[rmv]
             del corpora[rmv]
+            del labels[rmv]
     # Uninformative
     obs = observation_uninformative_prior(k, n, seq, sampling = plot)
-
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
-    prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta))
-    
+    prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
+    # If prior mix CDF is already estimated to 0, set log2FC to infinite
+    if not prior_mix_CDF:
+        print("Warning: prior mix CDF is estimated to 0. The value of the CDF ratio between MeSH prior and prior mix is set to Inf.")
+        prior_cdf_ratios = np.Inf
+    else:
+        prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/prior_mix_CDF)
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
@@ -419,6 +453,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     Log2numFC = np.log2(posterior_mix.mu/p)
     
     if plot: 
+        plot_prior_mix_distributions(prior_mix, labels, seq)
         plot_distributions(obs, prior_mix, posterior_mix)
     
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)

@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = FALSE)
 library(ggplot2)
 library(tidyverse)
 library(DT)
+library(ggridges)
 ```
 
 ## La distribution Beta 
@@ -40,29 +41,11 @@ La moyenne d'une variable suivant une loi beta est $E[X] = \frac{\alpha}{\alpha 
 
 On peut retrouver dans la literature une autre manière, simplement $\sigma = (\alpha + \beta)$, et donc $\alpha = \mu \sigma$ et $\beta = (1 - \mu) \sigma$
 
-L'idée avec cette re-paramétrisation c'est que $\mu$ représente la probabilié moyenne de succès (l'espérance moyenne de succès) et $\sigma$ est appelé le paramètre de surdispersion, qui va nous permettre de gérer la variabilité, l'incertitude, que l'on a autour de cette moyenne. En constatant que $\sigma$ est directement fonction de $\alpha + \beta$, on voit que l'on exprime notre variabilité autour de cette moyenne en fonction du nombre d'expériences totales réalisées : nb.succès + nb.échecs. Plus le nombre d'expériences est élevé, plus la variabilité est faible. 
+L'idée avec cette re-paramétrisation c'est que $\mu$ représente la probabilié moyenne de succès (l'espérance moyenne de succès) et $\sigma$ est appelé le paramètre de dispersion, qui va nous permettre de gérer la variabilité, l'incertitude, que l'on a autour de cette moyenne. En constatant que $\sigma$ est directement fonction de $\alpha + \beta$, on voit que l'on exprime notre variabilité autour de cette moyenne en fonction du nombre d'expériences totales réalisées : nb.succès + nb.échecs. Plus le nombre d'expériences est élevé, plus la variabilité est faible. Petite précision pour ne pas confondre: $\sigma$ est notre paramètre de dispersion, mais dans la literature on pourra entendre parler de $\phi$ ou de $\rho$ que l'on appelle le paramètre de *sur-dispersion*. Car comme on peut le voir il représente l'augmentation de la variabilité du à l'utilisation de notre $Beta()$, mais attention c'est différent de $\sigma$. Sur la doc de Gamlss on peut voir que la variabilité de notre $Beta-binomiale$ vaut: $Var(Y) = n \mu (1 - \mu)[1 + \frac{(n - 1)\sigma}{(\sigma + 1)}]$ en utilisant les $\mu$ et $\sigma$ paramètrisation. (Sur la doc il donne la sd, mais c'est simplement la racine de la variance). Or on a don cque $(\sigma + 1) = \frac{1 + \alpha + \beta}{\alpha + \beta}$ et donc : $\frac{(n - 1)\sigma}{(\sigma + 1)} = \frac{(n - 1)}{\alpha + \beta} \times \frac{\alpha + \beta}{1 + \alpha + \beta} = \frac{(n - 1)}{1 + \alpha + \beta}$ Ainsi: $[1 + \frac{(n - 1)\sigma}{(\sigma + 1)}] = [1 + \frac{(n - 1)}{1 + \alpha + \beta}]$. C'est alors qu'on pose $\rho$ ou $\phi = \frac{1}{1 + \alpha + \beta}$, donnant ainsi: $[1 + \frac{(n - 1)\sigma}{(\sigma + 1)}] = [1 + (n - 1)\phi]$
 
-## Petit exemples
+Pour notre variabilité on a donc: $Var(Y) = n \mu (1 - \mu) [1 + (n - 1)\phi]$. la propriété très interessant par rapport à $\phi$ c'est donc que lorsque l'on fixe le paramètre de sur-dispersion $\phi = 0$, on a que $Var(Y) = n \mu (1 - \mu)$, ce qui est **exactement** la variabilité d'une binomiale classique! Ceci montre que sans sur-dispersion apporté par notre $Beta()$, notre modèle est simplement une binomiale ! Ce paramètre ajoute donc de la variance à ntore Beta !!! :)
 
-Si je sais que ma *vrai* probabilité $p = 0.2$, et que je fais $n = 100$ tentatives, la moyenne de mes comptages observée sera donc $np$ soit ici 20. 
-Mais cependant, je ne vais pas toujours observée 20 ! Certaines fois j'aurais de la chance et je vais observée 25 succès et d'autres fois peut être moins de chance et observer seulement 15 succès. Ainsi, si avec ces comptages j'essaye de re-estimé ma probabilité, je sais que je ne vais pas toujours dire que $p = 0.2$, je l'estimerait certaines fois un peu plus haute car j'aurais eu de la chance sur mon tirage et certaines fois un peu plus faible. 
-
-On fait donc l'expérience, on réalise 10000 fois l'expérience binomiale avec $p = 0.2$ et $n = 100$. 
-A partir du nombre de succès observé, on ré-estime la probabilité $p$
-On regarde ensuite la distribution de ces probabilité et on y superpose la densité d'une loi Beta. On sait notamment que la probabilité moyenne obervé, sera 0.2.
-
-Comme on peut le constater, la loi Beta(20,80) définit parfaitement la distribution de mon paramètre $p$.
-
-```{r bintest1}
-x <- rbinom(10000, 100, 0.2)/100
-ggplot(data.frame(x = x), aes(x = x)) + 
-  theme_classic() +
-  geom_histogram(aes(y = ..density..), binwidth = 0.01, color="black", fill="white") +
-  stat_function(fun = dbeta, args = list(shape1 = 20, shape2 = 80), aes(colour = "Beta(20,80)"))
-```
-
-
-Mais dans cet exemple, j'ai créer mes comptages en connaissant à l'avance mon paramètre $p$. Or dans 'la vraie vie', c'est l'inverse, on observe des données et on veut en déduire le paramètre p.
+Mais attention, ce que l'on fit avec GAMLSS c'est $\mu$ et $\sigma$, on ne fit **pas** le paramètre de sur-dispersion directement !! Par contre on voit très bien le lien entre $\sigma = \frac{1}{\alpha + \beta}$ et $\phi = \frac{1}{\alpha + \beta + 1}$, les deux sont tout de même largement corrélés quand $\sigma$ est grand, globalement $\phi$ est grand aussi. Donc les deux tendent à refléter la même chose, la dispersion, mais ne sont pas tout à fait égaux  :)
 
 ## Les estimateurs
 
@@ -258,6 +241,7 @@ for(p in v.p){
 data <- data %>% filter(X == 20)
 ggplot(data, aes(x = p)) + 
   theme_classic() +
+  theme(text = element_text(size = 35)) +
   geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
   xlim(0,1) +
     geom_vline(xintercept = 0.2, 
@@ -282,9 +266,10 @@ Donc on refait le même plot en superposant :
 ```{r bintest5}
 ggplot(data, aes(x = p)) + 
   theme_classic() +
+  theme(text = element_text(size = 35)) +
   geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
   xlim(0,1) +
-  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(colour = "Beta(21,81)"), size=1)
+  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(colour = "Beta(21,81)"), size=1.5, color = "red")
 ```
 
 Comme on peut le voir notre distribution $Beta(21,81)$ fit parfaitement la distribution de nos probabilité $p$ lorsque $k = 20$, correspondant à la distribution de la vraisemblance par rapport à $p$. 
@@ -310,19 +295,20 @@ Maintenant on va tout ploter en même temps :
 map = 0.2
 ggplot(data, aes(x = p)) + 
   theme_classic() +
+  theme(text = element_text(size = 35)) +
   geom_histogram(aes(y = ..density..), binwidth = 0.005, color="black", fill="white") +
-  xlim(0,1) +
+  xlim(0,0.5) +
   geom_point(data=data.frame(proba = map, Likehood = dbeta(map,21,81)), 
              aes(x=proba,y=Likehood), 
              color='red',
              size=3) +
   annotate(geom = "text", x= map + 0.1, y = dbeta(map,21,81) + 0.1, label="MAP <-> MLE ") +
-  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(color = "Beta(21,81)"), size = 1) +
+  stat_function(fun = dbeta, args = list(shape1 = 21, shape2 = 81), aes(color = "Beta(21,81)"), size = 1.5, color = "red") +
   geom_vline(aes(xintercept = map, 
-                color = "MLE"), size = 0.5) + 
+                color = "MLE"), size = 2) + 
   geom_vline(aes(xintercept = (21/(21+81)), 
-                color = "BAYES"), size = 0.5) +
-  scale_color_manual(name = "Estimators", values = c(MLE = "red", BAYES = "green", "Beta(21,81)" = "blue"))
+                color = "BAYES"), size = 2) +
+  scale_color_manual(name = "Estimators", values = c(MLE = "blue", BAYES = "green", "Beta(21,81)" = "blue"))
 
 ```
 
@@ -740,7 +726,7 @@ On modélise ainsi les comptages de succès $Y_i$ par rapport à $\alpha_i$ et $
 Ainsi, il faut  
 
 
-Lorsque l'on pose notre modèle, on va effectué une reparamétrisation de la distribution beta, en terme de moyenne $\mu$ et de sur-dispersion (la variabilité derrière $p$) $\sigma$. On pose alors $\mu$, la probabilité moyenne de succès, $\mu = \frac{\alpha}{\alpha + \beta}$ et $\sigma = \frac{1}{\alpha + \beta}$. On peut donc re-paramétrer notre $Beta$ pour un MeSH $i$ tel que $p_i \sim Beta(\frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$. Même si cela semble compliqué les choses, en fait lorsque l'on veut poser des prior ou autre c'est plus facile de réfléchir en terme de probabilité moyenne et dispersion qu'en terme de $\alpha$ et de $\beta$. Donc par défaut on transforme nos paramètres avant de les mettre dans le modèle.
+Lorsque l'on pose notre modèle, on va effectué une reparamétrisation de la distribution beta, en terme de moyenne $\mu$ et de sur-dispersion (la variabilité derrière $p$) $\sigma$. On pose alors $\mu$, la probabilité moyenne de succès, $\mu = \frac{\alpha}{\alpha + \beta}$ et $\sigma = \frac{1}{\alpha + \beta}$. On peut donc re-paramétrer notre $Beta$ pour un MeSH $i$ tel que $p_i \sim Beta(\frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$. Même si cela semble compliqué les choses, en fait lorsque l'on veut poser des prior ou autre c'est plus facile de réfléchir en terme de probabilité moyenne et dispersion qu'en terme de $\alpha$ et de $\beta$. Donc par défaut on transforme nos paramètres avant de les mettre dans le modèle. Pour avoir une explication (une référence pour cette reparamétrisation), il suffit de regarder le document The gamlss.family distributions. Dans la formulation de la densité de probabilité de leur BB, ils définissent en fonction des deux paramètres $\mu$ et $\sigma$. En comparant avec la formule classique de la BB, on peut facilement re-identifier les termes et voir que $\frac{1}{\sigma}$ correspond à $\alpha + \beta$, donc effectivement $\sigma = \frac{1}{\alpha + \beta}$ et on voit aussi que $\frac{\mu}{\sigma}$ correspond au terme $\alpha$ dans l'équation classique, donc que $\mu(\alpha + \beta) = \alpha$, alors on retrouve bien que $\mu = \frac{\alpha}{\alpha + \beta}$ 
 
 Ainsi après reparamétrisation : $p_i \sim Beta(\frac{\mu_i}{\sigma_i}, \frac{(1 - \mu_i)}{\sigma_i})$
 
@@ -945,3 +931,384 @@ On peut donc déterminer la probabilité moyenne $p(m|s)$ pour notre composé ci
 
 Ma probabilité moyenne $p(m|s)$ peut être considérer comme mon estimateur Bayesien de la moyenne ;)
 Pour estimer à quel point notre probabilité moyenne est supérieure à $p(m)$ on peut regarder la CDF par rapport à cette proba.
+
+
+## Nouvel estimateurs du prior :
+Ref: John_K_Kruschke-Doing_Bayesian_Data_Analysis-EN.pdf pages.129-130 
+
+Nous devons estimé les distributions à priori qu'un article discutte du MeSH pour nos composés,k mais la regression ne semble pas être la solution la plus adapté, car le modèle semble difficilement se fitter.
+
+Cependant, on peut imaginer poser un à prior théorique en formulant une hypothèse génératrice :
+- L'hypothèse la plus simple que l'on puisse formuler sur notre prior est que l'on estime, à priori, qu'il n'y a pas de liens particulier (de relation directe) entre notre composé notre MeSH. A priori on peut largement considérer que ces éléments sont indépendants et que si il y a une relation, ce sont nos données qui devront le montrer. L'apriori indiquerait donc une indépendances entre nos évènemenet "l'article parle du composé X" et "l'article parle du MeSH Y", puiqu'a priori on a aucun indice sur leur relation.
+
+Sachant cela, on s'attend donc à priori, que la probababilité $p(m|s) = p(m)$ sous l'hypothèse d'indépendance, donc on peut estimer que notre distribution à priori devrait être centré autour de la probabilité générale d'observer le MeSH, soit $p(m)$
+
+Intuitivement, on pourrait donc utiliser la moyenne par exemple, pour fixer le paramètre $\mu$ de notre distribution et ainsi posé notre prior. Cependant, les probabilités $p(m)$ d'observer les MeSH sont généralement assez faible (98\% < 0.01 par exemple) 
+Cependant, la valeur moyenne $\mu$ d'une distribution, affecte ce que l'on appelle la *skewness* de la distribution. La *skewness* représente le degré d'asymétrie de la distribution. Pour une *skewness* nulle, la distribution est symétrique, pour des positive de *skewness*, elle présente une *right tail* et pour des valeurs négatives une *left tail*
+
+Dans le cas de la distribution beta, dans le cas non-symmétrique lorsque $\alpha \neq \beta$ (ce qui est notre cas), on a que :
+$\lim_{\mu \to 0} \gamma = \infty$
+
+Dans le cas particulier où $\alpha = \beta$, la moyenne, la mediane et le mode sont égaux
+
+Ainsi, à mesure que la moyenne $\mu$ tend vers 0, notre distribution de vient de plus en plus asymétrique, ce qui est a un effet important sur  la relation entre la moyenne et le mode de la distribution. Lorsque la distribution est symétrique, la moyenne est égale au mode de la distribution, soit la valeur la plus probable. Dans le cas d'une distribution asymétrique la moyenne s'éloigne du mode et se décale vers la longue tail, c'est l'asymétrie. Quelques exemples :
+
+```{r}
+mu.1 <- 0.5
+mu.2 <- 0.05
+mu.3 <- 0.95
+o <- 100
+p <- seq(0, 1, 0.0001)
+for(mu in c(mu.1, mu.2, mu.3)){
+  alpha <- mu * o
+  beta <- (1 - mu) * o
+  mode <- (alpha - 1)/(alpha + beta - 2)
+  g <- ggplot(data.frame(proba = p, density = dbeta(p, alpha, beta)), aes(x = proba, y = density)) + 
+    geom_line() +
+    ylim(c(0,20)) +
+    theme_classic() + 
+    stat_function(fun = dbeta,
+                args = list(shape1 = alpha, shape2 = beta),
+                geom = "area",
+                fill = "#F8766D",
+                xlim = c(mu, 1)) +
+    stat_function(fun = dbeta,
+            args = list(shape1 = alpha, shape2 = beta),
+            geom = "area",
+            fill = "#619CFF",
+            xlim = c(0, mu)) +
+    geom_vline(xintercept = mu, colour = "black") +
+    annotate("text", x = mu + 0.1, label = paste0("Mean\n", "P(p < Mean) = ", round(pbeta(mu, alpha, beta), 2), "\n", "P(p > Mean) = ", round(1 - pbeta(mu, alpha, beta), 2)), y = 10, color = "black") +
+    geom_vline(xintercept = mode, colour = "blue") +
+    annotate("text", x = mu + 0.1, label = "Mode", y = 13, color = "purple")
+  plot(g)
+}
+
+```
+
+En prenant des cas plus prononcés :
+$\alpha < 1$, le mode n'est plus définis, la distribution est **J**-shaped, la densité de probabilités tend vers l'infini en se rapprochant de 0
+
+```{r}
+mu.1 <- 0.5
+mu.2 <- 0.005
+mu.3 <- 0.995
+o <- 100
+p <- seq(0, 1, 0.0001)
+for(mu in c(mu.1, mu.2, mu.3)){
+  alpha <- mu * o
+  beta <- (1 - mu) * o
+  g <- ggplot(data.frame(proba = p, density = dbeta(p, alpha, beta)), aes(x = proba, y = density)) + 
+    geom_line() +
+    ylim(c(0,100)) +
+    theme_classic() + 
+    stat_function(fun = dbeta,
+                args = list(shape1 = alpha, shape2 = beta),
+                geom = "area",
+                fill = "#F8766D",
+                xlim = c(mu, 1),
+                ylim = c(0, 100)) +
+    stat_function(fun = dbeta,
+            args = list(shape1 = alpha, shape2 = beta),
+            geom = "area",
+            fill = "#619CFF",
+            xlim = c(0, mu),
+            ylim = c(0, 100)) +
+    geom_vline(xintercept = mu, colour = "black") +
+    annotate("text", x = mu + 0.1, label = paste0("Mean\n", "P(p < Mean) = ", round(pbeta(mu, alpha, beta), 2), "\n", "P(p > Mean) = ", round(1 - pbeta(mu, alpha, beta), 2)), y = 10, color = "black") +
+    annotate("text", x = mu + 0.1, label = "Mode", y = 13, color = "purple")
+  plot(g)
+}
+
+```
+
+Comme on peut le voir à mesure de $\mu$ diminue, on a l'asymétriue de la distribution s'accentue ! 
+On passe par exemple pour 
+
+- $\mu = 0.05, s = 100$: $P(p \le \mu) = 0.56, P(p > \mu) = 0.44$
+
+- $\mu = 0.005, s = 100$: $P(p \le \mu) = 0.68, P(p > \mu) = 0.32$ (quasi 2/3 - 1/3)
+
+
+Ainsi dans notre cas, si on essaye de poser cette distribution à priori en fixant la moyenne $\mu$ comme paramètre, on risque de poser des distributions très asymétriques, généralement même avec un $\alpha < 1$. Ainsi la grande partie de la masse des probabilités se trouvera inférieure à la moyenne et cette asymétrie peut biaisé nos résultats. En effet, en voulant initialement centré à la moyenne on a pas de prior sur si les probabilité serait plutôt inférieure ou supérieure à celle-ci, on voudrait quelque chose. 
+Deplus notre 'test' final consiste à chercher pour notre distribution à posteriori, $P(p <= p(m))$, on cherche qu'elle est la probabilité qu'a posteriori notre probabilité estimé soit inférieure à celle d'observer le MeSH de manière générale, plus cette proba ($P(p <= p(m))$) est faible, plus on est sur de notre proposition. Or dans ce cas, notre prior à déjà tendance à favoriser le rejet alors qu'il n'y pas de raisons apparente de considérer cela à priori.
+
+Ainsi dans l'idée que notre distribution à priori décrive l'hypothèse d'indépendance, il semble alors plus correct d'utiliser le mode plutôt que la moyenne pour poser notre prior. Ainsi, dans l'idée du prior, on souhaite alors que la valeur $p(m)$ soit la valeur la plus probable dans notre distribution. En utilisant le mode pour construire notre distribution, on va donc poser un modèle dans lequel le pic de notre distribution sera centré autour de $p(m)$. 
+
+Aussi, le fait de poser notre modèle autour du mode, impose que notre distribution sera unimodale, avec une valeur précise du mode, ce qui n'est pas le cas quand $\alpha < 1$ par exemple, où les densités de proba tendent vers l'infini quand les probas se rapproche de 0. Utiliser le mode pour poser notre modèle, impose donc que pour notre prior: $\alpha, \beta > 1$.
+Ceci impose également que la densité sera nulle en 0 et en 1, ce qui est en accord avec notre hypothèse selon laquelle toute proba $p(m|s) > 0$.
+
+On note le mode $\omega$, $\omega = \frac{\alpha - 1}{\alpha  + \beta - 2}$.
+On pose également un second paramètre $s = \alpha + \beta$, la sample size, où *concentration* qui représente le *spread*, l'étendu de notre distribution. Plus $s$ est grand, plus la variance de la distribution sera faible, basé sur beaucoup d'observations, et quand $s$ sera faible, au contraire l'allure de la distribution sera très étendue, avec une grande variance. 
+
+On a donc :
+
+$\alpha = \omega(s - 2) + 1$ et $\beta = (1 - \omega) (s - 2) + 1$
+
+C'est une paramétrisation connue de la beta décrite dans  John_K_Kruschke-Doing_Bayesian_Data_Analysis-EN.pdf pages.129-130  et sur Wikipedia ^^
+
+Pour la paramètre $s$, la concentration, il va représenter la variance que l'on souhaite intégrée dans notre prior. Plus $s$ sera faible plus notre distribution à priori sera "large" et plus $s$ sera grand, on notre prior aura l'allure d'un pic !
+
+Pour choisir une valeur initiale, on peut utiliser la mediane des tailles de corpus de nos species, en se considérant que celles avec au moins 1 article annoté.  On trouve alors 235, on peut donc mettre 200 comme valeur intiale.
+Je pense qu'il sera intéressant de faire varier ce paramètre, car il gère la variance de notre prior
+
+
+
+**MAIS EN FAIT C'EST TOUJOURS PAS LA SOLUTION !!!** 
+
+Lors effectivement on obtinedra toujours une distribution unimodale etc ... **MAIS**, pour la répartition des probabilité on va obtenir l'effet inverse ... C'est à toujours que l'on aura tendance à favoriser les probabilité supérieure à $p(m)$ et en fait, je trouve que c'est pire que l'obtiens de la moyenne car ça augmentera le taux de Faux positif.. Ainsi, on préfère utiliser la moyenne $\mu$ qui certe va augmenter notre taux de faux négatifs, mais c'est moins grave que les faux positifs !!
+
+
+Exemple 
+
+On pose $s = 200$
+Cas où l'on utilise $\mu$ pour poser notre prior
+
+```{r}
+data <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/data_specie100_mesh100_tspvalue.csv")
+dt <- data[data$TOTAL_PMID_MESH > 9000 & data$TOTAL_PMID_MESH < 11000 & data$ts.p.value > 0.1, ]
+s <- 11028.3
+mu <- mean(dt$TOTAL_PMID_MESH)/N
+alpha <- mu * s
+beta <-  (1 - mu) * s
+
+cc <- data.frame(p = c(dt$p, rbeta(10000, alpha, beta)), Type = c(rep("Observed", nrow(dt)), rep("Sampled", 10000)))
+
+ggplot(cc, aes(x = log(p), y = 1, color = Type)) + 
+  geom_density_ridges2(aes(fill = Type), alpha = .5, color = "white") + 
+  scale_fill_cyclical(
+    values = c("#ff0000", "#0000ff"),
+    name = "Option", guide = "legend"
+  ) +
+  theme_ridges()
+```
+
+Quand on utilise le mode :
+
+```{r}
+mode <- mean(dt$TOTAL_PMID_MESH)/N
+alpha <- mode * (s - 2) + 1
+beta <-  (1 - mode) * (s - 2) + 1
+
+cc <- data.frame(p = c(dt$p, rbeta(10000, shape1 = alpha, shape2 = beta)), Type = c(rep("Observed", nrow(dt)), rep("Sampled", 10000)))
+
+ggplot(cc, aes(x = log(p), y = 1, color = Type)) + 
+  geom_density_ridges2(aes(fill = Type), alpha = .5, color = "white") + 
+  scale_fill_cyclical(
+    values = c("#ff0000", "#0000ff"),
+    name = "Option", guide = "legend"
+  ) +
+  theme_ridges()
+```
+
+
+
+Donc on utilisera $\mu$ pour poser notre distribution, avec le paramètre $s$ :
+
+- $\alpha  = \mu s$ 
+- $\beta  = (1 - \mu) s$
+
+Maintenant, est-ce qu'on peut améliorer l'estimation de $s$ ?
+Plot :
+
+```{r}
+N <- 8877780
+data_mesh <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/mesh_pmid.csv")
+cid_stats_assos <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/cid_mesh_stats_assos2.csv")
+data_specie <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/species_cid_pmid.csv")
+data_specie_mesh <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/species_cid_mesh_pmid.csv")
+data <- data_specie_mesh %>% left_join(data_mesh, by = "MESH") %>% left_join(data_specie, by = "SPECIE") %>% mutate(p = COOC/TOTAL_PMID_SPECIE)
+# On ajoute les stats sur les assos CID - MESH
+cid_stats_assos <- cid_stats_assos %>% mutate(ID = paste0(CID, MESH)) %>% dplyr::select(ID, p.value, odds_ratio, q.value)
+data <- data %>% mutate(ID = paste0(CID, MESH)) %>% left_join(cid_stats_assos, by = "ID") %>% dplyr::select(-ID)
+
+data_plot <- data %>% group_by(MESH) %>% mutate(MEDIAN = median(TOTAL_PMID_SPECIE)) %>% dplyr::select(MESH, TOTAL_PMID_MESH, MEDIAN) %>% distinct()
+ggplot(data_plot, aes(x  = log(TOTAL_PMID_MESH), y = log(MEDIAN))) + geom_point() + theme_classic()
+```
+
+En utilisant l'ensemble des associations, j'ai tracé le nuage de point montrant la mediane des tailles de corpus des composés en fonction de la taille corpus des MeSH (en log) et on voit une tendance très claire !
+Alors pour que ce soit plus évident il faut considérer les tailles de corpus de MeSH à partir de 500 par exemple car avant on voit beaucoup de variabilité, il n'y a pas becoup d'associations pour calculer cette mediane.
+À mesure que la taille du corpus augmente, et donc que l'on représente des termes de plus en plus larges (Coronary Occlusion -> Cardiovascular diseases), le corpus des composés associés médian est plus faible. En gros j'ai l'impression que ça montre que lorsque l'on parle de MeSH assez "rare", ce sont des composés avec beaucoup de literature qui arrive à les capter et que les composés "rare" ont donc tendance à rarement aborder des sujets  peu fréquement discutés. De la même manière, plus on regarde des composés avec des corpus forts, décrivant des concepts fréquents/broads, plus on va retrouver des composés peu fréquent dans les composés qui le discutte. Je pense que ça explique également pourquoi je vois beaucoup de variabilité pour les MeSH à fort corpus, ils sont dicutté par un large panel de composés avec des tailles de corpus différentes.
+
+C'est pour les associations générale c'est pas valable si on considère que les signif ou autre. Aussi, c'est pas un biais des species du réseau, j'observe le même pattern sur les composés PubChem.
+
+Ceci corrobore également l'observation que l'on avait fait précédemnt où il semblait que la variabilité de mes proba estimées était croissante par rapport à la taille de corpus :
+
+
+```{r}
+data_plot <- data %>% group_by(MESH) %>% mutate(VAR = var(p)) %>% dplyr::select(MESH, TOTAL_PMID_MESH, VAR) %>% distinct()
+ggplot(data_plot, aes(x  = log(TOTAL_PMID_MESH), y = log(VAR))) + geom_point() + theme_classic()
+
+```
+
+Or, le paramètre qui va nous permettre de régler la variabilité c'est bien $s$, la taille de sample que l'on choisit pour notre prior.
+Ce que l'on a constaté c'est que la mediane des species associées aux MeSH était décroissante par rapport à la taille du corpus MeSH. Les MeSH les plus rares sont abordés par des composés à fort corpus tandis que les MeSH fréquents, broads, sont abordés par l'ensemble des species, avec des faibles comme des forts corpus.
+
+Ainsi pour les MeSh à faible corpus, sachant que ce sont des composés très fréquent qui en parle, le paramètre $s$ derrière la distribution à priori sera plus élevé, une variabilité faible, plutôt que pour les MeSH à fort corpus pour lesquel on admettra une plus faible valeur de $s$ et donc une plus grande variabilité
+
+On va donc fitter la taille du corpus $s$ que l'on souhaite utiliser pour notre prior par rapport à la taille du corpus du MeSH. On fit en log ce sera mieux et en utilisant seulement les MeSH > 2000:
+
+```{r}
+data_fit <- data %>% filter(TOTAL_PMID_MESH > 2000) %>% group_by(MESH) %>% mutate(MEDIAN = log(median(TOTAL_PMID_SPECIE)), LOG_SIZE_MESH = log(TOTAL_PMID_MESH)) %>% dplyr::select(MESH, LOG_SIZE_MESH, MEDIAN) %>% distinct()
+fit <- lm(data = data_fit, formula = MEDIAN ~ LOG_SIZE_MESH)
+ggplot(data_fit, aes(x = LOG_SIZE_MESH, y  = MEDIAN)) + geom_point() + geom_line(data = data.frame(x = data_fit$LOG_SIZE_MESH, y = fit$fitted.values), aes(x = x, y = y, color = "red")) + theme_classic()
+```
+
+j'aime bien aussi comment ils parent de ce paramètre $s$ (appelé $k$ dans le texte suivant, traduit depuis la Ref: John_K_Kruschke-Doing_Bayesian_Data_Analysis-EN.pdf pages.129-130 ) :
+la valeur que nous choisissons pour le κ peut être pensée de cette façon : C'est le nombre de nouveaux coups de pièce de monnaie dont nous aurions besoin pour nous faire osciller entre les nouvelles données et la croyance antérieure concernant μ. Si nous n'avions besoin que de quelques nouveaux coups de pièce de monnaie pour faire osciller nos croyances, alors nos croyances antérieures devraient être représentées par un petit κ. Si nous avons besoin d'un grand nombre de nouveaux mouvements pour nous éloigner de nos convictions antérieures sur μ, alors nos convictions antérieures valent un très grand κ.
+
+Dans le cas de MeSH à faible corpus, je vois que les composés qui ont vu ces MeSH sont des composés à fort corpus, donc je sais avec sufisament de certitude qu'ils doivent être rare car même en piochant un grand nombre d'article je les voyais rarement. Ainsi je veux un prior fort, qui se base sur une forte taille de corpus. Dans le cas inverse, pour les MeSH à fort corpus, je les ai observés à la fois pour de composés à fort corpus mais aussi pour des composés à plus faible corpus sur lesquels on aura donc une plus grande variabilité, je souhaite donc avoir un prior plus faible basé sur moins d'effectifs.
+
+
+TEST :
+```{r}
+data_ts <- read_csv("/home/mxdelmas/Documents/Thèse/building_database/FORUM/kg-explorer/data/prior_models/data_specie100_mesh100_tspvalue.csv")
+dt <- data_ts[data_ts$TOTAL_PMID_MESH > 50000 & data_ts$TOTAL_PMID_MESH < 55000 & data_ts$ts.p.value > 0.1, ]
+s <- exp(predict.lm(fit, data.frame(LOG_SIZE_MESH = c(log(mean(dt$TOTAL_PMID_MESH))))))
+mu <- mean(dt$TOTAL_PMID_MESH)/N
+alpha <- mu * s
+beta <-  (1 - mu) * s
+
+cc <- data.frame(p = c(dt$p, rbeta(10000, alpha, beta)), Type = c(rep("Observed", nrow(dt)), rep("Sampled", 10000)))
+
+ggplot(cc, aes(x = log(p), y = 1, color = Type)) + 
+  geom_density_ridges2(aes(fill = Type), alpha = .5, color = "white") + 
+  scale_fill_cyclical(
+    values = c("#ff0000", "#0000ff"),
+    name = "Option", guide = "legend"
+  ) +
+  theme_ridges() +
+  ggtitle(paste("MESH Aortic Stenosis, Subvalvular (D001020), taille = 3690 articles\nMoyenne observée = ", mean(dt$p), "\nMoyenne du prior = ", mu))
+
+
+
+```
+Alors on pourrait dire qu'il est "semi-théorique" car la moyenne de la distribution est fixé théoriquement par p(M), par contre le paramètre sigma de taille de l'échantillon, j'ai fais une regression "Mediane corpus composés" ~ "Corpus MeSH" pour le déterminer.
+Vue que l'on a pas d'apriori sur le paramètre taille de l'échantillon de la distribution, on l'estime par la mediane des tailles de corpus des composés qui discuttent de MeSH avec des tailles de corpus similaires. Ainsi :
+
+    MeSH à faible corpus: On impose une grosse taille d'échantillon, comme ce que l'on voit sur nos données ce sont essentiellement des composés à fort coprus qui les observent, on a ainsi peu de variabilité attendue
+    MeSH à fort corpus: On impose une taille d'échantillon plus faible pour représenter le fait que même des composés à faibles corpus peuvent y être associé, on augmente la variabiltié attendue
+
+## Simplification du modèle :
+
+Notre modèle où l'on souhaite modéliser le paramètre *s* en fonction de la taille du corpus MeSH est peut être biaisé :
+
+D'un coté en formulant les choses de cette manière, le modèle "semble" fonctionner correctement, mais quand j'essaie de me l'expliquer, je trouve qu'il y a des éléments dont je ne suis pas certains. Est-ce qu'au final ces différences de variabilité que j'observe et que je veux représenter, est-ce que c'est pas simplement des artefacts, justement due aux différences que j'ai sur les tailles de corpus de mes MeSH. Mais, si tout mes composés était a peu près représentés de la même manière dans la litterature (le cas idéal), est-ce que je verrais également ça ? Pas sur ...
+Il y a une phrase dans un cours (Cf. Ref) que j'ai lu qui dit : "la valeur que nous choisissons pour le κ (le paramètre de taille d'échantillon) peut être pensée de cette façon : C'est le nombre de nouveaux coups de pièce de monnaie dont nous aurions besoin pour nous faire osciller entre les nouvelles données et la croyance antérieure concernant μ. Si nous n'avions besoin que de quelques nouveaux coups de pièce de monnaie pour faire osciller nos croyances, alors nos croyances antérieures devraient être représentées par un petit κ. Si nous avons besoin d'un grand nombre de nouveaux mouvements pour nous éloigner de nos convictions antérieures sur μ, alors nos convictions antérieures valent un très grand κ."
+Je vais poser s (le paramètre de taille d'échantillon) comme un hyperparamètre en disant: Je pose un prior en considérant qu'il a été construit sur la base de s articles, ainsi on peut s'attendre à ce que seul les composé avec au moins s articles seront en mesures de faire changé d'avis mon prior. C'est à dire que rajouter au moins autant d'observations qu'il en a été utilisé pour construire le prior
+De la sorte, j'impose une variabiltié sur le prior de tout les MeSH, $V(X) = \frac{\mu (1 - \mu)}{(1 + s)}$. Ainsi elle sera nécéssairement croissante en fonction de mu (jusqu'a 0.5 mais celui-ci n'est jamais atteint) et sinon sera décoissante par rapport à s
+Ça me semble relativement propre ...
+On connait facilement la moyenne et la variance de notre prior. On l'imagine donc comme étant issus de pseudo observations. On a donc un prior construit avec *\mu s* pseudo-succès et $(1 - mu)s$ pseudo échecs
+Après peut être que c'est un hyperparamètre que l'on a envie de faire varié pour rendre plus ou moins "fort" le prior ....
+
+**Cependant,** vue que dans la majorité de nos cas notre alpha sera < 1, et pour la beta il semble que l'on puisse interpréter alpha - 1 en terme de pseudo count, et non alpha ! : Cf Wiki :
+In Bayesian inference, using a prior distribution Beta(αPrior,βPrior) prior to a binomial distribution is equivalent to adding (αPrior − 1) pseudo-observations of "success" and (βPrior − 1) pseudo-observations of "failure" to the actual number of successes and failures observed, then estimating the parameter p of the binomial distribution by the proportion of successes over both real- and pseudo-observations. A uniform prior Beta(1,1) does not add (or subtract) any pseudo-observations since for Beta(1,1) it follows that (αPrior − 1) = 0 and (βPrior − 1) = 0. 
+Donc en fait si mon composé n'a pas d'observations succès, son nombre de pseudo-counts success sera négatif !!!
+Peut être que dans ce cas il vaut mieux le dégager du prior ...
+Pour ré-équilibrer les weights on a juste à recalculer les proportions sans lui ... et comme ça on ne le prends plus en compte. Si aucun voisin ne reste, peut être que l'on ne peut rien faire ...
+
+A voir avec Pablo et tout !!
+
+Ce qui dis Wikipedia : 
+The Haldane prior Beta(0,0) subtracts one pseudo observation from each and Jeffreys prior Beta(1/2,1/2) subtracts 1/2 pseudo-observation of success and an equal number of failure. This subtraction has the effect of smoothing out the posterior distribution. If the proportion of successes is not 50% (s/n ≠ 1/2) values of αPrior and βPrior less than 1 (and therefore negative (αPrior − 1) and (βPrior − 1)) favor sparsity, i.e. distributions where the parameter p is closer to either 0 or 1. In effect, values of αPrior and βPrior between 0 and 1, when operating together, function as a concentration parameter. 
+
+Après comment choisir un *s* par défaut ?
+
+
+Alors j'ai peut être trouvé une méthode pas trop mal pour ce donner une idée :
+
+Je récupère des associations significatives de FORUM (q.value <= 1e-6), sans weakness et parlant de diseases, j'en échantillonnage 1 million par exemple 
+
+Vue que dans notre modèle thérorique mu est fixé par la taille du corpus du MeSH, seul s, la taille d'échantillon peut varier
+
+On sélectionne plusieurs valeurs possible de s, j'ai pris:  c(10,20,30,40,50,60,70,80,90,100,150,200,250,500,750,1000,1500,2000)
+
+Pour chaque valeur de s, on calcule la distribution à posteriori que l'on obtiendrait pour chaque observation en utilisant un prior construit avec s
+
+Pour chaque distribution à posteriori obtenu, on calcule la valeur P(p <= mu), qui est la probabiltié selon ma distribution que la valeur de p soit inférieure à la probabilité d'observer le MeSH de manière générale. Plus elle est faible plus on est certain que notre association est signficative, notre proba est très certainement supérieure à la proba d'observer le MeSH de manière générale. C'est notamment comme ça que je test l'asssociation avec le modèle de mélange à la fin.
+
+Enfin, on calcule la proportion d'associations pour lesquelles P(p <= mu) indique toujours que l'asso est significative. Cela indique que notre prior n'a pas écrasé notre observation et que ceux qui était significatif l'est toujours selon la distribution
+
+J'ai vérifié initialement et en utilisant un prior non-informatif 100% des assos sont retrouvé donc pas de biais :wink:
+
+
+Et on peut faire pareil pour els assos Négatives !!! 
+
+Ça nous donne une idée de comment notre paramètre *s* influe sur les taux de faux-positifs et négatifs ;)
+
+### Nouvelle manère de voir les choses :
+
+En fait c'est pas si différent mais dans mon approche actuelle il y a peut être quelque chose de mal gérer au niveau de mes poids
+- initialement j'utilise ma probabilité FOT, qui représente en gros la proportion de marcheurs qui arrivent sur mon noeud cible. La chose étant, mes distribution à posteriori représente la probabilité qu'un article parlant du composé $i$ discutte du MeSH $M$. Ainsi, d'un coté je discutte de marcheurs qui représente en gros des paquets d'information et de l'autre coté on a des articles, c'est pas vraiment la même chose... En fait je pense que pour que mon modèle soit vraiment fluide, il faudrait que j'utilise les probabilité qu'un *article* du composé $i$ arrive sur mon composé cible. De cette manière, mon poids dans la mixture correpondent à la probabilité qu'un article arrivé sur le composé cible proviennent du composé $i$, et les proba associé correspondent à la probabilité qu'un article provenant du composé $i$, discutte de mon MeSH. Cela semble collé.
+
+C'est pablo qui a soulevé le problème. En effet mes probabilité jointe, qu'un article arrivé mon composé cible discutte du composé $i$ **ET** du MeSH $M$ snt assez flou car ce que je fais c'est une moyenne à la fin ... "Define the full joint probability of each node, which is not the same as averaging the outputs of the other nodes"
+
+**ATTENTION: ** Quand je faisait mon test de Fisher, je considéré mes composés entre eux, et mes MeSH entre eux, comme étant **des variables différentes** et non **des modalités** d'une même variables !! Dans mon test de Fisher l'évènement: l'article discutte du composé $i$^est une variable binaire: l'article discutte ou non du composé $i$, pareil pour les MeSH ! On avait jamais à prendre en compte le cas où un article parlait de plusieurs composés ou articles ... MAIS là, si on veut les considéré comme des modalités d'une même variable ça va être différent !!!!
+
+
+Ainsi, peut être qu'il faut que l'on discutte en terme d'association ! "Une asociation implique mon composé et mon MeSh" Ainsi, ce que l'on diffuse depuis les composés dans le réseau, ce sont des citation, des mentions, d'un composé avec un MeSH dans un article
+
+Cela change donc la probabilité simple d'observer 1 MeSH !!!
+En effet, désormais on ne cherche plus à savoir la probabilité d'un article discutte du MeSH, mais à savoir la probabilité qu'une "mention" dicutte du MeSH
+Néanmoins on peut faire la même hypothèse en terme d'indépendance ! La proabilité qu'une mention implique le MeSH $M$, sachant qu'elle implique dle composé $i$ est égale à la proba générale qu'une mention implique le MeSH $M$.
+
+Le modèle posé ne change pas :
+
+pour un composé $C_i$, j'ai $N_i$ article associé, formant $N_i$ mention de ce composés avec $k_i$ impliquant également mon MeSH $M$
+Pour une mention quelconque impliquant ce composé $C_i$, il a une probabilité $p_i$ qu'elle implique mon MeSH $M$. Si on note $X$ la variable aléatoire suivant un loi de Bernouli avec $X = 1$: "la mention parle du MeSH $M$" et $X = 0$: "la mention ne parle pas du MeSH $M$". J'ai $X \sim Be(p_i)$
+Cet épreuve est répété $N_i$ fois, et donc j'ai une suite de variables $X_1^i,X_2^i, ..., X_{N_i}^i$ qui suivent cette loi de Bernouli $Be(p_i)$
+
+On peut donc dire que leur somme pour le composé $i$, $\sum_{k = 1}^{N_i} X_k^i$, suit une loi de Bernouli de même paramètre $p_i$, $Bin(p_i, N_i)$
+
+Le fait est que je dispose également d'un apriori sur ce paramètre $p_i$ représente par ma distribution Beta: $Beta(\mu \nu, (1 - \mu) \nu)$ où $\nu$ est un hyperparamètre fixé et $\mu$ représente la probabilité générale, sur l'ensemble des mentions observées, qu'une mention implique le MeSH $M$
+
+
+On peut donc redéfinit notre modèle et nos probabilité marginale :
+
+Les évènements:
+
+- $m$: la mention parle/implique le mesh $m$
+- $c_i$: la mention parle/implique le composé $c_i$
+- $I$ la mention a atteint le composé cible
+
+$f(m|I) = \sum_{c= 1}^{N} = p(m|c_i)p(c_i|I)$
+$p(c_i|I)$ représentant la probabilité qu'une mention, arrivée sur le composé cible, parle de $c_i$.
+$p(m|c_i)$ represant la probabilité qu'une mention parlant du composé $c_i$, implique également le mesh $m$. Ceci étant indépendant de l'évènement $I$: "la mention arrive sur le composé $C_i$" -> $p(m|c_i, I) = p(m|c_i)$
+$f(m|I)$ représente donc la probabilité qu'une mention arrivant sur le composé cible mentionne le mesh $m$.
+
+En effet: 
+$f(m, c_i) = p(m|c_i)p(c_i)$
+$f(m, c_i|I) = p(m|c_i, I)p(c_i|I) = p(m|c_i)p(c_i|I)$ car indepéndace à $p(m|c_i, I) = p(m|c_i)$
+Et donc si on somme pour tous les $c_i$, on a bien que $f(m|I) = \sum_{c= 1}^{N} p(m|c_i)p(c_i|I)$
+
+
+
+Ensuite, à partir de cette distriubution, on calcule la probabilité à posteriori comme avant en ajoutant les observations qui sont propre au composé cible !
+
+Don en gros les choses qui changent par rapport àce que j'avais prévu intialement sont :
+
+- On considère des mentions et non des articles : Donc on calcule les probabilité marginales $p(m)$ avec la somme des co-occurences (qui représente les mentions) et non plus en utilisant le nombre total d'article.
+$N_i$ est le nombre total de mentions de composé $i$, ce qui correspond toujours à son nombre d'article annotés
+$N_i^m$ est le nombre de mentions du composé $i$ impluquant également le mesh $m$, c'est toujours la coocurence.
+$p(m|c_i) = \frac{N^m_i}{N_i}$, c'est la probabilité qu'une mention du composé $i$, implique le mesh $m$
+$p(c_i) = \frac{N_i}{\sum_j N_j}$, cette probabilité n'est plus calculé en utilisant l'Univers, le nombre d'articles distincts, mais, en utilisant la somme du nombre de mentions (aka nombre d'articles) annotés à chaque composé
+$p(m) = \sum_i p(m|c_i) p(ci) = \sum_i \frac{N_i^m}{Ni} \frac{N_i}{\sum_j N_j}$
+
+- Ainsi mes poids dans ma mixture : $p(c_i|I) = \frac{p(c_i, I)}{p(I)} = \frac{p(c_i, I)}{\sum_jp(c_j, I)}= \frac{P(I|c_i)p(c_i)}{\sum_j P(I|c_j)p(c_j)} = \frac{\frac{\sigma_i N_i}{N}}{\sum_j\frac{\sigma_j N_j}{N}} = \frac{\sigma_i N_i}{\sum_j \sigma_j N_j}$
+
+- Indépendance conditionnelle de  $p(m|c_i, I) = p(m|c_i)$
+En effet, si on voulait déterminer $p(m|c_i, I)$ on ferait $p(m|c_i, I) ) \frac{\sigma_i N_i^m}{\sigma_i N_i} = \frac{N_i^m}{N_i} = p(m|c_i)$
+
+Donc finalement avec toutes ses probabilités, on va pouvoir faire la même chose ! C'est juste que maintenant notre prior parle en terme de mentions et non plus d'articles mais l'idée d'indépendance qu'il soutient est toujours la même. Sous hypothèse d'indépendance $p(m|c_i) = p(m)$, le fait que la mention implique le composé $c_i$ n'a aucun effet sur le fait qu'elle implique le MeSH $m$, donc on peut toujours mettre notre $\mu$ à $p(m)$
+
+Ensuite on ajoute effectivement des observations. Pour chaque composé $c_i$, initialement j'ai un apriori sur $p(m|c_i)$, dans lequel $\mu = p(m)$. Mais j'observe ensuite mes observations $N$ et $N_i$ qui me permettent de mettre à jour ma probabilité $p(m|c_i)$, qui est toujuurs indépendance de $I$. Ensuite je peux utiliser cette probabilité pour construire mon prior pour le composé cible. Je cherche alors $p(m|I)$ qui est la probabilité qu'une mention parle du MeSH $m$ sachant qu'elle est arrivé sur le composé cible ! Alors, $p(m|I) = \sum_{c= 1}^{n} = p(m|c_i)p(c_i|I)$, où $p(c_i|)$ est simplement la proba qu'une mention du composé $c_i$ atteigne le composé cible !
+
+
+
+
+
+
+$\sigma_i$ étant simplement la probabilité qu'une mention atteigne le composé cible (évènement $I$), sachant qu'ell est partie du composé $c_i$
+
+
+

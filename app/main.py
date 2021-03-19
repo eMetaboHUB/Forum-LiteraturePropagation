@@ -43,14 +43,26 @@ table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
 print("Ok")
 
 
-mesh = "D002386" # "D018312"
-specie = "M_zymstnl" # "M_tststerone"
+mesh = "D022124" # "D002386" # "D018312"
+specie = "M_acorn" # "M_zymstnl" # "M_tststerone"
 
 
 probabilities = propagation_volume(g, alpha = alpha)
 
-# cc = (100 * probabilities.FOT).round(3)
-# cc.to_csv("FOT_" + str(alpha) + ".csv")
+# Compute weights
+sigmas = probabilities.SFT.to_numpy()
+v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
+# Compute totals
+t = sigmas @ v
+# But sometimes, the neighborhood does not have any mentions to transmit and the total recieved may be 0. to avoid divide by 0 we add 1 to every time there is 0.
+# pd.DataFrame({"l": table_species_corpora["SPECIE"], "t": t[:,0]}).to_csv("T" + str(alpha) + ".csv")
+t = t + (t == 0) * 1
+# Compute value by specie
+w = (sigmas @ np.diag(v[:,0])).T
+# Normalise by total
+weights = w @ np.diag(1/t[:, 0])
+# cc = (100 * weights).round(3)
+# cc.to_csv("NEW_WEIGHTS_" + str(alpha) + ".csv")
 
 if False:
     validation_set = pd.read_csv("data/validation_set_associations.csv")
@@ -64,7 +76,7 @@ if False:
         index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
         # Create association table
         # Prepare data
-        table_species_corpora["weights"] = probabilities.FOT.iloc[:, index].tolist()
+        table_species_corpora["weights"] = weights[:, index].tolist()
         cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
         data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
         # Forget data
@@ -80,7 +92,7 @@ if False:
 # START TEST
 if True:
     index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
-    table_species_corpora.insert(2, "weights", probabilities.FOT.iloc[:, index].tolist())
+    table_species_corpora.insert(2, "weights", weights[:, index].tolist())
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
     # Forget data
@@ -93,7 +105,7 @@ if True:
 
 if False:
     index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
-    r2 = specie_mesh(index, table_coocurences, table_species_corpora, probabilities.FOT, table_mesh_corpora)
+    r2 = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora)
     r2.to_csv("data/M_4mptnl.csv", index = False)
 
 

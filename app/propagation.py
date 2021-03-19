@@ -403,7 +403,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5):
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-3):
     
     # Out
     r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
@@ -418,6 +418,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     n = corpora.pop(index)
 
     # Check for other null weights, in cas of low alpha (damping) for instance. We consider a weight null if weight < 1e-5
+    if all(w == 0 for w in weights):
+        print("Neiborhood literature information does not reach the targeted compound. You should increase the damping factor")
+        return r(np.NaN, np.NaN, np.NaN, np.NaN)
+
     if not all(w > weigth_limit for w in weights):
         to_remove = list()
         for it in range(0, len(weights)):
@@ -468,7 +472,7 @@ def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
     df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
 
     # Prepare data table
-    table_corpora.insert(2, "weights", matrix_proba.iloc[:, index].tolist())
+    table_corpora.insert(2, "weights", weights[:, index].tolist())
     
     for i in indexes:
         print(str(i) + "/" + str(len(indexes)))

@@ -8,3 +8,5 @@ data/**
 .Rhistory
 **.csv
 **.png
+notes/wacom.sh
+notes/brouillon.xoj

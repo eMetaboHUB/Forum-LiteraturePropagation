@@ -12,7 +12,7 @@ parser.add_argument("--mesh.corpora", help="path to the MeSH corpus size file ",
 args = parser.parse_args()
 
 sample_size = 100
-alpha = 0
+alpha = 0.1
 
 g = import_metabolic_network(args.g_path)
 
@@ -39,12 +39,11 @@ mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh_V2,
 mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
 
 table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
-# table_mesh_corpora = table_mesh_corpora.head(100)
 print("Ok")
 
 
-mesh = "D018312" # "D002386" # "D018312"
-specie = "M_tststerone" # "M_zymstnl" # "M_tststerone"
+mesh = "D052439" # "D002386" # "D018312"
+specie = "M_ddsmsterol" # "M_zymstnl" # "M_tststerone"
 
 
 probabilities = propagation_volume(g, alpha = alpha)
@@ -96,7 +95,7 @@ if True:
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
     # Forget data
-    data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+    # data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
     MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
     p = float(MeSH_info["P"])
     r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)

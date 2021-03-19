@@ -12,7 +12,7 @@ parser.add_argument("--mesh.corpora", help="path to the MeSH corpus size file ",
 args = parser.parse_args()
 
 sample_size = 100
-alpha = 0.1
+alpha = 0
 
 g = import_metabolic_network(args.g_path)
 
@@ -43,8 +43,8 @@ table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
 print("Ok")
 
 
-mesh = "D022124" # "D002386" # "D018312"
-specie = "M_acorn" # "M_zymstnl" # "M_tststerone"
+mesh = "D018312" # "D002386" # "D018312"
+specie = "M_tststerone" # "M_zymstnl" # "M_tststerone"
 
 
 probabilities = propagation_volume(g, alpha = alpha)
@@ -55,14 +55,14 @@ v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
 # Compute totals
 t = sigmas @ v
 # But sometimes, the neighborhood does not have any mentions to transmit and the total recieved may be 0. to avoid divide by 0 we add 1 to every time there is 0.
-# pd.DataFrame({"l": table_species_corpora["SPECIE"], "t": t[:,0]}).to_csv("T" + str(alpha) + ".csv")
+# pd.DataFrame({"l": table_species_corpora["SPECIE"], "TT": table_species_corpora["TOTAL_PMID_SPECIE"]}).to_csv("T" + str(alpha) + ".csv")
 t = t + (t == 0) * 1
 # Compute value by specie
 w = (sigmas @ np.diag(v[:,0])).T
 # Normalise by total
 weights = w @ np.diag(1/t[:, 0])
 # cc = (100 * weights).round(3)
-# cc.to_csv("NEW_WEIGHTS_" + str(alpha) + ".csv")
+# pd.DataFrame(cc).to_csv("NEW_WEIGHTS_" + str(alpha) + ".csv")
 
 if False:
     validation_set = pd.read_csv("data/validation_set_associations.csv")
@@ -87,7 +87,7 @@ if False:
         r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
         # fill with results
         validation_set.iloc[i, 2:6] = list(r)
-    validation_set.to_csv("data/validation_out_new10.csv", index = False)
+    validation_set.to_csv("data/validation_new_met_0.csv", index = False)
 
 # START TEST
 if True:
@@ -96,7 +96,7 @@ if True:
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
     # Forget data
-    # data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+    data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
     MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
     p = float(MeSH_info["P"])
     r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)

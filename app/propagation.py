@@ -231,11 +231,9 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
 
     return res
 
-def estimate_prior_distribution_mesh_V2(mesh_corpora, N, sample_size):
+def estimate_prior_distribution_mesh_V2(mu, sample_size):
     
     r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
-    # Determine expected mu:
-    mu = mesh_corpora/N
 
     alpha =  mu * sample_size
     beta = (1 - mu) * sample_size

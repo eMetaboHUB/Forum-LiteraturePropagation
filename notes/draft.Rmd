@@ -1243,8 +1243,12 @@ En fait c'est pas si différent mais dans mon approche actuelle il y a peut êtr
 
 C'est pablo qui a soulevé le problème. En effet mes probabilité jointe, qu'un article arrivé mon composé cible discutte du composé $i$ **ET** du MeSH $M$ snt assez flou car ce que je fais c'est une moyenne à la fin ... "Define the full joint probability of each node, which is not the same as averaging the outputs of the other nodes"
 
-**ATTENTION: ** Quand je faisait mon test de Fisher, je considéré mes composés entre eux, et mes MeSH entre eux, comme étant **des variables différentes** et non **des modalités** d'une même variables !! Dans mon test de Fisher l'évènement: l'article discutte du composé $i$^est une variable binaire: l'article discutte ou non du composé $i$, pareil pour les MeSH ! On avait jamais à prendre en compte le cas où un article parlait de plusieurs composés ou articles ... MAIS là, si on veut les considéré comme des modalités d'une même variable ça va être différent !!!!
+**ATTENTION: ** Quand je faisait mon test de Fisher, je considéré mes composés entre eux, et mes MeSH entre eux, comme étant **des variables différentes** et non **des modalités** d'une même variables !! Dans mon test de Fisher l'évènement: l'article discutte du composé $i$ est une variable binaire: l'article discutte ou non du composé $i$, pareil pour les MeSH ! On avait jamais à prendre en compte le cas où un article parlait de plusieurs composés ou MeSH ... MAIS là, si on veut les considéré comme des modalités d'une même variable ça va être différent !!!!
 
+Ainsi, on considère la variable **composé** comme étant les modalité d'une même variable du type: "la mention dans la literature, implique le composé $i$" **MAIS** la variable MeSH est toujours du type binaire, la mention implque ou non, le mesh $m$. Ainsi, on duplique les associations uniquement par composé mais pas par MeSH.
+J'ai fait un schema pour mieux comprendre.
+
+Mais par contre: si on divise également nos mentions par MeSH: a ce moment toutes les variables deviennent des variables à modalité et à ce moment là, je poourrait utiliser une distribution de dirichlet comme prior !!!
 
 Ainsi, peut être qu'il faut que l'on discutte en terme d'association ! "Une asociation implique mon composé et mon MeSh" Ainsi, ce que l'on diffuse depuis les composés dans le réseau, ce sont des citation, des mentions, d'un composé avec un MeSH dans un article
 
@@ -1290,9 +1294,9 @@ Don en gros les choses qui changent par rapport àce que j'avais prévu intialem
 - On considère des mentions et non des articles : Donc on calcule les probabilité marginales $p(m)$ avec la somme des co-occurences (qui représente les mentions) et non plus en utilisant le nombre total d'article.
 $N_i$ est le nombre total de mentions de composé $i$, ce qui correspond toujours à son nombre d'article annotés
 $N_i^m$ est le nombre de mentions du composé $i$ impluquant également le mesh $m$, c'est toujours la coocurence.
-$p(m|c_i) = \frac{N^m_i}{N_i}$, c'est la probabilité qu'une mention du composé $i$, implique le mesh $m$
+$p(m|c_i) = \frac{N^m_i}{N_i}$, c'est la probabilité qu'une mention du composé $i$, implique le mesh $m$, c'est toujours la co-coocurence sur la taille du corpus du composé
 $p(c_i) = \frac{N_i}{\sum_j N_j}$, cette probabilité n'est plus calculé en utilisant l'Univers, le nombre d'articles distincts, mais, en utilisant la somme du nombre de mentions (aka nombre d'articles) annotés à chaque composé
-$p(m) = \sum_i p(m|c_i) p(ci) = \sum_i \frac{N_i^m}{Ni} \frac{N_i}{\sum_j N_j}$
+$p(m) = \sum_i p(m|c_i) p(ci) = \sum_i \frac{N_i^m}{Ni} \frac{N_i}{\sum_j N_j} = \sum_i \frac{N_i^m}{\sum_j N_j}$
 
 - Ainsi mes poids dans ma mixture : $p(c_i|I) = \frac{p(c_i, I)}{p(I)} = \frac{p(c_i, I)}{\sum_jp(c_j, I)}= \frac{P(I|c_i)p(c_i)}{\sum_j P(I|c_j)p(c_j)} = \frac{\frac{\sigma_i N_i}{N}}{\sum_j\frac{\sigma_j N_j}{N}} = \frac{\sigma_i N_i}{\sum_j \sigma_j N_j}$
 

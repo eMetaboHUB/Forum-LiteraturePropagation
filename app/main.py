@@ -11,7 +11,6 @@ parser.add_argument("--mesh.corpora", help="path to the MeSH corpus size file ",
 
 args = parser.parse_args()
 
-N = 8877780
 sample_size = 100
 alpha = 0.1
 
@@ -19,21 +18,24 @@ g = import_metabolic_network(args.g_path)
 
 print("> Import species corpora sizes ... ", end = '')
 table_species_corpora = import_and_map_indexes(args.specie_corpora_path, g)
+
+# Compute total number of cpd-articles mentions
+TOTAL_CPD_MENTIONS = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
 print("Ok")
 
 print("> Import species-MeSH co-occurences ... ", end = '')
 table_coocurences = import_and_map_indexes(args.specie_mesh_path, g)
 print("Ok")
 
-print("> Import MeSH corpora sizes ... ", end = '')
-table_mesh_corpora = import_table(args.mesh_corpora_path)
+# Compute the total number of mentions between a compound and an article, that also involved MeSHs
+table_mesh_corpora = table_coocurences.groupby('MESH', as_index=False)[['COOC']].sum().rename(columns={"COOC": "TOTAL_CPD_MENTION_MESH"})
 
-# Compute MeSH probabilities
-table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_PMID_MESH"]/N
+# Compute MeSH probabilities normalising by the total number of cpd-article mentions
+table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/TOTAL_CPD_MENTIONS
 
 # Compute prior parameters:
 # mesh_priors = table_mesh_corpora["TOTAL_PMID_MESH"].apply(estimate_prior_distribution_mesh)
-mesh_priors = table_mesh_corpora["TOTAL_PMID_MESH"].apply(estimate_prior_distribution_mesh_V2, N = N, sample_size = sample_size)
+mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh_V2, sample_size = sample_size)
 mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
 
 table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
@@ -98,3 +100,19 @@ if False:
 # plt.plot(prior_test.x, prior_test.f)
 # plt.show()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# print("> Import MeSH corpora sizes ... ", end = '')
+# table_mesh_corpora = import_table(args.mesh_corpora_path)

@@ -232,7 +232,17 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
     return res
 
 def estimate_prior_distribution_mesh_V2(mu, sample_size):
-    
+    """This function is used to estimate the prior distribution of the probability that a mention of a compound in an article, also involved the studied MeSH.
+    This prior distribution is based on the independance hypothesis. 
+    Args:
+        mu (float): The expected mean of the prior probability distributions
+        sample_size (integer): The expected sample size from which this prior distribution has been generated, related to the variability, certainity of the distribution. This parameter could also be refered as the concentration parameter. 
+
+    Returns:
+        [collection]: A collection with:
+            - alpha: the alpha parameter of the prior distribution 
+            - beta: the beta parameter of the prior distribution 
+    """
     r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
 
     alpha =  mu * sample_size
@@ -266,6 +276,22 @@ def estimate_prior_distribution_mesh(mesh_corpora):
     return result
 
 def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
+    """This function is used to estimate parameters and distribution of a simple prior distribution, no mixture.
+
+    Args:
+        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        seq (float): The step used in np.arange to create the x vector of probabilities, only when sampling is True.
+        sampling (bool, optional): Does the function have to compute a sampling of density values ?
+
+    Returns:
+    [collection]: A collection with:
+        - alpha (float): The alpha parameter to the prior distribution. 
+        - beta (float): The beta parameter to the prior distribution.
+        - x (list): Probabilities
+        - f (list): Densities
+        - mu (float): Mean of the distribution  
+    """
     # Get parameters
     r = collections.namedtuple("simple_prior", ["alpha", "beta", "x", "f", "mu"])
     x = None
@@ -282,6 +308,24 @@ def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
     return res
 
 def simple_posterior(cooc, corpora, alpha_prior, beta_prior, seq, sampling = True):
+    """This function is used to estimate parameters and distribution of a simple posterior distribution, no mixture.
+
+    Args:
+        cooc (list): The co-occurence between the specie in the graph and a particular MeSH descriptor  
+        corpora (list): The corpus size related to the specie in the graph
+        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        seq (float): The step used in np.arange to create the x vector of probabilities, only when sampling is True.
+        sampling (bool, optional): Does the function have to compute a sampling of density values ?
+
+    Returns:
+    [collection]: A collection with:
+        - alpha (float): The alpha parameter to the post distribution. 
+        - beta (float): The beta parameter to the prior distribution.
+        - x (list): Probabilities
+        - f (list): Densities
+        - mu (float): Mean of the distribution  
+    """
     # Get parameters
     r = collections.namedtuple("simple_posterior", ["alpha", "beta", "x", "f", "mu"])
     x = None
@@ -303,24 +347,26 @@ def simple_posterior(cooc, corpora, alpha_prior, beta_prior, seq, sampling = Tru
 
 def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior, sampling = True):
     """This function is used to determine values of the prior mixture distribution.
-    In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
-    Weights used in the mixture model are probabilities that a walker on the targeted specie comes from a particular specie 's': FinishOnTarget
+    In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: a mention of a compound (or specie) in an article also involving the MeSH descriptor 'M'  
+    Weights used in the mixture model are probabilities that a mention between a compound and an article, that reached the targeted compound, involved the 'i' compound.
 
     Args:
-        weights (list): A list of float used as weights in the mixture distribution. (Cf. propagation_volume mode FinishOnTarget)
+        weights (list): A list of float used as weights in the mixture distribution.
         cooc (list): A list of integer values representing co-occurences between species in the graph and a particular MeSH descriptor  
         corpora (list):  A list of integer values representing copus sizes related to each compounds in the graph
-        seq (float): the step used in np.arange to create the x vector of probabilities.
+        seq (float): the step used in np.arange to create the x vector of probabilities, only when sampling is True.
         alpha_prior (float): the alpha parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S). Default to 1 for uninformative prior.
         beta_prior (float): the beta parameter of the beta prior distribution associated to the MeSH probabilities, p(M|S). Default to 1 for uninformative prior.
+        sampling (bool, optional): Does the function have to compute a sampling of density values ?
 
     Returns:
         [collection]: A collection with:
             - alpha (list): vector of alpha parameters related to each individual Beta distribution in the prior mixture. 
             - beta (list): vector the beta parameters related to each individual Beta distribution in the prior mixture.
             - weights (list): vector of weights related to each individual Beta distribution in the prior mixture.
-            - x (list): probabilities
-            - y (list): density 
+            - x (list): Probabilities
+            - f (list): Densities 
+            - mu (float): Mean of the distribution  
     """
     # Get parameters
     r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f", "mu"])
@@ -358,16 +404,18 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
         weights_pior (list): The prior mixture distribution weights (item 'weights' in create_prior_beta_mix result)
         alpha_prior (list): The prior mixture distribution alpha parameters (item 'alpha' in create_prior_beta_mix result)
         beta_prior (list): The prior mixture distribution beta parameters (item 'beta' in create_prior_beta_mix result)
-        seq (float): the step used in np.arange to create the x vector of probabilities.
+        seq (float): The step used in np.arange to create the x vector of probabilities, only when sampling is True.
         use_log (boolean, optional): A boolean telling if the computation of the weights W have to be achieve using classic formula or using logs (As alpha and beta values are often large, log method is prefered). Default = True
+        sampling (bool, optional): Does the function have to compute a sampling of density values ?
 
     Returns:
         [collection]: A collection with:
             - alpha (list): vector of alpha parameters related to each individual Beta distribution in the posterior mixture. 
             - beta (list): vector the beta parameters related to each individual Beta distribution in the posterior mixture.
             - weights (list): vector of weights related to each individual Beta distribution in the posterior mixture.
-            - x (list): probabilities
-            - y (list): density 
+            - x (list): Probabilities
+            - f (list): Densities 
+            - mu (float): Mean of the distribution 
     """
     r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu"])
     l = len(weights_pior)
@@ -411,6 +459,12 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 
 
 def plot_distributions(prior_mix, posterior_mix):
+    """This function is used to plot prior distribution against a posterior distribution
+
+    Args:
+        prior_mix (collection): A collection containing information about a prior distribution with x probabilties and associated densities from create_prior_beta_mix or simple_prior with the samping = True
+        posterior_mix (collection): A collection containing information about a posterior distribution with x probabilties and associated densities from create_posterior_beta_mix or simple_posterior with the samping = True
+    """
     plt.plot(prior_mix.x, prior_mix.f, label = "prior", color = "blue")
     plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior", color = "red")
     plt.title('Differences between prior mix and posterior mix distribution ')
@@ -420,6 +474,13 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.show()
 
 def plot_prior_mix_distributions(prior_mix, labels, seq):
+    """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component.
+
+    Args:
+        prior_mix (collections): A collection containing information about the  prior mixture distribution: weights, alpha and beta parameters
+        labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
+        seq (float): The step used in np.arange to create the x vector of probabilities.
+    """
     x = np.arange(0, 1 + seq, seq).tolist()
     weights = prior_mix.weights
     for it in range(0, len(weights)):
@@ -434,11 +495,42 @@ def plot_prior_mix_distributions(prior_mix, labels, seq):
 
 
 def compute_mix_CDF(p, weights, alpha, beta):
+    """This function is used to compute the CDF of a mixture distribution
+
+    Args:
+        p (float): the probability P(x <= p)
+        weights (list): The mixture distribution weights
+        alpha (list): The mixture distribution alpha parameters
+        beta (list): The mixture distribution beta parameters
+
+    Returns:
+        [type]: [description]
+    """
     cdf_i = [ss.beta.cdf(p, alpha[it], beta[it]) for it in range(0, len(weights))]
     cdf = np.dot(weights, cdf_i)
     return cdf
 
 def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5):
+    """This function is used to compute the complete analysis for a Compound - MeSH relation.
+    If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh_V2 is used, otherwise we will used the prior mixture.
+
+    Args:
+        index (integer): the index of the specie if the metabolic network
+        data (pandas.DataFrame): data related to corpus size of each compound in the metabolic network and their co-occurence with the studied MeSH 
+        p (float): The general probability to observed a mention of a compound in an article, also involving the MeSH.
+        alpha_prior (float): The alpha parameter of the prior distribution
+        beta_prior (float): The beta parameter of the prior distribution
+        seq (float, optional): The step used to create a x vector of probabilities (for plotting distribution only). Defaults to 0.0001.
+        plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_prior_mix_distributions and plot_distributions. Defaults to False.
+        weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. it may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
+
+    Returns:
+        [collection]: A collection with:
+        - Mean (float): The mean of the posterior distribution. 
+        - CDF (float): The probability P(p <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (independance hypothesis)
+        - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH
+        - priorCDFratio: The log2 ratio of the CDF probabilities P(p <= p(M)) obtained between the initial prior and the mixture prior. When this value is high, it indicates that the studied MeSH is more frequent than usual in the neiborhood of the targeted compound. This value is correlated with the CDF. This value is NaN is the neighborhood can't provide information, as these both prior will be the same
+    """
     
     # Out
     r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])

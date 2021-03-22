@@ -34,7 +34,6 @@ table_mesh_corpora = table_coocurences.groupby('MESH', as_index=False)[['COOC']]
 table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/TOTAL_CPD_MENTIONS
 
 # Compute prior parameters:
-# mesh_priors = table_mesh_corpora["TOTAL_PMID_MESH"].apply(estimate_prior_distribution_mesh)
 mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh_V2, sample_size = sample_size)
 mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
 
@@ -42,8 +41,8 @@ table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
 print("Ok")
 
 
-mesh = "D052439" # "D002386" # "D018312"
-specie = "M_ddsmsterol" # "M_zymstnl" # "M_tststerone"
+mesh = "D006501" # "D002386" # "D018312"
+specie = "M_HC01399" # "M_zymstnl" # "M_tststerone"
 
 
 probabilities = propagation_volume(g, alpha = alpha)
@@ -86,7 +85,7 @@ if False:
         r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
         # fill with results
         validation_set.iloc[i, 2:6] = list(r)
-    validation_set.to_csv("data/validation_new_met_0.csv", index = False)
+    validation_set.to_csv("data/validation_new_met_0.5.csv", index = False)
 
 # START TEST
 if True:
@@ -95,7 +94,7 @@ if True:
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
     # Forget data
-    # data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+    data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
     MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
     p = float(MeSH_info["P"])
     r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)

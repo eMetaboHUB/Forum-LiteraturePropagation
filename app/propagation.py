@@ -265,6 +265,42 @@ def estimate_prior_distribution_mesh(mesh_corpora):
     result = r(alpha, beta)
     return result
 
+def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
+    # Get parameters
+    r = collections.namedtuple("simple_prior", ["alpha", "beta", "x", "f", "mu"])
+    x = None
+    y = None
+    
+    if sampling:
+        x = np.arange(0, 1 + seq, seq).tolist()
+        y = ss.beta.pdf(x, a = alpha_prior, b = beta_prior)
+
+    # Get mean
+    mu = alpha_prior/(alpha_prior + beta_prior)
+    res = r(alpha_prior, beta_prior, x, y, mu)
+
+    return res
+
+def simple_posterior(cooc, corpora, alpha_prior, beta_prior, seq, sampling = True):
+    # Get parameters
+    r = collections.namedtuple("simple_posterior", ["alpha", "beta", "x", "f", "mu"])
+    x = None
+    y = None
+
+    # Get beta component paremeters for each compounds, using a posterior with uniformative prior
+    alpha = cooc + alpha_prior
+    beta = corpora - cooc + beta_prior
+    
+    if sampling:
+        x = np.arange(0, 1 + seq, seq).tolist()
+        y = ss.beta.pdf(x, a = alpha, b = beta)
+
+    # Get mean
+    mu = alpha/(alpha + beta)
+    res = r(alpha, beta, x, y, mu)
+
+    return res
+
 def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior, sampling = True):
     """This function is used to determine values of the prior mixture distribution.
     In the prior mixture distribution, individual components are Beta() distributions related to the probability 'p' of success: an article discussing about a specie 's', also discusses the MeSH descriptor 'M'  
@@ -374,11 +410,10 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ####################
 
 
-def plot_distributions(uninformative, prior_mix, posterior_mix):
-    # plt.plot(uninformative.x, uninformative.f, label = "Posterior with uninformative prior")
-    plt.plot(prior_mix.x, prior_mix.f, label = "prior mix", color = "blue")
-    plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior with prior mix", color = "red")
-    plt.title('Differences between Uninformative, mix prior and posterior mix distribution ')
+def plot_distributions(prior_mix, posterior_mix):
+    plt.plot(prior_mix.x, prior_mix.f, label = "prior", color = "blue")
+    plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior", color = "red")
+    plt.title('Differences between prior mix and posterior mix distribution ')
     plt.legend()
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
@@ -417,11 +452,21 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     del labels[index]
     n = corpora.pop(index)
 
-    # Check for other null weights, in cas of low alpha (damping) for instance. We consider a weight null if weight < 1e-5
+    # If all weights are null, no neighborhood information:
     if all(w == 0 for w in weights):
-        print("Neiborhood literature information does not reach the targeted compound. You should increase the damping factor")
-        return r(np.NaN, np.NaN, np.NaN, np.NaN)
+        print("Neiborhood literature information does not reach the targeted compound. You should increase the damping factor. Use default prior.")
+        prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
+        posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = plot)
+        # In case of no neighborhood information, we simply plot prior vs posterior distributions:
+        if plot:
+            plot_distributions(prior, posterior)
+        # Compute additional values:
+        Log2numFC = np.log2(posterior.mu/p)
 
+        resultat = r(posterior.mu, ss.beta.cdf(p, posterior.alpha, posterior.beta), Log2numFC, np.NaN)
+        return resultat
+
+    # Check for other null weights, in case of low alpha (damping) for instance. We consider a weight null if weight < 1e-5
     if not all(w > weigth_limit for w in weights):
         to_remove = list()
         for it in range(0, len(weights)):
@@ -436,8 +481,6 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
             del cooc[rmv]
             del corpora[rmv]
             del labels[rmv]
-    # Uninformative
-    obs = observation_uninformative_prior(k, n, seq, sampling = plot)
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
@@ -447,7 +490,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         print("Warning: prior mix CDF is estimated to 0. The value of the CDF ratio between MeSH prior and prior mix is set to Inf.")
         prior_cdf_ratios = np.Inf
     else:
-        prior_cdf_ratios = np.log2(compute_mix_CDF(p,[1], [alpha_prior], [beta_prior])/prior_mix_CDF)
+        prior_cdf_ratios = np.log2(ss.beta.cdf(p, alpha_prior, beta_prior)/prior_mix_CDF)
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
@@ -464,7 +507,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     
     if plot: 
         plot_prior_mix_distributions(prior_mix, labels, seq)
-        plot_distributions(obs, prior_mix, posterior_mix)
+        plot_distributions(prior_mix, posterior_mix)
     
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)
 

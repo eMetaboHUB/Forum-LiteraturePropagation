@@ -606,7 +606,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     return resultat
 
 
-def specie_mesh(index, table_cooc, table_corpora, matrix_proba, table_mesh):
+def specie_mesh(index, table_cooc, table_corpora, weights, table_mesh):
     
     print("Treat index: " + str(index))
     # Create result Dataframe from MeSH list

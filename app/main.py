@@ -42,7 +42,7 @@ print("Ok")
 
 
 mesh = "D006501" # "D002386" # "D018312"
-specie = "M_HC01399" # "M_zymstnl" # "M_tststerone"
+specie = "M_acorn" # "M_zymstnl" # "M_tststerone"
 
 
 probabilities = propagation_volume(g, alpha = alpha)
@@ -88,7 +88,7 @@ if False:
     validation_set.to_csv("data/validation_new_met_0.5.csv", index = False)
 
 # START TEST
-if True:
+if False:
     index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
     table_species_corpora.insert(2, "weights", weights[:, index].tolist())
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
@@ -101,10 +101,10 @@ if True:
     print(r)
 # END TEST
 
-if False:
+if True:
     index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
     r2 = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora)
-    r2.to_csv("data/M_4mptnl.csv", index = False)
+    r2.to_csv("data/M_acorn.csv", index = False)
 
 
 # plt.plot(prior_test.x, prior_test.f)

@@ -41,28 +41,15 @@ table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
 print("Ok")
 
 
-mesh = "D006501" # "D002386" # "D018312"
-specie = "M_acorn" # "M_zymstnl" # "M_tststerone"
+mesh = "D016905" # "D002386" # "D018312"
+specie = "M_orn" # "M_zymstnl" # "M_tststerone"
 
 
 probabilities = propagation_volume(g, alpha = alpha)
 
-# Compute weights
-sigmas = probabilities.SFT.to_numpy()
-v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
-# Compute totals
-t = sigmas @ v
-# But sometimes, the neighborhood does not have any mentions to transmit and the total recieved may be 0. to avoid divide by 0 we add 1 to every time there is 0.
-# pd.DataFrame({"l": table_species_corpora["SPECIE"], "TT": table_species_corpora["TOTAL_PMID_SPECIE"]}).to_csv("T" + str(alpha) + ".csv")
-t = t + (t == 0) * 1
-# Compute value by specie
-w = (sigmas @ np.diag(v[:,0])).T
-# Normalise by total
-weights = w @ np.diag(1/t[:, 0])
-# cc = (100 * weights).round(3)
-# pd.DataFrame(cc).to_csv("NEW_WEIGHTS_" + str(alpha) + ".csv")
+weights = compute_weights(probabilities, table_species_corpora)
 
-if False:
+if True:
     validation_set = pd.read_csv("data/validation_set_associations.csv")
     # add results columns
     validation_set = pd.concat([validation_set, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
@@ -85,7 +72,7 @@ if False:
         r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
         # fill with results
         validation_set.iloc[i, 2:6] = list(r)
-    validation_set.to_csv("data/validation_new_met_0.5.csv", index = False)
+    validation_set.to_csv("data/validation_" + str(alpha) + "_" + str(sample_size) + ".csv", index = False)
 
 # START TEST
 if False:
@@ -94,17 +81,17 @@ if False:
     cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
     data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
     # Forget data
-    data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+    # data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
     MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
     p = float(MeSH_info["P"])
     r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
     print(r)
 # END TEST
 
-if True:
+if False:
     index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
     r2 = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora)
-    r2.to_csv("data/M_acorn.csv", index = False)
+    r2.to_csv("data/M_acorn_" + str(alpha) + ".csv", index = False)
 
 
 # plt.plot(prior_test.x, prior_test.f)

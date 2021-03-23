@@ -192,6 +192,21 @@ def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
     return result
 
 
+def compute_weights(probabilities, table_species_corpora):
+    # Compute weights
+    sigmas = probabilities.SFT.to_numpy()
+    v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
+    # Compute totals
+    t = sigmas @ v
+    # But sometimes, the neighborhood does not have any mentions to transmit and the total recieved may be 0. to avoid divide by 0 we add 1 to every time there is 0.
+    t = t + (t == 0) * 1
+    # Compute value by specie
+    w = (sigmas @ np.diag(v[:,0])).T
+    # Normalise by total
+    weights = w @ np.diag(1/t[:, 0])
+    
+    return weights
+
 ####################
 ## Beta functions ##
 ####################

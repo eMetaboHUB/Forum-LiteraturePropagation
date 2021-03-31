@@ -1262,7 +1262,7 @@ pour un composé $C_i$, j'ai $N_i$ article associé, formant $N_i$ mention de ce
 Pour une mention quelconque impliquant ce composé $C_i$, il a une probabilité $p_i$ qu'elle implique mon MeSH $M$. Si on note $X$ la variable aléatoire suivant un loi de Bernouli avec $X = 1$: "la mention parle du MeSH $M$" et $X = 0$: "la mention ne parle pas du MeSH $M$". J'ai $X \sim Be(p_i)$
 Cet épreuve est répété $N_i$ fois, et donc j'ai une suite de variables $X_1^i,X_2^i, ..., X_{N_i}^i$ qui suivent cette loi de Bernouli $Be(p_i)$
 
-On peut donc dire que leur somme pour le composé $i$, $\sum_{k = 1}^{N_i} X_k^i$, suit une loi de Bernouli de même paramètre $p_i$, $Bin(p_i, N_i)$
+On peut donc dire que leur somme pour le composé $i$, $\sum_{k = 1}^{N_i} X_k^i$, suit une loi Binomiale de même paramètre $p_i$, $Bin(p_i, N_i)$
 
 Le fait est que je dispose également d'un apriori sur ce paramètre $p_i$ représente par ma distribution Beta: $Beta(\mu \nu, (1 - \mu) \nu)$ où $\nu$ est un hyperparamètre fixé et $\mu$ représente la probabilité générale, sur l'ensemble des mentions observées, qu'une mention implique le MeSH $M$
 

@@ -292,7 +292,7 @@ def estimate_prior_distribution_mesh(mesh_corpora):
     return result
 
 def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
-    """This function is used to estimate parameters and distribution of a simple prior distribution, no mixture.
+    """This function is used to compute the density of a simple prior distribution, no mixture.
 
     Args:
         alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
@@ -324,7 +324,7 @@ def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
     return res
 
 def simple_posterior(cooc, corpora, alpha_prior, beta_prior, seq, sampling = True):
-    """This function is used to estimate parameters and distribution of a simple posterior distribution, no mixture.
+    """This function is used to estimate parameters and density of a simple posterior distribution, no mixture.
 
     Args:
         cooc (list): The co-occurence between the specie in the graph and a particular MeSH descriptor  
@@ -534,17 +534,17 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         index (integer): the index of the specie if the metabolic network
         data (pandas.DataFrame): data related to corpus size of each compound in the metabolic network and their co-occurence with the studied MeSH 
         p (float): The general probability to observed a mention of a compound in an article, also involving the MeSH.
-        alpha_prior (float): The alpha parameter of the prior distribution
-        beta_prior (float): The beta parameter of the prior distribution
-        seq (float, optional): The step used to create a x vector of probabilities (for plotting distribution only). Defaults to 0.0001.
+        alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
+        beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
+        seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
         plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_prior_mix_distributions and plot_distributions. Defaults to False.
-        weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. it may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
+        weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
 
     Returns:
         [collection]: A collection with:
         - Mean (float): The mean of the posterior distribution. 
-        - CDF (float): The probability P(p <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (independance hypothesis)
-        - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH
+        - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
+        - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
         - priorCDFratio: The log2 ratio of the CDF probabilities P(p <= p(M)) obtained between the initial prior and the mixture prior. When this value is high, it indicates that the studied MeSH is more frequent than usual in the neiborhood of the targeted compound. This value is correlated with the CDF. This value is NaN is the neighborhood can't provide information, as these both prior will be the same
     """
     
@@ -623,7 +623,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
 
 
 def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, forget):
-    """[summary]
+    """This function is used to computed associations from a specific specie against all available MeSHs.
 
     Args:
         index (int): index of the specie in the metabolic network
@@ -666,6 +666,16 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     return(df_)
 
 def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    """This function is used to computed associations from a specific MeSH against all available species.
+
+    Args:
+        index (int): index of the specie in the metabolic network
+        table_cooc (pandas.DataFrame): table of co-occurences
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        weights (numpy): weight matrix
+        table_mesh (pandas.DataFrame): table of MeSH corpora
+        forget (bool): Keep only prior information from the neighborhood, removing specie's observation.
+    """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
     df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
@@ -694,6 +704,19 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     return(df_)
 
 def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    """This function is used to compute all associations specified in a Dataframe (SPECIE, MESH)
+
+    Args:
+        f (pandas.Dataframe): A two columns Dataframe storing all SPECIE - MESH pairs that need to be computed.
+        table_cooc (pandas.DataFrame): table of co-occurences
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        weights (numpy): weight matrix
+        table_mesh (pandas.DataFrame): table of MeSH corpora
+        forget (bool): Keep only prior information from the neighborhood, removing specie's observation.
+
+    Returns:
+        [type]: [description]
+    """
     associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
     n = len(associations)
     

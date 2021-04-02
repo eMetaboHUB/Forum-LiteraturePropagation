@@ -6,16 +6,15 @@ from propagation import *
 # Get arguments
 # python app/main.py --graph="tests/data/test_urea.gml" --specie.corpora="data/species_cid_pmid.csv" --specie.cooc="data/species_cid_mesh_pmid.csv" --mesh.corpora="data/mesh_pmid.csv"
 parser = argparse.ArgumentParser()
-parser.add_argument("--graph", help="path to metabolic network compound graph", type = str, required = True, dest = 'g_path')
+parser.add_argument("--graph", help="path to the metabolic network compound graph", type = str, required = True, dest = 'g_path')
 parser.add_argument("--specie.corpora", help="path to the species corpus size file ", type = str, required = True, dest = 'specie_corpora_path')
 parser.add_argument("--specie.cooc", help="path to the species MeSH co-occurences file ", type = str, required = True, dest = 'specie_mesh_path')
-parser.add_argument("--mesh", help="The studied MeSH, incompatible with the 'file' argument. The program will return all association between this MeSH and all species in the metabolic network. If the 'specie' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'mesh')
-parser.add_argument("--specie", help="The studied specie, incompatible with the 'file' argument. The program will return all association between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'specie')
-parser.add_argument("--file", help="Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH), incompatible with the 'mesh' and 'specie' arguments.", type = str, required = False, dest = 'file')
-parser.add_argument("--benchmark", help="Compute a benchmark for the analysis by varying the damping factor and the sample size paramters. In benchmark mode, provided values of damping factor and sample size parameters wil be erased.", type = bool, default = False, required = False, dest = 'benchmark')
-parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null.", type = bool, default = False, required = False, dest = 'forget')
-parser.add_argument("--alpha", help="The damping factor", type = float, default = 0.1, required = False, dest = 'alpha')
-parser.add_argument("--sample_size", help="The sample size parameter", type = int, default = 100, required = False, dest = 'ss')
+parser.add_argument("--mesh", help="The studied MeSH. This argument is incompatible with the 'file' argument. The program will return all association between this MeSH and all species in the metabolic network. If the 'specie' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'mesh')
+parser.add_argument("--specie", help="The studied specie. This argument is incompatible with the 'file' argument. The program will return all association between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'specie')
+parser.add_argument("--file", help="Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH). This argument is incompatible with the 'mesh' and 'specie' arguments.", type = str, required = False, dest = 'file')
+parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null. Default = False", type = bool, default = False, required = False, dest = 'forget')
+parser.add_argument("--alpha", help="The damping factor. It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
+parser.add_argument("--sample_size", help="The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100", nargs = "*", type = int, default = [100], required = False, dest = 'ss')
 parser.add_argument("--out", help="path to the output directory", type = str, required = True, dest = 'out')
 
 
@@ -69,21 +68,17 @@ if args.file:
     except Exception as e:
         print("Error while trying to read association file. \n" + str(e))
 
-# Analysis in benchmark mode ?
-if args.benchmark:
-    print("\n> Compute analysis in benchmark mode !")
-    alpha_set = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
-    sample_size_set = [1, 10, 100, 1000, 10000, 100000, 1000000]
-else:
-    print("\n> Compute analysis in normal mode !")
-    # Default parameters
-    alpha_set = [args.alpha]
-    sample_size_set = [args.ss]
+
+alpha_set = args.alpha
+sample_size_set = args.ss
+
+if 0 in sample_size_set:
+    print("\n /!\ 0 is not allowed for sample_size.")
+    sample_size_set.remove(0)
 
 # Compute analysis
 
 print("\nParameters:\n")
-print("- benchmark: " + str(args.benchmark))
 print("- forget: " + str(args.forget))
 print("- damping factor: " + str(alpha_set))
 print("- sample size: " + str(sample_size_set))

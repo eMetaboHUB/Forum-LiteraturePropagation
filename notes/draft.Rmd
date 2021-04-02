@@ -1316,3 +1316,35 @@ $\sigma_i$ étant simplement la probabilité qu'une mention atteigne le composé
 
 
 
+
+
+
+
+### Résultats de validation
+
+Les résultats de validation montre les ROC curves par rapport aux différentes indices utilisés: CDF, Log2FC, ou le score.
+
+- Globalement Score et Log2FC semble donner le même score lorsque l'on considère notre set négatifs comme étant des associations sous-représentées (OR < 0.1 & q.value = 1). C'est la manière la plus simple de définir le set de négatif, car dans le cas là on limite de taux de faux-négatif en utilisant ce dont le odd-ratio tend à représenter une sous-représentation.
+
+- Néanmoins, le score que l'on a développé semble pertinent pour du moins ranker les associations
+
+Les effet des facteurs alpha et sample_size sont également nets.
+
+On a réalisé les barplots de TPR et FPR en utilisant différents seuil sur le Log2FC: 1,2,3
+
+Globalement, le taux de True-positive et de FPR diminue avec alpha et également avec sample_size.
+
+Comme attendu, plus on va chercher des articles loin dans le réseau plus :
+  1) On prend le risque de récupèrer des articles de composé 'trop aloignés' pour être également associé à notre concept d'intérêt
+  2) Si le prior tend à confirmer l'association, il faut que nos voisins les plus proches est beaucoup de litterature pour rester majoritaire dans le prior
+
+Pour le paramètre sample_size, comme on peut le constater plus il est élevé plus notre TPR et FPR diminue, le prior devenant trop puissant pour faire changer d'avis. Vue qu'il représente en gros l'indépendance, on a aucun positif.
+
+
+
+
+
+
+
+
+

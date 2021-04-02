@@ -50,7 +50,7 @@ specie = "M_spc_hs" # "M_zymstnl" # "M_tststerone"
 # weights = compute_weights(probabilities, table_species_corpora)
 
 if True:
-    validation_set = pd.read_csv("data/Validation/validation_set_classic.csv")
+    validation_set = pd.read_csv("data/Validation/validation_set_associations_Qvalue.csv")
     # add results columns
     validation_set = pd.concat([validation_set, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
     # Compute the total number of mentions between a compound and an article, that also involved MeSHs
@@ -61,7 +61,7 @@ if True:
     for alpha in [0, 0.1, 0.2, 0.3, 0.4, 0.5]:
         probabilities = propagation_volume(g, alpha = alpha)
         weights = compute_weights(probabilities, table_species_corpora)
-        for sample_size in [100000, 1000000]: # 1, 10, 100, 1000, 10000
+        for sample_size in [1, 10, 100, 1000, 10000, 100000, 1000000]: 
             # Prepare priors
             mesh_priors = M["P"].apply(estimate_prior_distribution_mesh_V2, sample_size = sample_size)
             mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
@@ -86,7 +86,7 @@ if True:
                 r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
                 # fill with results
                 validation_set.iloc[i, 2:6] = list(r)
-            validation_set.to_csv("data/Validation/neg_classic/validation_" + str(alpha) + "_" + str(sample_size) + ".csv", index = False)
+            validation_set.to_csv("data/Validation/Neg_Qvalue/validation_" + str(alpha) + "_" + str(sample_size) + ".csv", index = False)
 
 # Anomalie test
 

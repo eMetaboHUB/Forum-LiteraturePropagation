@@ -13,7 +13,7 @@ parser.add_argument("--mesh", help="The studied MeSH. This argument is incompati
 parser.add_argument("--specie", help="The studied specie. This argument is incompatible with the 'file' argument. The program will return all association between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'specie')
 parser.add_argument("--file", help="Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH). This argument is incompatible with the 'mesh' and 'specie' arguments.", type = str, required = False, dest = 'file')
 parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null. Default = False", type = bool, default = False, required = False, dest = 'forget')
-parser.add_argument("--alpha", help="The damping factor. It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
+parser.add_argument("--alpha", help="The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
 parser.add_argument("--sample_size", help="The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100", nargs = "*", type = int, default = [100], required = False, dest = 'ss')
 parser.add_argument("--out", help="path to the output directory", type = str, required = True, dest = 'out')
 
@@ -80,9 +80,8 @@ if 0 in sample_size_set:
 
 print("\nParameters:\n")
 print("- forget: " + str(args.forget))
-print("- damping factor: " + str(alpha_set))
+print("- damping factor (alpha): " + str(alpha_set))
 print("- sample size: " + str(sample_size_set))
-
 
 
 for alpha in alpha_set:
@@ -102,11 +101,11 @@ for alpha in alpha_set:
         print("\nTreating alpha = " + str(alpha) + " and sample_size = " + str(sample_size))
 
         # If an SPECIE-MESH file was provided:
-        if not f.empty:
+        if args.file and (not f.empty):
             print("\nCompute association from file: " + args.file)
             r = association_file(f, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
             f_out_name = os.path.splitext(os.path.basename(args.file))[0]
-            out = os.path.join(out_path, f_out_name + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            out = os.path.join(out_path, f_out_name + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             r.to_csv(out, index = False)
 
@@ -115,7 +114,7 @@ for alpha in alpha_set:
             print("\nCompute associations between " + args.specie + " and all MeSHs")
             index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
             r = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
-            out = os.path.join(out_path, args.specie + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            out = os.path.join(out_path, args.specie + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             r.to_csv(out, index = False)
         
@@ -123,7 +122,7 @@ for alpha in alpha_set:
         elif args.mesh and not args.specie:
             print("\nCompute associations between " + args.mesh + " and all species")
             r = mesh_specie(args.mesh, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
-            out = os.path.join(out_path, args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            out = os.path.join(out_path, args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             r.to_csv(out, index = False)
 
@@ -139,7 +138,7 @@ for alpha in alpha_set:
             p = float(MeSH_info["P"])
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
             df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDFratio": [res.priorCDFratio]})
-            out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             df_.to_csv(out, index = False)
         

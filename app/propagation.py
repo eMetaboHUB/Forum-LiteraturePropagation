@@ -81,7 +81,7 @@ def import_and_map_indexes(path, g, name_att = "label"):
     Returns:
         (pandas.DataFrame): The imported table with a new column, index, indicating the species index in the graph
     """
-    # Create a table to map species labels (SPECIE column) to indexes in the graph
+    # Create a table to map species labels (SPECIE column) to indexes in the graph.
     label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
     data = import_table(path)
 
@@ -549,7 +549,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     """
     
     # Out
-    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
+    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
 
     weights = data["weights"].tolist()
     del weights[index]
@@ -613,11 +613,14 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
 
     Log2numFC = np.log2(posterior_mix.mu/p)
     
+    # Compute score :
+    Score = -np.log(cdf_posterior_mix) * Log2numFC
+
     if plot: 
         plot_prior_mix_distributions(prior_mix, labels, seq)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)
+    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios, Score)
 
     return resultat
 
@@ -636,7 +639,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
 
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
@@ -678,17 +681,17 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
+    cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
     p = float(MeSH_info["P"])
     
     # Browser all species
     with progressbar.ProgressBar(max_value=len(indexes)) as bar:
         for i in indexes:
             table_species_corpora["weights"] = weights[:, i].tolist()
-            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
             data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
             
             # If forget option is true, remove observation of the studied specie
@@ -717,7 +720,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     Returns:
         [type]: [description]
     """
-    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
+    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])])
     n = len(associations)
     
     # Browse associations
@@ -741,6 +744,6 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
 
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-            associations.iloc[i, 2:6] = list(r)
+            associations.iloc[i, 2:7] = list(r)
             bar.update(i)
     return associations

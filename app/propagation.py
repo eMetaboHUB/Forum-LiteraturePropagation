@@ -7,6 +7,7 @@ import copy
 import collections
 import scipy.special as sc
 import scipy.stats as ss
+import progressbar
 import matplotlib.pyplot as plt
 np.set_printoptions(suppress=True)
 
@@ -621,38 +622,102 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     return resultat
 
 
-def specie_mesh(index, table_cooc, table_corpora, weights, table_mesh):
-    
-    print("Treat index: " + str(index))
+def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    """[summary]
+
+    Args:
+        index (int): index of the specie in the metabolic network
+        table_cooc (pandas.DataFrame): table of co-occurences
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        weights (numpy): weight matrix
+        table_mesh (pandas.DataFrame): table of MeSH corpora
+        forget (bool): Keep only prior information from the neighborhood, removing specie's observation
+    """
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
     df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
 
     # Prepare data table
-    table_corpora.insert(2, "weights", weights[:, index].tolist())
+    table_species_corpora["weights"] = weights[:, index].tolist()
     
-    for i in indexes:
-        print(str(i) + "/" + str(len(indexes)))
-        mesh = mesh_list[i]
-        # Get cooc vector. It only contains species that have at least one article, need to left join.
-        cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
-        # Get data
-        data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
-        MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
-        p = float(MeSH_info["P"])
-        r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
-        df_.loc[i] = r
+    with progressbar.ProgressBar(max_value=len(indexes)) as bar:
+        for i in indexes:
+            mesh = mesh_list[i]
+            # Get cooc vector. It only contains species that have at least one article, need to left join.
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+            # Get data
+            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            
+            # If forget option is true, remove observation of the studied specie
+            if forget:
+                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+            
+            # Get MeSH info
+            MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
+            p = float(MeSH_info["P"])
+            
+            # Computation
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+            df_.loc[i] = r
+            bar.update(i)
     
     df_.insert(0, "MESH", mesh_list)
     return(df_)
-        
 
-# if data["COOC"][index] > 0:
-# Test of interest (mean raw Log2FC neighboors > 1):
-# testFC = np.dot(data[data["TOTAL_PMID_SPECIE"] != 0]["weights"], ((data[data["TOTAL_PMID_SPECIE"] != 0]["COOC"]/data[data["TOTAL_PMID_SPECIE"] != 0]["TOTAL_PMID_SPECIE"])/p))
-# if testFC != 0 and np.log2(testFC) > 1 :
-# if r.CDF <= 0.001:
+def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    specie_list = table_species_corpora["SPECIE"].tolist()
+    indexes = range(0, len(specie_list))
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
+    
+    # Get MeSH info
+    MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
+    p = float(MeSH_info["P"])
+    
+    # Browser all species
+    with progressbar.ProgressBar(max_value=len(indexes)) as bar:
+        for i in indexes:
+            table_species_corpora["weights"] = weights[:, i].tolist()
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            
+            # If forget option is true, remove observation of the studied specie
+            if forget:
+                data.loc[data["index"] == i, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+            
+            # Computation
+            r = computation(i, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+            df_.loc[i] = r
+            bar.update(i)
+    
+    df_.insert(0, "SPECIE", specie_list)
+    return(df_)
 
+def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
+    n = len(associations)
+    
+    # Browse associations
+    with progressbar.ProgressBar(max_value = n) as bar:
+        for i in range(0, n):
+            specie = str(associations.iloc[[i], 0].item())
+            mesh = str(associations.iloc[[i], 1].item())
+            index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
+            # Prepare data
+            table_species_corpora["weights"] = weights[:, index].tolist()
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            
+            # If forget option is true, remove observation of the studied specie
+            if forget:
+                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+            
+            # Get MeSH info
+            MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
+            p = float(MeSH_info["P"])
 
-
+            # Computation
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
+            associations.iloc[i, 2:6] = list(r)
+            bar.update(i)
+    return associations

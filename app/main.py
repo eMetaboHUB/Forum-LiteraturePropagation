@@ -1,4 +1,6 @@
 import argparse
+import sys
+import os
 from propagation import *
 
 # Get arguments
@@ -7,13 +9,30 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--graph", help="path to metabolic network compound graph", type = str, required = True, dest = 'g_path')
 parser.add_argument("--specie.corpora", help="path to the species corpus size file ", type = str, required = True, dest = 'specie_corpora_path')
 parser.add_argument("--specie.cooc", help="path to the species MeSH co-occurences file ", type = str, required = True, dest = 'specie_mesh_path')
-parser.add_argument("--mesh.corpora", help="path to the MeSH corpus size file ", type = str, required = True, dest = 'mesh_corpora_path')
+parser.add_argument("--mesh", help="The studied MeSH, incompatible with the 'file' argument. The program will return all association between this MeSH and all species in the metabolic network. If the 'specie' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'mesh')
+parser.add_argument("--specie", help="The studied specie, incompatible with the 'file' argument. The program will return all association between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'specie')
+parser.add_argument("--file", help="Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH), incompatible with the 'mesh' and 'specie' arguments.", type = str, required = False, dest = 'file')
+parser.add_argument("--benchmark", help="Compute a benchmark for the analysis by varying the damping factor and the sample size paramters. In benchmark mode, provided values of damping factor and sample size parameters wil be erased.", type = bool, default = False, required = False, dest = 'benchmark')
+parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null.", type = bool, default = False, required = False, dest = 'forget')
+parser.add_argument("--alpha", help="The damping factor", type = float, default = 0.1, required = False, dest = 'alpha')
+parser.add_argument("--sample_size", help="The sample size parameter", type = int, default = 100, required = False, dest = 'ss')
+parser.add_argument("--out", help="path to the output directory", type = str, required = True, dest = 'out')
+
 
 args = parser.parse_args()
 
-sample_size = 100
-alpha = 0.1
+# Parse options
+if args.file and (args.specie or args.mesh):
+    print("\nThe 'file' option and 'mesh' and/or 'specie' are incomptibles: \n")
+    print("(1) To compute associations between a specific specie and all MeSH, use only the 'specie' option")
+    print("(2) To compute associations between a specific MeSH and all specie, use only the 'mesh' option")
+    print("(3) To compute a specific association, set both the 'specie' and the 'mesh' option")
+    print("(4) To compute a specific set of associations provided as pairs in a file, use the file option")
+    sys.exit(2)
 
+out_path = args.out
+
+# Import data
 g = import_metabolic_network(args.g_path)
 
 print("> Import species corpora sizes ... ", end = '')
@@ -33,105 +52,104 @@ table_mesh_corpora = table_coocurences.groupby('MESH', as_index=False)[['COOC']]
 # Compute MeSH probabilities normalising by the total number of cpd-article mentions
 table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/TOTAL_CPD_MENTIONS
 
-# Compute prior parameters:
-mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh_V2, sample_size = sample_size)
-mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
+# Test if provided MeSH exists
+if args.mesh and (not args.mesh in table_mesh_corpora["MESH"].tolist()):
+    print("Unknown MeSH identifier: " + args.mesh)
+    sys.exit(3)
 
-table_mesh_corpora = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
-print("Ok")
+# Test if provided specie exists
+if args.specie and (not args.specie in table_species_corpora["SPECIE"].tolist()):
+    print("Unknown specie identifier: " + args.specie)
+    sys.exit(3)
+
+# Test if provided file exists
+if args.file:
+    try:
+        f = pd.read_csv(args.file)
+    except Exception as e:
+        print("Error while trying to read association file. \n" + str(e))
+
+# Analysis in benchmark mode ?
+if args.benchmark:
+    print("\n> Compute analysis in benchmark mode !")
+    alpha_set = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
+    sample_size_set = [1, 10, 100, 1000, 10000, 100000, 1000000]
+else:
+    print("\n> Compute analysis in normal mode !")
+    # Default parameters
+    alpha_set = [args.alpha]
+    sample_size_set = [args.ss]
+
+# Compute analysis
+
+print("\nParameters:\n")
+print("- benchmark: " + str(args.benchmark))
+print("- forget: " + str(args.forget))
+print("- damping factor: " + str(alpha_set))
+print("- sample size: " + str(sample_size_set))
 
 
-mesh = "D052536" # "D002386" # "D018312"
-specie = "M_spc_hs" # "M_zymstnl" # "M_tststerone"
 
+for alpha in alpha_set:
 
-# probabilities = propagation_volume(g, alpha = alpha)
+    # Compute network analysis
+    print("\n- Compute weights using alpha = " + str(alpha))
+    probabilities = propagation_volume(g, alpha = alpha)
+    weights = compute_weights(probabilities, table_species_corpora)
+    
+    for sample_size in sample_size_set:
+        print("\n- Compute MeSH priors using sample size = " + str(sample_size))
+        # Compute prior parameters:
+        mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh_V2, sample_size = sample_size)
+        mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
+        table_mesh_corpora_work = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
+        
+        print("\nTreating alpha = " + str(alpha) + " and sample_size = " + str(sample_size))
 
-# weights = compute_weights(probabilities, table_species_corpora)
+        # If an SPECIE-MESH file was provided:
+        if not f.empty:
+            print("\nCompute association from file: " + args.file)
+            r = association_file(f, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            f_out_name = os.path.splitext(os.path.basename(args.file))[0]
+            out = os.path.join(out_path, f_out_name + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            print("Export results in " + out)
+            r.to_csv(out, index = False)
 
-if True:
-    validation_set = pd.read_csv("data/Validation/validation_set_associations_Qvalue.csv")
-    # add results columns
-    validation_set = pd.concat([validation_set, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
-    # Compute the total number of mentions between a compound and an article, that also involved MeSHs
-    M = table_coocurences.groupby('MESH', as_index=False)[['COOC']].sum().rename(columns={"COOC": "TOTAL_CPD_MENTION_MESH"})
-    # Compute MeSH probabilities normalising by the total number of cpd-article mentions
-    M["P"] = M["TOTAL_CPD_MENTION_MESH"]/TOTAL_CPD_MENTIONS
-    # Iter over associations
-    for alpha in [0, 0.1, 0.2, 0.3, 0.4, 0.5]:
-        probabilities = propagation_volume(g, alpha = alpha)
-        weights = compute_weights(probabilities, table_species_corpora)
-        for sample_size in [1, 10, 100, 1000, 10000, 100000, 1000000]: 
-            # Prepare priors
-            mesh_priors = M["P"].apply(estimate_prior_distribution_mesh_V2, sample_size = sample_size)
-            mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
-            table_mesh_corpora = pd.concat([M, mesh_priors], axis = 1)
-            # Compute validation for set parameters
-            print("Treating alpha = " + str(alpha) + " and sample_size = " + str(sample_size))
-            for i in range(0, len(validation_set.index)):
-                # get row info
-                specie = str(validation_set.iloc[[i], 0].item())
-                mesh = str(validation_set.iloc[[i], 1].item())
-                index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
-                # Create association table
-                # Prepare data
-                table_species_corpora["weights"] = weights[:, index].tolist()
-                cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
-                data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
-                # Forget data
+        # If only a specie has been provided
+        elif args.specie and not args.mesh:
+            print("\nCompute associations between " + args.specie + " and all MeSHs")
+            index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
+            r = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            out = os.path.join(out_path, args.specie + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            print("Export results in " + out)
+            r.to_csv(out, index = False)
+        
+        # If only a mesh has been provided
+        elif args.mesh and not args.specie:
+            print("\nCompute associations between " + args.mesh + " and all species")
+            r = mesh_specie(args.mesh, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            out = os.path.join(out_path, args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            print("Export results in " + out)
+            r.to_csv(out, index = False)
+
+        elif args.mesh and args.specie:
+            print("\nCompute associations between " + args.specie + "and" + args.mesh)
+            index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
+            table_species_corpora["weights"] = weights[:, index].tolist()
+            cooc = table_coocurences[table_coocurences["MESH"] == args.mesh][["index", "COOC"]]
+            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            if args.forget:
                 data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
-                # Launch analysis
-                MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
-                p = float(MeSH_info["P"])
-                r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-                # fill with results
-                validation_set.iloc[i, 2:6] = list(r)
-            validation_set.to_csv("data/Validation/Neg_Qvalue/validation_" + str(alpha) + "_" + str(sample_size) + ".csv", index = False)
-
-# Anomalie test
-
-if False:
-    weaks = pd.read_csv("data/Validation/Anomalie_detection/weakness_set.csv")
-    weaks = pd.concat([weaks, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])])
-    for i in range(0, len(weaks.index)):
-        # get row info
-        specie = str(weaks.iloc[[i], 0].item())
-        mesh = str(weaks.iloc[[i], 1].item())
-        index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
-        table_species_corpora["weights"] = weights[:, index].tolist()
-        cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
-        data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
-        MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
-        p = float(MeSH_info["P"])
-        r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-        weaks.iloc[i, 2:6] = list(r)
-    weaks.to_csv("data/Validation/Anomalie_detection/set_" + str(alpha) + "_" + str(sample_size) + ".csv", index = False)
-
-# START TEST
-if False:
-    index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
-    table_species_corpora.insert(2, "weights", weights[:, index].tolist())
-    cooc = table_coocurences[table_coocurences["MESH"] == mesh][["index", "COOC"]]
-    data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
-    # Forget data
-    # data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
-    MeSH_info = table_mesh_corpora[table_mesh_corpora["MESH"] == mesh]
-    p = float(MeSH_info["P"])
-    print(p)
-    print(str(MeSH_info["alpha_prior"]))
-    print(str(MeSH_info["beta_prior"]))
-    r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
-    print(r)
-# END TEST
-
-if False:
-    index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
-    r2 = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora)
-    r2.to_csv("data/" + specie + "_" + str(alpha) + ".csv", index = False)
-
-
-# plt.plot(prior_test.x, prior_test.f)
-# plt.show()
+            MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
+            p = float(MeSH_info["P"])
+            res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
+            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDFratio": [res.priorCDFratio]})
+            out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ".csv")
+            print("Export results in " + out)
+            df_.to_csv(out, index = False)
+        
+        else:
+            print("Nothing to do ...")
 
 
 
@@ -141,11 +159,3 @@ if False:
 
 
 
-
-
-
-
-
-
-# print("> Import MeSH corpora sizes ... ", end = '')
-# table_mesh_corpora = import_table(args.mesh_corpora_path)

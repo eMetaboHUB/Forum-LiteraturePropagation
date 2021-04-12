@@ -100,7 +100,7 @@ def compute_PR(A, i, alpha, epsilon = 1e-9):
     Args:
         A ([numpy.ndarray]): Graph adjacency matrix
         i ([int]): Index of the target node
-        alpha (float): The damping factor.
+        alpha (float): The damping factor. WARGNING alpha is [0, 1[. '1' is excluded because we need restart probabilies to ensure the graph connexion !
         epsilon ([float], optional): Tolerance for convergence. Defaults to 1e-9.
 
     Returns:

@@ -76,6 +76,10 @@ if 0 in sample_size_set:
     print("\n /!\ 0 is not allowed for sample_size.")
     sample_size_set.remove(0)
 
+if 1 in alpha_set:
+    print("\n /!\ 1 is not allowed for damping factor (alpha).")
+    alpha_set.remove(1)
+
 # Compute analysis
 
 print("\nParameters:\n")

@@ -1273,17 +1273,17 @@ Les évènements:
 
 - $m$: la mention parle/implique le mesh $m$
 - $c_i$: la mention parle/implique le composé $c_i$
-- $I$ la mention a atteint le composé cible
+- $I = k$ la mention a atteint le composé cible $j$
 
-$f(m|I) = \sum_{c= 1}^{N} = p(m|c_i)p(c_i|I)$
-$p(c_i|I)$ représentant la probabilité qu'une mention, arrivée sur le composé cible, parle de $c_i$.
-$p(m|c_i)$ represant la probabilité qu'une mention parlant du composé $c_i$, implique également le mesh $m$. Ceci étant indépendant de l'évènement $I$: "la mention arrive sur le composé $C_i$" -> $p(m|c_i, I) = p(m|c_i)$
-$f(m|I)$ représente donc la probabilité qu'une mention arrivant sur le composé cible mentionne le mesh $m$.
+$f(m|I = k) = \sum_{c= 1}^{N} p(m|c_i)p(c_i|I = k)$, soit la probabilité d'observer une mention impliquant le mesh $m$ parmis celles arrivées sur le composé d'intérêt $k$. 
+$p(c_i|I = k)$ représentant la probabilité qu'une mention, arrivée sur le composé cible $k$, provienne de $c_i$.
+$p(m|c_i)$ representant la probabilité qu'une mention parlant du composé $c_i$, implique également le mesh $m$. Ceci étant indépendant de l'évènement $I = k$: la mention arrive sur le d'intérêt $k$. en gros le fait de savoir que la mention est sur le composé d'intérêt n'influe pas les proba qu'elle implique que MeSH et donc : $p(m|c_i, I = k) = p(m|c_i = k)$
+$f(m|I=k)$ représente donc la probabilité qu'une mention arrivant sur le composé cible $k$ mentionne le mesh $m$.
 
 En effet: 
 $f(m, c_i) = p(m|c_i)p(c_i)$
-$f(m, c_i|I) = p(m|c_i, I)p(c_i|I) = p(m|c_i)p(c_i|I)$ car indepéndace à $p(m|c_i, I) = p(m|c_i)$
-Et donc si on somme pour tous les $c_i$, on a bien que $f(m|I) = \sum_{c= 1}^{N} p(m|c_i)p(c_i|I)$
+$f(m, c_i|I=k) = p(m|c_i, I=k)p(c_i|I=k) = p(m|c_i)p(c_i|I=k)$ car indepéndace à $p(m|c_i, I=k) = p(m|c_i)$
+Et donc si on somme pour tous les $c_i$, on a bien que $f(m|I=k) = \sum_{c=1}^{N} p(m|c_i)p(c_i|I=k)$
 
 
 
@@ -1298,23 +1298,29 @@ $p(m|c_i) = \frac{N^m_i}{N_i}$, c'est la probabilité qu'une mention du composé
 $p(c_i) = \frac{N_i}{\sum_j N_j}$, cette probabilité n'est plus calculé en utilisant l'Univers, le nombre d'articles distincts, mais, en utilisant la somme du nombre de mentions (aka nombre d'articles) annotés à chaque composé
 $p(m) = \sum_i p(m|c_i) p(ci) = \sum_i \frac{N_i^m}{Ni} \frac{N_i}{\sum_j N_j} = \sum_i \frac{N_i^m}{\sum_j N_j}$
 
-- Ainsi mes poids dans ma mixture : $p(c_i|I) = \frac{p(c_i, I)}{p(I)} = \frac{p(c_i, I)}{\sum_jp(c_j, I)}= \frac{P(I|c_i)p(c_i)}{\sum_j P(I|c_j)p(c_j)} = \frac{\frac{\sigma_i N_i}{N}}{\sum_j\frac{\sigma_j N_j}{N}} = \frac{\sigma_i N_i}{\sum_j \sigma_j N_j}$
+- Ainsi mes poids dans ma mixture : $p(c_i|I = k) = \frac{p(c_i, I=k)}{p(I=k)} = \frac{p(c_i, I=k)}{\sum_jp(c_j, I=k)}= \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)} = \frac{\frac{\pi_{k,i} N_i}{N}}{\sum_j\frac{\pi_{k,j} N_j}{N}} = \frac{\pi_{k,i} N_i}{\sum_j \pi_{k,j} N_j}$
 
-- Indépendance conditionnelle de  $p(m|c_i, I) = p(m|c_i)$
-En effet, si on voulait déterminer $p(m|c_i, I)$ on ferait $p(m|c_i, I) ) \frac{\sigma_i N_i^m}{\sigma_i N_i} = \frac{N_i^m}{N_i} = p(m|c_i)$
+La matrice $pi$ contient les vecteurs de résultats du PPR rangées **en colonnes** ! Ainsi, $\pi_{k,i}$ représente la probabilité attendu d'atteindre le noeud $k$ dans le réseau pour une marche aléatoire de type  PPR partant du noeud $i$.
 
-Donc finalement avec toutes ses probabilités, on va pouvoir faire la même chose ! C'est juste que maintenant notre prior parle en terme de mentions et non plus d'articles mais l'idée d'indépendance qu'il soutient est toujours la même. Sous hypothèse d'indépendance $p(m|c_i) = p(m)$, le fait que la mention implique le composé $c_i$ n'a aucun effet sur le fait qu'elle implique le MeSH $m$, donc on peut toujours mettre notre $\mu$ à $p(m)$
+- Indépendance conditionnelle de  $p(m|c_i, I=k) = p(m|c_i)$
+En effet, si on voulait déterminer $p(m|c_i, I=k)$ on ferait $p(m|c_i, I=k) = \frac{\pi_{k,i} N_i^m}{\pi_{k,i} N_i} = \frac{N_i^m}{N_i} = p(m|c_i)$
 
-Ensuite on ajoute effectivement des observations. Pour chaque composé $c_i$, initialement j'ai un apriori sur $p(m|c_i)$, dans lequel $\mu = p(m)$. Mais j'observe ensuite mes observations $N$ et $N_i$ qui me permettent de mettre à jour ma probabilité $p(m|c_i)$, qui est toujuurs indépendance de $I$. Ensuite je peux utiliser cette probabilité pour construire mon prior pour le composé cible. Je cherche alors $p(m|I)$ qui est la probabilité qu'une mention parle du MeSH $m$ sachant qu'elle est arrivé sur le composé cible ! Alors, $p(m|I) = \sum_{c= 1}^{n} = p(m|c_i)p(c_i|I)$, où $p(c_i|)$ est simplement la proba qu'une mention du composé $c_i$ atteigne le composé cible !
+Donc finalement avec toutes ses probabilités, on va pouvoir faire la même chose ! C'est juste que maintenant notre prior parle en terme de mentions et non plus d'articles mais l'idée d'indépendance qu'il soutient est toujours la même. Sous hypothèse d'indépendance $p(m|c_i) = p(m)$, le fait que la mention implique/provienne du composé $c_i$ n'a aucun effet sur le fait qu'elle implique le MeSH $m$, donc on peut toujours mettre notre $\mu$ à $p(m)$
 
-
-
-
+Ensuite on ajoute effectivement des observations. Pour chaque composé $c_i$, initialement j'ai un apriori sur $p(m|c_i)$, dans lequel $\mu = p(m)$. Mais j'observe ensuite mes observations $N$ et $N_i$ qui me permettent de mettre à jour ma probabilité $p(m|c_i)$, qui est toujours indépendance de $I=k$. Ensuite je peux utiliser cette probabilité pour construire mon prior pour le composé cible. Je cherche alors $p(m|I=k)$ qui est la probabilité qu'une mention parle du MeSH $m$ sachant qu'elle est arrivé sur le composé cible ! Alors, $p(m|I=k) = \sum_{c= 1}^{n} = p(m|c_i)p(c_i|I=k)$, où $p(c_i|I=k)$ est simplement la proba qu'une mention ayant atteint le composé cible $k$, provienne de $c_i$ !
 
 
 $\sigma_i$ étant simplement la probabilité qu'une mention atteigne le composé cible (évènement $I$), sachant qu'ell est partie du composé $c_i$
 
+### Ce qui change :
 
+Désormais, les poids dans le modèle de mélange sont également fonction de la taille du corpus du composé (en terme de nombre de *mentions* à des articles)
+Ceci implique que **les composés sans literature ne participent PAS à la construction des priors**
+
+Ainsi, si un composé est entouré uniquement de composés non-informatif (en utilisant $\alpha = 0$ par exemple), il se peut que l'on ne puisse pas lui définir de prior car tous ces voisins sont non-informatif. A ce moment là, on affiche un Warning: "Neiborhood literature information does not reach the targeted compound. You should increase the damping factor. Use default prior." et on va réaliser l'analyse en considérant comme un prior, le prior général associé au MeSH, déterminé en fonction de $\mu$ et $\nu$. Ainsi, il n'y **pas** de distribution de mélange construite, c'est un prior simple !
+On renvoie les même valeurs que pour une analyse classique (Mean, CDF, log2FC) mais pas le *Log2CDFRatio* puisque notre prior est exactement le même que celui qui est prévu de manière générale ..
+
+Une autre chose à bien voir est que même si l'on utilise la taille de corpus dans le calcul des poids, on utilise seulement le corpus effectif associé à chaque composé, on ne compte pas les articles *imaginaires* qui sont issus du prior général dans ce calcul ! Ces articles *imaginaires*, dont le nombre est gérer par l'hyperparamètre $\nu$, ne sont utilisés que pour éviter des biais par rapport à des voisins qui aurait peu de literature et dont les probabilités seraient peu fiables. Ainsi en réalité ce prior général n'est appliqué que sur les composés qui disposent de literature car les autres composés n'ayant pas de littérature et donc un poids nul, ne sont pas pris en compte dans l'analyse.
 
 
 
@@ -1343,8 +1349,68 @@ Pour le paramètre sample_size, comme on peut le constater plus il est élevé p
 
 
 
+### Limite sur le damping factor alpha: 
+
+Lorsque l'on réalise la truncation de la matrice d'adjascence, on supprime les noeud cible et tout les liens qu'il créée, il est possible que l'on crée des noeuds flottants, si par exemple le noeud cible était le seul voisin de ce noeud.
+Dans la construction de la matrice de proba, ce problème est réglé par les sink node: si aucun noeud n'est lié à mon noeud, alors toutes ces proba seront construite à l'aide de alpha. Même si alpha = 1, ça fonctionne.
 
 
+Mais la chose ce complique si au lieu de créée un noeud flottant, par suppression du noeud cible, on crée un sous-composante du graph ! Par exemple une partie des voisins du noeud target forment une chaine. lors que l'on supprime le noeud target, on se retrouve avec un chaine 'flottante' qui n'est plus relié au reste du graph ! 
+Le problème c'est qu'elle ne sont pas considéré comme des sink nodes, car chaque membre de la châine a au moins 1 voisin ...
+Ainsi ce qui d'habitude corrige se problème ne peut pas intervenir ici car ce ne sont pas des sink nodes , ainsi dans le calcul de la matrice de proba $M = alpha * P + (alpha * a + (1 - alpha) * e) @ v.T$ 
+La partie $(alpha * a + (1 - alpha) * e) @ v.T$ est égal à 0 car ce ne sont pas des sink nodes et alpha = 1. Ainsi il n'y a pas d'ajout de proba de restart qui nous assure de pouvoir redémarrer sur les voisins du noeud et donc d'avoir une structure connexe !!
+Or si on a pas de structure connexe, on ne peut pas assurer la convergence du PPR !
+
+Ainsi pour assurer la convergence du PPR et donc que notre graph, même après suppression de notre noeud target forment toujours une composante connexe, on a besoin de la probabilité de restart, car ce restart sur les voisins du noeuds cible, compense la suppression du noeud !
+Ainsi il faut poser alpha entre [0, 1[ soit 0 compris mais 1 non-compris !!
 
 
+Deplus, même dans le cas où l'on pose alpha = 0, si le noeud formait le seul chemin à travers nos voisins, grâce aux probabilité de restart on reconnecte tous les voisins entre eux
+
+### Focus analysis
+Comme l'analyse globale que l'on a réalisée dans FORUM, la principale faiblesse de notre approche est que nous testons des relations et construisons des aprioris sur des relations sans connaitre la nature de cette relation. 
+On pourrait donc très bien imaginer que 2 composés contribuent de manière équivalente à un prior, mais que l'un indique en fait une utilisation thérapeutique, alors que l'autre est un biomarker. Ici les deux composés contribuent de manière équivalente à l'apriori que l'on va poser sur la relation, mais décrivent deux relations différentes, que l'on utiliserait de manière équivalente pour construire un prior sur une relations sans nature précise, ce qui est problématique
+Il faut donc arriver à extraire un set d'article associés à une relation spécifique (therapeutiques, biomarqueurs, etc ...) entre la molécule et la maladie
+Pour cela on va utiliser les qualifiers associés aux termes MeSh des maladies pour notamment distinguer les mentions de composés dans des artciles dans des cas thérapeutiques, on de diagnostiques par exemple.
+
+https://www.nlm.nih.gov/mesh/qualifiers_scopenotes.html
+
+Quelques qualifiers qui pourrait nous être utiles: 
+
+Tout n'est pas lié aux relations chemicals - **diseases**, mais 
+
+- Chemically Induced:  	Used for biological phenomena, **diseases**, syndromes, congenital abnormalities, or symptoms caused by endogenous or exogenous substances.
+
+- Complications: Used with **diseases** to indicate conditions that co-exist or follow, i.e., co-existing diseases, complications, or sequelae.
+
+- Diagnosis: Used with **diseases** for all aspects of diagnosis, including examination, differential diagnosis and prognosis. Excludes diagnosis using imaging techniques (e.g. radiography, scintigraphy, and ultrasonography) for which "diagnostic imaging" is used.
+
+- Drug Therapy:	Used with **disease** headings for the treatment of disease by the administration of drugs, chemicals, and antibiotics. For diet therapy and radiotherapy, use specific subheadings. Excludes immunotherapy for which "therapy" is used.
+
+- Therapy: Used with **diseases** for therapeutic interventions except drug therapy, diet therapy, radiotherapy, and surgery, for which specific subheadings exist. The concept is also used for articles and books dealing with multiple therapies.
+
+- Metabolism: Used with organs, cells and subcellular fractions, organisms, and **diseases** for biochemical changes and metabolism. It is used also with drugs and chemicals for catabolic changes (breakdown of complex molecules into simpler ones). For anabolic processes (conversion of small molecules into large), BIOSYNTHESIS is used. For enzymology and pharmacokinetics, use the specific subheadings.
+
+- Used with drugs, biological preparations, and physical agents for their use in the prophylaxis and treatment of disease. It includes veterinary use.
+
+- Toxicity: Used with drugs and chemicals for experimental human and animal studies of their ill effects. It includes studies to determine the margin of safety or the reactions accompanying administration at various dose levels. It is used also for exposure to environmental agents. Poisoning should be considered for life-threatening exposure to environmental agents.
+
+
+Après dans notre cas ce sont les diseases qui sont représentés par des MeSH  et donc pour lesquelles on peut facilement utiliser les qualifiers. Dans le cas des composés, certes ils peuvent être décrits à l'aide de meSH indéxant la publication, néanmoins dans notre cas, c'est en utilisation les NCBI Eutilities que l'on va pouvoir les déterminer.
+  
+
+Si on regarde un peu les résultats
+
+HE/Metabolism VS (HE/Metabolism - HE/Therapy&Co)
+
+Pas de grosse diff, les molécules sont relativement les même mais apparaisse dans des ordres légèrement différents.
+
+
+Lorsque l'on regarde sans filtre sur les qualifiers (les assos classiques) il y a deux molécules qui arrivent en top liste mais qui pourtant sont beaucoup bas dans la liste lorsque l'on regarde seulement metabolism par exemple, c'est "bilirubin" et "acetaminophen/paracetamol"
+
+Pour "acetaminophen/paracetamol", on le retrouve notamment attaché au qualifier diagnostic, mais non pas car cette molécule est dosé pour diagnostiqué la maladie, mais car on diagnostique des HE chez des patients ayant reçu de forte dose de paracétamol car cela peut entrainé des liver failures dont l'HE.
+
+Bilirupin quant à elle est bien dosé pour diagnostiquer l'HE, mais pourtant elle n'est pas mentionné souvent lorsque l'on discutte du métabolisme de l'HE
+
+Il faut peut être voir à se focaliser plus sur 'diagnostic' mais en intégrant également des filtres sur "Complication" et "Chemically induiced" pour bien spécifier que l'on veut parler de diagnostic au sens : on dose la molécule pour diagnostiquer la pathologie.
 

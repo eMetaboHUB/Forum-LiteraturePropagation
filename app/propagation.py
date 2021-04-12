@@ -7,6 +7,7 @@ import copy
 import collections
 import scipy.special as sc
 import scipy.stats as ss
+import progressbar
 import matplotlib.pyplot as plt
 np.set_printoptions(suppress=True)
 
@@ -80,7 +81,7 @@ def import_and_map_indexes(path, g, name_att = "label"):
     Returns:
         (pandas.DataFrame): The imported table with a new column, index, indicating the species index in the graph
     """
-    # Create a table to map species labels (SPECIE column) to indexes in the graph
+    # Create a table to map species labels (SPECIE column) to indexes in the graph.
     label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
     data = import_table(path)
 
@@ -99,7 +100,7 @@ def compute_PR(A, i, alpha, epsilon = 1e-9):
     Args:
         A ([numpy.ndarray]): Graph adjacency matrix
         i ([int]): Index of the target node
-        alpha (float): The damping factor.
+        alpha (float): The damping factor. WARGNING alpha is [0, 1[. '1' is excluded because we need restart probabilies to ensure the graph connexion !
         epsilon ([float], optional): Tolerance for convergence. Defaults to 1e-9.
 
     Returns:
@@ -291,7 +292,7 @@ def estimate_prior_distribution_mesh(mesh_corpora):
     return result
 
 def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
-    """This function is used to estimate parameters and distribution of a simple prior distribution, no mixture.
+    """This function is used to compute the density of a simple prior distribution, no mixture.
 
     Args:
         alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
@@ -323,7 +324,7 @@ def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
     return res
 
 def simple_posterior(cooc, corpora, alpha_prior, beta_prior, seq, sampling = True):
-    """This function is used to estimate parameters and distribution of a simple posterior distribution, no mixture.
+    """This function is used to estimate parameters and density of a simple posterior distribution, no mixture.
 
     Args:
         cooc (list): The co-occurence between the specie in the graph and a particular MeSH descriptor  
@@ -533,22 +534,22 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         index (integer): the index of the specie if the metabolic network
         data (pandas.DataFrame): data related to corpus size of each compound in the metabolic network and their co-occurence with the studied MeSH 
         p (float): The general probability to observed a mention of a compound in an article, also involving the MeSH.
-        alpha_prior (float): The alpha parameter of the prior distribution
-        beta_prior (float): The beta parameter of the prior distribution
-        seq (float, optional): The step used to create a x vector of probabilities (for plotting distribution only). Defaults to 0.0001.
+        alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
+        beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
+        seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
         plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_prior_mix_distributions and plot_distributions. Defaults to False.
-        weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. it may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
+        weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
 
     Returns:
         [collection]: A collection with:
         - Mean (float): The mean of the posterior distribution. 
-        - CDF (float): The probability P(p <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (independance hypothesis)
-        - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH
+        - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
+        - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
         - priorCDFratio: The log2 ratio of the CDF probabilities P(p <= p(M)) obtained between the initial prior and the mixture prior. When this value is high, it indicates that the studied MeSH is more frequent than usual in the neiborhood of the targeted compound. This value is correlated with the CDF. This value is NaN is the neighborhood can't provide information, as these both prior will be the same
     """
     
     # Out
-    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio"])
+    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
 
     weights = data["weights"].tolist()
     del weights[index]
@@ -612,47 +613,137 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
 
     Log2numFC = np.log2(posterior_mix.mu/p)
     
+    # Compute score :
+    Score = -np.log(cdf_posterior_mix) * Log2numFC
+
     if plot: 
         plot_prior_mix_distributions(prior_mix, labels, seq)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios)
+    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios, Score)
 
     return resultat
 
 
-def specie_mesh(index, table_cooc, table_corpora, weights, table_mesh):
-    
-    print("Treat index: " + str(index))
+def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    """This function is used to computed associations from a specific specie against all available MeSHs.
+
+    Args:
+        index (int): index of the specie in the metabolic network
+        table_cooc (pandas.DataFrame): table of co-occurences
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        weights (numpy): weight matrix
+        table_mesh (pandas.DataFrame): table of MeSH corpora
+        forget (bool): Keep only prior information from the neighborhood, removing specie's observation
+    """
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
 
     # Prepare data table
-    table_corpora.insert(2, "weights", weights[:, index].tolist())
+    table_species_corpora["weights"] = weights[:, index].tolist()
     
-    for i in indexes:
-        print(str(i) + "/" + str(len(indexes)))
-        mesh = mesh_list[i]
-        # Get cooc vector. It only contains species that have at least one article, need to left join.
-        cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
-        # Get data
-        data = pd.merge(table_corpora, cooc, on = "index", how = "left").fillna(0)
-        MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
-        p = float(MeSH_info["P"])
-        r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
-        df_.loc[i] = r
+    with progressbar.ProgressBar(max_value=len(indexes)) as bar:
+        for i in indexes:
+            mesh = mesh_list[i]
+            # Get cooc vector. It only contains species that have at least one article, need to left join.
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+            # Get data
+            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            
+            # If forget option is true, remove observation of the studied specie
+            if forget:
+                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+            
+            # Get MeSH info
+            MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
+            p = float(MeSH_info["P"])
+            
+            # Computation
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+            df_.loc[i] = r
+            bar.update(i)
     
     df_.insert(0, "MESH", mesh_list)
     return(df_)
-        
 
-# if data["COOC"][index] > 0:
-# Test of interest (mean raw Log2FC neighboors > 1):
-# testFC = np.dot(data[data["TOTAL_PMID_SPECIE"] != 0]["weights"], ((data[data["TOTAL_PMID_SPECIE"] != 0]["COOC"]/data[data["TOTAL_PMID_SPECIE"] != 0]["TOTAL_PMID_SPECIE"])/p))
-# if testFC != 0 and np.log2(testFC) > 1 :
-# if r.CDF <= 0.001:
+def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    """This function is used to computed associations from a specific MeSH against all available species.
 
+    Args:
+        index (int): index of the specie in the metabolic network
+        table_cooc (pandas.DataFrame): table of co-occurences
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        weights (numpy): weight matrix
+        table_mesh (pandas.DataFrame): table of MeSH corpora
+        forget (bool): Keep only prior information from the neighborhood, removing specie's observation.
+    """
+    specie_list = table_species_corpora["SPECIE"].tolist()
+    indexes = range(0, len(specie_list))
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
+    
+    # Get MeSH info
+    MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
+    cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+    p = float(MeSH_info["P"])
+    
+    # Browser all species
+    with progressbar.ProgressBar(max_value=len(indexes)) as bar:
+        for i in indexes:
+            table_species_corpora["weights"] = weights[:, i].tolist()
+            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            
+            # If forget option is true, remove observation of the studied specie
+            if forget:
+                data.loc[data["index"] == i, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+            
+            # Computation
+            r = computation(i, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+            df_.loc[i] = r
+            bar.update(i)
+    
+    df_.insert(0, "SPECIE", specie_list)
+    return(df_)
 
+def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, forget):
+    """This function is used to compute all associations specified in a Dataframe (SPECIE, MESH)
 
+    Args:
+        f (pandas.Dataframe): A two columns Dataframe storing all SPECIE - MESH pairs that need to be computed.
+        table_cooc (pandas.DataFrame): table of co-occurences
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        weights (numpy): weight matrix
+        table_mesh (pandas.DataFrame): table of MeSH corpora
+        forget (bool): Keep only prior information from the neighborhood, removing specie's observation.
+
+    Returns:
+        [type]: [description]
+    """
+    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])])
+    n = len(associations)
+    
+    # Browse associations
+    with progressbar.ProgressBar(max_value = n) as bar:
+        for i in range(0, n):
+            specie = str(associations.iloc[[i], 0].item())
+            mesh = str(associations.iloc[[i], 1].item())
+            index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
+            # Prepare data
+            table_species_corpora["weights"] = weights[:, index].tolist()
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            
+            # If forget option is true, remove observation of the studied specie
+            if forget:
+                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+            
+            # Get MeSH info
+            MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
+            p = float(MeSH_info["P"])
+
+            # Computation
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
+            associations.iloc[i, 2:7] = list(r)
+            bar.update(i)
+    return associations

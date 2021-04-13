@@ -1347,26 +1347,6 @@ Comme attendu, plus on va chercher des articles loin dans le réseau plus :
 Pour le paramètre sample_size, comme on peut le constater plus il est élevé plus notre TPR et FPR diminue, le prior devenant trop puissant pour faire changer d'avis. Vue qu'il représente en gros l'indépendance, on a aucun positif.
 
 
-
-
-### Limite sur le damping factor alpha: 
-
-Lorsque l'on réalise la truncation de la matrice d'adjascence, on supprime les noeud cible et tout les liens qu'il créée, il est possible que l'on crée des noeuds flottants, si par exemple le noeud cible était le seul voisin de ce noeud.
-Dans la construction de la matrice de proba, ce problème est réglé par les sink node: si aucun noeud n'est lié à mon noeud, alors toutes ces proba seront construite à l'aide de alpha. Même si alpha = 1, ça fonctionne.
-
-
-Mais la chose ce complique si au lieu de créée un noeud flottant, par suppression du noeud cible, on crée un sous-composante du graph ! Par exemple une partie des voisins du noeud target forment une chaine. lors que l'on supprime le noeud target, on se retrouve avec un chaine 'flottante' qui n'est plus relié au reste du graph ! 
-Le problème c'est qu'elle ne sont pas considéré comme des sink nodes, car chaque membre de la châine a au moins 1 voisin ...
-Ainsi ce qui d'habitude corrige se problème ne peut pas intervenir ici car ce ne sont pas des sink nodes , ainsi dans le calcul de la matrice de proba $M = alpha * P + (alpha * a + (1 - alpha) * e) @ v.T$ 
-La partie $(alpha * a + (1 - alpha) * e) @ v.T$ est égal à 0 car ce ne sont pas des sink nodes et alpha = 1. Ainsi il n'y a pas d'ajout de proba de restart qui nous assure de pouvoir redémarrer sur les voisins du noeud et donc d'avoir une structure connexe !!
-Or si on a pas de structure connexe, on ne peut pas assurer la convergence du PPR !
-
-Ainsi pour assurer la convergence du PPR et donc que notre graph, même après suppression de notre noeud target forment toujours une composante connexe, on a besoin de la probabilité de restart, car ce restart sur les voisins du noeuds cible, compense la suppression du noeud !
-Ainsi il faut poser alpha entre [0, 1[ soit 0 compris mais 1 non-compris !!
-
-
-Deplus, même dans le cas où l'on pose alpha = 0, si le noeud formait le seul chemin à travers nos voisins, grâce aux probabilité de restart on reconnecte tous les voisins entre eux
-
 ### Focus analysis
 Comme l'analyse globale que l'on a réalisée dans FORUM, la principale faiblesse de notre approche est que nous testons des relations et construisons des aprioris sur des relations sans connaitre la nature de cette relation. 
 On pourrait donc très bien imaginer que 2 composés contribuent de manière équivalente à un prior, mais que l'un indique en fait une utilisation thérapeutique, alors que l'autre est un biomarker. Ici les deux composés contribuent de manière équivalente à l'apriori que l'on va poser sur la relation, mais décrivent deux relations différentes, que l'on utiliserait de manière équivalente pour construire un prior sur une relations sans nature précise, ce qui est problématique
@@ -1414,3 +1394,52 @@ Bilirupin quant à elle est bien dosé pour diagnostiquer l'HE, mais pourtant el
 
 Il faut peut être voir à se focaliser plus sur 'diagnostic' mais en intégrant également des filtres sur "Complication" et "Chemically induiced" pour bien spécifier que l'on veut parler de diagnostic au sens : on dose la molécule pour diagnostiquer la pathologie.
 
+
+
+
+### Limite sur le damping factor alpha: 
+
+Lorsque l'on réalise la truncation de la matrice d'adjascence, on supprime les noeud cible et tout les liens qu'il créée, il est possible que l'on crée des noeuds flottants, si par exemple le noeud cible était le seul voisin de ce noeud.
+Dans la construction de la matrice de proba, ce problème est réglé par les sink node: si aucun noeud n'est lié à mon noeud, alors toutes ces proba seront construite à l'aide de alpha. Même si alpha = 1, ça fonctionne.
+
+
+Mais la chose ce complique si au lieu de créée un noeud flottant, par suppression du noeud cible, on crée un sous-composante du graph ! Par exemple une partie des voisins du noeud target forment une chaine. lors que l'on supprime le noeud target, on se retrouve avec un chaine 'flottante' qui n'est plus relié au reste du graph ! 
+Le problème c'est qu'elle ne sont pas considéré comme des sink nodes, car chaque membre de la châine a au moins 1 voisin ...
+Ainsi ce qui d'habitude corrige se problème ne peut pas intervenir ici car ce ne sont pas des sink nodes , ainsi dans le calcul de la matrice de proba $M = alpha * P + (alpha * a + (1 - alpha) * e) @ v.T$ 
+La partie $(alpha * a + (1 - alpha) * e) @ v.T$ est égal à 0 car ce ne sont pas des sink nodes et alpha = 1. Ainsi il n'y a pas d'ajout de proba de restart qui nous assure de pouvoir redémarrer sur les voisins du noeud et donc d'avoir une structure connexe !!
+Or si on a pas de structure connexe, on ne peut pas assurer la convergence du PPR !
+
+Ainsi pour assurer la convergence du PPR et donc que notre graph, même après suppression de notre noeud target forment toujours une composante connexe, on a besoin de la probabilité de restart, car ce restart sur les voisins du noeuds cible, compense la suppression du noeud !
+Ainsi il faut poser alpha entre [0, 1[ soit 0 compris mais 1 non-compris !!
+
+
+Deplus, même dans le cas où l'on pose alpha = 0, si le noeud formait le seul chemin à travers nos voisins, grâce aux probabilité de restart on reconnecte tous les voisins entre eux
+
+
+EDIT: Finalement, on observe ce phénomène pour toute valeur de alpha qui tend vers 1. On peut observer la création de pseudos sous-composantes dans les graphs lorsque l'on va utiliser des valeurs de alpha proche de 1 (0.99, etc ...)
+
+l'inconvénient est que la création de ces sous-composantes perturbe le calcul des poids. Lorsqu'une sous-composante est crée (par retrait du noeud d'intérêt) une partie, proportionnelle au nombre de voisins formant cette sous-composante, des mentions de la cible est "piégée" dans cette sous composante ...
+Si par exemple pour un composé à 3 voisins, la suppression de celui-ci entraine la création d'une clique avec deux de ses voisins, c'est 66% de ces mentions (2/3) qui seront piégés dans cette cliques.
+Alors certe, le PPR convergera mais on aura 66% des mentions piégé dans la clique.
+Ceci peut avoir une influence importante sur le calcul des poids associés à ces voisins appartenant à la clique. 
+En effet, du au fort damping factor, ils vont recevoir un faible pourcentage des mentions venant de tous les autres composé MAIS vont recevoir 33% des mentions venant du composé cible précédent ! Ce qui fait que ce composé devient forcément majoritaire dans les poids, même si sa taille de corpus est beaucoup plus faible que ces autres voisins.
+Pour donner un exemple, dans le cas des poids associés au composé M_C01041 dans Recon2.03_Compound_Graph, le composé le plus majoritaire dans son prior pour un alpha proche de 1, est M_dhdascb. Or M_dhdascb est un voisin direct de M_C01041 comme M_ascb_L qui pourtant à 5x plus de mentions annotés que M_dhdascb. 
+Les deux étant des voisins direct, c'est M_ascb_L qui devrait être majoritaire dans le calcul des poids car il a beaucoup plus de litterature. Or, due à la création d'une pseudo-clique lors de la suppression de M_dhdascb avec un alpha proche de 1, 33% de ces mentions viennent enrichir le prior de M_C01041, ce qui fait que M_dhdascb est majortaire.
+
+Pour contrer ce biais, on propose une autre version du calcul des probabilités.
+La suppression temporaire du noeud dans le graph peut entrainer la formation de pseudo-clique, car lorsque alpha sera proche de 1, les voisins ne seront reliés entre eux que par la probabilité de restart qui sera très faible.
+Or, en ne reliant que par la probabilité de restart, on ne considère pas que de base, il existe une connexion entre eux à travers le composé cible et donc on sous-estime énormément les probabilité de passer de l'un à l'autre. La suppression temporaire du noeud cible, nous a en fait supprimer des chemins qui connecter nos voisins entre eux. Simplement les relier à l'aide de la proba de restart sous-estime beaucoup les proba de transité entre voisins lorsque alpha est proche de 1.
+
+On va donc réaliser le PPR, toujours en utilisant un vecteur de restart par rapport aux voisinnage, car :
+  - C'est le voisinnage autour du composé cible qui nous intéresse
+  -  Cela permet de maintenair la propriété que si alpha = 0, seul les voisins directs comptent !
+
+On va réaliser le PPR classique sans supprimer le noeud d'intérêt !!
+En revanche à la fin on va re-estimé les probabilités. En effet, on s'interresse à la proportion du temps passé, aux probabilité d'être sur un noeud, mais HORS du noeud cible.  
+Ainsi, à la fin du calcul, on attribue la valeur 0 au noeud cible dans le vecteur de probabilité stationnaire et on re-calcule les probabilité. Ce vecteur re-estimé représente alors les probabilités, la proportion du temps passé sur les noeuds, hors du noeud cible !
+Ce qui à nouveau nous permettra d'estimer à l'aide des poids la proportion de mentions partant du noeud cible qui vont aller influencer le prior des voisins, sans que le noeud ne s'influence lui même !!
+
+Globalement le petit changement que j'ai pu observer en regardant les probabilités que l'on obtenaient sur notre graph de test avec l'urée (Cf. data/cytoscape/SFT_V2.cys) c'est qu'en utilisant le graph complet, cela semble favoriser le voisinnage proche de composé (ce que l'on souhaite en plus) car le fait de conserver le noeud cible, permet de garder des chemins entre nos voisins à traves ce cible au cours de la marche, qui avant été perdu quand on supprimait le noeud.
+
+
+Les résultats semblent très peu affecter par ce changement dans la méthode. Par exemple pour les résultat sur l'encephalopathy hepatique, on a une corrélation de 0.9999948 entre les valeurs de Scores obtenus entre les deux méthodes !

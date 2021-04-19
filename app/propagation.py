@@ -226,12 +226,20 @@ def propagation_volume(g, alpha = 0.8, name_att = "label"):
     return df
 
 
-def compute_weights(probabilities, table_species_corpora):
+def compute_weights(probabilities, table_species_corpora, q):
     # Compute weights
     sigmas = probabilities.to_numpy()
-    # We are interested in probabilities when we are NOT on the targeted node. So we have to estimate probabilities without considering the moments we are on the target node. We set the diag of the matrix to 0
-    np.fill_diagonal(sigmas, 0)
-    # We estimate probabilities after filtering for self contribution and contributor's distance
+    # To determine contributors of each compounds, we build a constrain matrix using the q parameter (tolerance threshold) to filter out contributors that a too far from the targeted node and also to avoid a compound to contribute itself to its prior.
+    # First we get probability from the PPR
+    constrains = copy.copy(sigmas)
+    # To filter using the tolerance threshold, we first re-estimate probability without considering self-contribution !
+    np.fill_diagonal(constrains, 0)
+    constrains = constrains @ np.diag(1/(constrains.sum(axis=0)))
+    # Test which resulting probability are higher than the tolerance threshold to create the constrain matrix. The diagonal will always be at False as we set 0 on diag previously
+    constrains = (constrains > q) * 1
+    # Apply constrain matrix on probability
+    sigmas = sigmas * constrains
+    # We estimate probabilities after filtering from constrains
     sigmas = sigmas @ np.diag(1/(sigmas.sum(axis=0)))
     # Get vector of corpora sizes
     v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T

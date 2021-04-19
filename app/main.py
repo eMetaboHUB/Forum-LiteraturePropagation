@@ -90,6 +90,10 @@ for alpha in alpha_set:
     print("\n- Compute weights using alpha = " + str(alpha))
     probabilities = propagation_volume(g, alpha = alpha)
     weights = compute_weights(probabilities, table_species_corpora)
+
+    out = os.path.join(out_path, "NEW_W_" + str(alpha) + ".csv")
+    o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
+    o.to_csv(out, index = False)
     
     for sample_size in sample_size_set:
         print("\n- Compute MeSH priors using sample size = " + str(sample_size))

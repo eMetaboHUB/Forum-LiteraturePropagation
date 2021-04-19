@@ -192,14 +192,11 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
         c += 1
     # print(str(c) + " iterations to convergence.")
 
-    # We are interested in probabilities when we are NOT on the targeted node. So we have to estimate probabilities without considering the moments we are on the target node.  
-    new_pi[i, 0] = 0
-    r = new_pi/np.sum(new_pi)
     # Float are basically imprecise and so after several matrix multiplications, the sum of probabilities in the vector may not equal to 1, but 0.9999999999999999 or 1.0000000000000001 for example. 
-    if np.sum(r, axis = 0, dtype = np.float16) != 1:
+    if np.sum(new_pi, axis = 0, dtype = np.float16) != 1:
         print("Warning at index " + str(i) + ": the final probability vector does not sum to 1. This may be due to float approximation errors")
 
-    return r
+    return new_pi
 
 def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
@@ -250,6 +247,11 @@ def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
 def compute_weights(probabilities, table_species_corpora):
     # Compute weights
     sigmas = probabilities.SFT.to_numpy()
+    # We are interested in probabilities when we are NOT on the targeted node. So we have to estimate probabilities without considering the moments we are on the target node. We set the diag of the matrix to 0
+    np.fill_diagonal(sigmas, 0)
+    # We estimate probabilities after filtering for self contribution and contributor's distance
+    sigmas = sigmas @ np.diag(1/(sigmas.sum(axis=0)))
+    # Get vector of corpora sizes
     v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
     # Compute totals
     t = sigmas @ v

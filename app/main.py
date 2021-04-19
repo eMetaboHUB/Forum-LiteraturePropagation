@@ -15,6 +15,7 @@ parser.add_argument("--file", help="Path to a file containing pairs of SPECIE an
 parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null. Default = False", type = bool, default = False, required = False, dest = 'forget')
 parser.add_argument("--alpha", help="The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
 parser.add_argument("--sample_size", help="The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100", nargs = "*", type = int, default = [100], required = False, dest = 'ss')
+parser.add_argument("--q", help="The tolerance threshold for PPR probabilities. Default = 1e-3", nargs = "*", type = float, default = 1e-3, required = False, dest = 'q')
 parser.add_argument("--out", help="path to the output directory", type = str, required = True, dest = 'out')
 
 
@@ -71,6 +72,7 @@ if args.file:
 
 alpha_set = args.alpha
 sample_size_set = args.ss
+q = args.q
 
 if 0 in sample_size_set:
     print("\n /!\ 0 is not allowed for sample_size.")
@@ -82,7 +84,7 @@ print("\nParameters:\n")
 print("- forget: " + str(args.forget))
 print("- damping factor (alpha): " + str(alpha_set))
 print("- sample size: " + str(sample_size_set))
-
+print("- q: " + str(q))
 
 for alpha in alpha_set:
 
@@ -91,7 +93,8 @@ for alpha in alpha_set:
     probabilities = propagation_volume(g, alpha = alpha)
     weights = compute_weights(probabilities, table_species_corpora)
 
-    out = os.path.join(out_path, "NEW_W_" + str(alpha) + ".csv")
+
+    out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
     o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
     o.to_csv(out, index = False)
     

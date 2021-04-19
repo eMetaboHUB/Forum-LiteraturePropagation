@@ -164,8 +164,9 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
     """
     # Get length
     l = A.shape[0]
-    # Create restart vector by extracting probability, fromated as a column vector.
-    v = np.array([(A[i, :]/A[i, :].sum())]).T
+    # Create restart vector on the targeted node
+    v = np.zeros((l, 1))
+    v[i,0] = 1
 
     # Sink node vector, as column vector
     a = np.array([((A.sum(axis = 1) == 0) * 1)]).T
@@ -198,55 +199,36 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
 
     return new_pi
 
-def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
+def propagation_volume(g, alpha = 0.8, name_att = "label"):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
     Args:
         g (igraph.Graph): The compound graph
         alpha (float, optional): The damping factor. Defaults to 0.8.
         name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
-        direction (str, optional): The direction og random walks that will be used to compute probabilities:
-            - SFT: StartFromTarget, for each node the resulting vector contains the probabilities to be on a particular compound node during the random walk starting from the targeted node.
-            - FOT: FinishOnTarget, for each node, the resulting vector contains the probability that a walker on the targeted node comes from a particular node. The result of the StartFromTarget propagation in used to compute the FinishOnTarget probabilities.
-            - both: The both matrix probabilities are computed are returned
 
     Returns:
-        collections.namedtuple: A named.tuple containing pandas DataFrame representing the probability matrix using SFT and/or FOT propagation.
+        numpy array: The probability matrix
     """
-    # Init tuple
-    r = collections.namedtuple("propagation", ["SFT", "FOT"])
-    # Compute for each node SFT propagation
+    # Get adjacency matrix
     A = np.array(g.get_adjacency().data)
-    full = np.zeros(A.shape)
-    for i in range(0, A.shape[0]):
-        full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
     
-    # If SFT direction
-    if direction == "SFT":
-        df_SFT = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
-        result = r(df_SFT, None)
+    # If alpha is set to 0, simply return the probability matrix from direct neighborhood, otherwise compute PPR
+    if not alpha:
+        full = A @ np.diag(1/A.sum(axis=0))
+    else:
+        full = np.zeros(A.shape)
+        for i in range(0, A.shape[0]):
+            full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
 
-    # If backward direction
-    if direction == "FOT":
-        d = np.diag(1/full.sum(axis = 1))
-        bkw = (full.T) @ d
-        df_FOT = pd.DataFrame(bkw, columns=g.vs[name_att], index=g.vs[name_att])
-        
+    df = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
     
-    # If both
-    if direction == "both":
-        d = np.diag(1/full.sum(axis = 1))
-        bkw = (full.T) @ d
-        df_SFT = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
-        df_FOT = pd.DataFrame(bkw, columns=g.vs[name_att], index=g.vs[name_att])
-        result = r(df_SFT, df_FOT)
-    
-    return result
+    return df
 
 
 def compute_weights(probabilities, table_species_corpora):
     # Compute weights
-    sigmas = probabilities.SFT.to_numpy()
+    sigmas = probabilities.to_numpy()
     # We are interested in probabilities when we are NOT on the targeted node. So we have to estimate probabilities without considering the moments we are on the target node. We set the diag of the matrix to 0
     np.fill_diagonal(sigmas, 0)
     # We estimate probabilities after filtering for self contribution and contributor's distance

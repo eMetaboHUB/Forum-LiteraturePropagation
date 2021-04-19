@@ -106,7 +106,7 @@ def compute_PR(A, i, alpha, epsilon = 1e-9):
     Returns:
         [numpy.ndarray]: Vector of stationary probabilities (as column vector)
     """
-    # Get truncated length
+    # Get length
     l = A.shape[0]
     # Create restart vector by extracting probability, fromated as a column vector.
     v = np.array([(A[i, :]/A[i, :].sum())]).T
@@ -147,6 +147,60 @@ def compute_PR(A, i, alpha, epsilon = 1e-9):
 
     return r
 
+def compute_PR_2(A, i, alpha, epsilon = 1e-9):
+    """
+    This function is used to determine the vector probability using a PPR approach applied on the graph without the targeted node, only considering its neighbours.
+    In this second approach we do not remove the targeted node to prevent the creation of pseudo sub-components while the damping factor get close to 1.
+    We compute the PPR using all the network, also restarting from the neighborhood of the target compound.
+    Then, we re-estimate the probability vector, setting the probability to be on the targeted node at 0, to represent the proportion of time passed out of the targeted node.
+    Args:
+        A ([numpy.ndarray]): Graph adjacency matrix
+        i ([int]): Index of the target node
+        alpha (float): The damping factor. WARGNING alpha is [0, 1[. '1' is excluded because we need restart probabilies to ensure the graph connexion !
+        epsilon ([float], optional): Tolerance for convergence. Defaults to 1e-9.
+
+    Returns:
+        [numpy.ndarray]: Vector of probabilities to be out of the targeted node
+    """
+    # Get length
+    l = A.shape[0]
+    # Create restart vector by extracting probability, fromated as a column vector.
+    v = np.array([(A[i, :]/A[i, :].sum())]).T
+
+    # Sink node vector, as column vector
+    a = np.array([((A.sum(axis = 1) == 0) * 1)]).T
+    
+    # For sink nodes, the diagonal element is 0 instead of 1 for non-sink nodes. Adding the vector a to diagonal elements, ensure that we will not divide by 0 for sink nodes
+    # For the time, we use undirected graphs so there is no reason to have sink nodes, but it could happens if we use directed graphs
+    z = A.sum(axis = 1) + a.T
+    d = np.diag(1/z[0])
+    
+    # Get probability matrix
+    P = d @ A
+    e = np.ones((l, 1))
+    M = alpha * P + (alpha * a + (1 - alpha) * e) @ v.T
+    
+    # Apply Power method
+    # Use transpose of M in power method
+    c = 1
+    M = M.T
+    pi = v
+    new_pi = M @ v
+    while(np.linalg.norm(pi - new_pi) > epsilon):
+        pi = new_pi
+        new_pi = M @ pi
+        c += 1
+    # print(str(c) + " iterations to convergence.")
+
+    # We are interested in probabilities when we are NOT on the targeted node. So we have to estimate probabilities without considering the moments we are on the target node.  
+    new_pi[i, 0] = 0
+    r = new_pi/np.sum(new_pi)
+    # Float are basically imprecise and so after several matrix multiplications, the sum of probabilities in the vector may not equal to 1, but 0.9999999999999999 or 1.0000000000000001 for example. 
+    if np.sum(r, axis = 0, dtype = np.float16) != 1:
+        print("Warning at index " + str(i) + ": the final probability vector does not sum to 1. This may be due to float approximation errors")
+
+    return r
+
 def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
@@ -168,7 +222,7 @@ def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
     A = np.array(g.get_adjacency().data)
     full = np.zeros(A.shape)
     for i in range(0, A.shape[0]):
-        full[:, i] = compute_PR(A, i, alpha)[:, 0]
+        full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
     
     # If SFT direction
     if direction == "SFT":
@@ -206,6 +260,7 @@ def compute_weights(probabilities, table_species_corpora):
     # Normalise by total
     weights = w @ np.diag(1/t[:, 0])
     
+    # Weights are also store in columns !
     return weights
 
 ####################
@@ -602,7 +657,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
-    # print(labels)
+    # print(labels)
     # print(prior_mix.weights)
     # print(prior_mix.alpha)
     # print(prior_mix.beta)

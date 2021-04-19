@@ -19,11 +19,11 @@ class TestPropagationMethods(unittest.TestCase):
         self.assertEqual(type(self.g), ig.Graph)
 
     def test_propagation_volume_SFT(self):
-        SFT_ref = pd.read_csv("tests/data/SFT_ref.csv", index_col = 0)
+        SFT_ref = pd.read_csv("tests/data/SFT_ref_2.csv", index_col = 0)
         pd.testing.assert_frame_equal(self.propagation_volume.SFT, SFT_ref)
 
     def test_propagation_volume_FOT(self):
-        FOT_ref = pd.read_csv("tests/data/FOT_ref.csv", index_col = 0)
+        FOT_ref = pd.read_csv("tests/data/FOT_ref_2.csv", index_col = 0)
         pd.testing.assert_frame_equal(self.propagation_volume.FOT, FOT_ref)
     
     def test_prior_mix(self):

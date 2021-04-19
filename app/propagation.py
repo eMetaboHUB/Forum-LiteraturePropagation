@@ -260,6 +260,7 @@ def compute_weights(probabilities, table_species_corpora):
     # Normalise by total
     weights = w @ np.diag(1/t[:, 0])
     
+    # Weights are also store in columns !
     return weights
 
 ####################
@@ -656,7 +657,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
-    # print(labels)
+    # print(labels)
     # print(prior_mix.weights)
     # print(prior_mix.alpha)
     # print(prior_mix.beta)

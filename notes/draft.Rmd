@@ -1267,6 +1267,7 @@ On peut donc dire que leur somme pour le composé $i$, $\sum_{k = 1}^{N_i} X_k^i
 Le fait est que je dispose également d'un apriori sur ce paramètre $p_i$ représente par ma distribution Beta: $Beta(\mu \nu, (1 - \mu) \nu)$ où $\nu$ est un hyperparamètre fixé et $\mu$ représente la probabilité générale, sur l'ensemble des mentions observées, qu'une mention implique le MeSH $M$
 
 
+
 On peut donc redéfinit notre modèle et nos probabilité marginale :
 
 Les évènements:
@@ -1276,7 +1277,7 @@ Les évènements:
 - $I = k$ la mention a atteint le composé cible $j$
 
 $f(m|I = k) = \sum_{c= 1}^{N} p(m|c_i)p(c_i|I = k)$, soit la probabilité d'observer une mention impliquant le mesh $m$ parmis celles arrivées sur le composé d'intérêt $k$. 
-$p(c_i|I = k)$ représentant la probabilité qu'une mention, arrivée sur le composé cible $k$, provienne de $c_i$.
+$p(c_i|I = k)$ représentant la probabilité qu'une mention, arrivée sur le composé cible $k$, provienne de $c_i$, c'est les poids dans le modèle.
 $p(m|c_i)$ representant la probabilité qu'une mention parlant du composé $c_i$, implique également le mesh $m$. Ceci étant indépendant de l'évènement $I = k$: la mention arrive sur le d'intérêt $k$. en gros le fait de savoir que la mention est sur le composé d'intérêt n'influe pas les proba qu'elle implique que MeSH et donc : $p(m|c_i, I = k) = p(m|c_i = k)$
 $f(m|I=k)$ représente donc la probabilité qu'une mention arrivant sur le composé cible $k$ mentionne le mesh $m$.
 
@@ -1298,12 +1299,30 @@ $p(m|c_i) = \frac{N^m_i}{N_i}$, c'est la probabilité qu'une mention du composé
 $p(c_i) = \frac{N_i}{\sum_j N_j}$, cette probabilité n'est plus calculé en utilisant l'Univers, le nombre d'articles distincts, mais, en utilisant la somme du nombre de mentions (aka nombre d'articles) annotés à chaque composé
 $p(m) = \sum_i p(m|c_i) p(ci) = \sum_i \frac{N_i^m}{Ni} \frac{N_i}{\sum_j N_j} = \sum_i \frac{N_i^m}{\sum_j N_j}$
 
-- Ainsi mes poids dans ma mixture : $p(c_i|I = k) = \frac{p(c_i, I=k)}{p(I=k)} = \frac{p(c_i, I=k)}{\sum_jp(c_j, I=k)}= \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)} = \frac{\frac{\pi_{k,i} N_i}{N}}{\sum_j\frac{\pi_{k,j} N_j}{N}} = \frac{\pi_{k,i} N_i}{\sum_j \pi_{k,j} N_j}$
+- Ainsi mes poids dans ma mixture : $p(c_i|I = k) = \frac{p(c_i, I=k)}{p(I=k)} = \frac{p(c_i, I=k)}{\sum_jp(c_j, I=k)} = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)}$
+
+Comment définit on $P(I = k|c_i)$ ?
+
+Dans notre analyse on ne veut pas qu'une mention du composé $c_k$ contribue au prior de ce même composé $k$. Ainsi, on souhaite que $P(I = k|c_k) = 0$
+Ainsi, toutes les publis qui allait sur $k$ sont redistribuées dans le reste du réseau. On pose donc :
+Pour $P(I = k|c_k) = 0$ et $\forall j \neq i: P(I = j|C_i) = \frac{\pi_{j,i}}{1 - \pi_{i,i}}$ On conserve $\sum_j P(I = j|C_i) = 1$
+
+Ainsi on lorsque le noeud d'arrivé est différent du noeud de départ, on considère la probabilité d'atteindre ce noeud cible, **sachant** que ce n'est pas le noeud de départ. Et on attribue la probabilité d'atteindre le noeud de départ à 0
+
+Ainsi, pour $i = k$:
+
+$p(c_k|I = k) = \frac{P(I=k|c_k)p(c_k)}{\sum_j P(I=k|c_j)p(c_j)} = 0$ car $P(I = k|c_k) = 0$ Le poids du composé $k$ à son propre prior est null !
+
+pour $i \neq k$:
+
+$p(c_i|I = k) = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)} = \frac{\frac{ \pi_{k,i} N_i}{ (1 - \pi_{i,i}) N}}{\sum_j \frac{ \pi_{k,j} N_j}{ (1 - \pi_{j,j}) N}} = \frac{\frac{ \pi_{k,i}}{ (1 - \pi_{i,i})} N_i}{\sum_j \frac{ \pi_{k,j}}{ (1 - \pi_{j,j})} N_j}$
 
 La matrice $pi$ contient les vecteurs de résultats du PPR rangées **en colonnes** ! Ainsi, $\pi_{k,i}$ représente la probabilité attendu d'atteindre le noeud $k$ dans le réseau pour une marche aléatoire de type  PPR partant du noeud $i$.
 
+Donc voilà pour les poids ! :)
+
 - Indépendance conditionnelle de  $p(m|c_i, I=k) = p(m|c_i)$
-En effet, si on voulait déterminer $p(m|c_i, I=k)$ on ferait $p(m|c_i, I=k) = \frac{\pi_{k,i} N_i^m}{\pi_{k,i} N_i} = \frac{N_i^m}{N_i} = p(m|c_i)$
+En effet, si on voulait déterminer $p(m|c_i, I=k)$ on ferait $p(m|c_i, I=k) = p(m|c_i) = \frac{N_i^m}{N_i} = $
 
 Donc finalement avec toutes ses probabilités, on va pouvoir faire la même chose ! C'est juste que maintenant notre prior parle en terme de mentions et non plus d'articles mais l'idée d'indépendance qu'il soutient est toujours la même. Sous hypothèse d'indépendance $p(m|c_i) = p(m)$, le fait que la mention implique/provienne du composé $c_i$ n'a aucun effet sur le fait qu'elle implique le MeSH $m$, donc on peut toujours mettre notre $\mu$ à $p(m)$
 
@@ -1323,6 +1342,36 @@ On renvoie les même valeurs que pour une analyse classique (Mean, CDF, log2FC) 
 Une autre chose à bien voir est que même si l'on utilise la taille de corpus dans le calcul des poids, on utilise seulement le corpus effectif associé à chaque composé, on ne compte pas les articles *imaginaires* qui sont issus du prior général dans ce calcul ! Ces articles *imaginaires*, dont le nombre est gérer par l'hyperparamètre $\nu$, ne sont utilisés que pour éviter des biais par rapport à des voisins qui aurait peu de literature et dont les probabilités seraient peu fiables. Ainsi en réalité ce prior général n'est appliqué que sur les composés qui disposent de literature car les autres composés n'ayant pas de littérature et donc un poids nul, ne sont pas pris en compte dans l'analyse.
 
 
+L'avantage par rappport à l'ancienne version est que l'on perd le coté ultra conservateur de la méthode. Avant, sachant que les poids était simplement calculé en fonction du PPR, un métabolite avec 10 articles associés pouvait avoir autant de poids dans le prior qu'un composé avec 10000 article. Ce qui fait que même dans des cas où 9 voisins sur 10 par exemple indiquaient un lien avec le MeSH, il suffisant qu'un seul des voisins ne l'indique pas pourque le modèle rejette l'association. Maintenant que les poids de le modèle sont calculé en fonction de la littérature, il faudra que ce dernier voisin est beaucoup de littérature pour faire penché la balance.
+
+
+### Loi géométrique et longueur moyenne des marches
+
+Pour modéliser la taille moyenne des marches, on peut utiliser la loi géométrique.
+La loi géométrique  définit la probabilité $P(X = k)$ de la distribution du nombre $k$ d'échecs pour une série d'expérience de Bernouli, avant le premier succès :
+$P(X = k) = (1 - p)^k p$ pour $k \in \{1,2, ..., n\}$
+Ici $p$ est la probabilité de succès, on réalise $k$ échecs avec une proba $(1 - p)$ avant le premier succès avec une proba $p$
+Dans notre cas, on définit comme succès, le fait de restart notre marche, la marche donc d'une marche. Donc $p = (1 - \alpha)$
+Dans notre PPR classique, on a donc $P(X = k) = \alpha^k (1 - \alpha)$
+La moyenne de cette distribution est alors $\frac{\alpha}{(1 - \alpha)}$
+
+Sachant que notre PPR restart au voisins de notre noeud cible, cela nous montre donc la taille moyenne d'une marche partant de nos voisins !
+
+Mais il est également possible de mettre le focus sur le noeud cible:
+
+Ainsi, si on place le focus sur notre noeud cible, alors le fait que l'on restart directment sur ces voisins, nous donne en gros une première marche *gratuite* partant de celui-ci !
+
+On a donc : $P(X = k) = 1 \times \alpha^{k - 1} (1 - \alpha)$
+
+Pour un nombre $k$ de marche réaliser avant de restart, la première marche partant de notre noeud cible vers ses voisins est gratuite (proba de 1) puis il nous reste donc $k - 1$ marche à réaliser avec donc une proba $\alpha^{k - 1}$, puis l'échec, on restart avec une proba $(1 - \alpha)$
+
+Dans ce focus donc :  $P(X = k) = \alpha^{k - 1} (1 - \alpha)$
+
+C'est en fait une autre formulation de la loi géométrique où on représente la probabilité que le premier succès arrive au $k$ième essai: ( $P(X = k) = (1 - p)^{k - 1} p$)
+
+Ainsi, si $P(X = k) = \alpha^{k - 1} (1 - \alpha)$, notre moyenne du nombre de marches effectué, autour de notre noeud cible, est de $\frac{1}{(1 - \alpha)}$ Quand $\alpha = 0$, on a donc notre moyenne qui vaut 1 ! En effet seulement $P(k = 1) = 1$ On ne visite que nos voisins !
+
+De la même manière quand $\alpha$ va tendre vers 1, notre moyenne tend vers l'infini.
 
 
 
@@ -1443,3 +1492,74 @@ Globalement le petit changement que j'ai pu observer en regardant les probabilit
 
 
 Les résultats semblent très peu affecter par ce changement dans la méthode. Par exemple pour les résultat sur l'encephalopathy hepatique, on a une corrélation de 0.9999948 entre les valeurs de Scores obtenus entre les deux méthodes !
+
+
+
+ ## Notes sur la nouvelle approche :
+ 
+### Problématique :
+
+Pour donner un petit exemple, j'ai étudié le comportement du prior avec un damping factor = 0.1 pour le composé M_CE5236. Globalement c'est un composé en bout de chaîne qui se trouve dans une région ou aucun de ces voisins est annotés dans la littérature. La problème c'est que du coup, son principal contributeur (87%) c'est l'acide formique qui est bieeeeeen plus loin dans le réseau (shortest.path = 6)
+Sur la schéma du graph (Cf notes/exemple_MCE5236_M_for.png), les couleurs représente une échelle pour la taille du corpus: blanc = pas d'article et rouge = STAR
+Les deux composés en mode en jaune sont en bas,  M_CE5236 et en haut dans le centre du réseau l'acide formique  
+
+Ce que l'on montre ici, c'est que dans le cas de composé situés dans des régions sans littérature ou avec des voisins proches avec une poignée d'articles, les éléments qui peuvent contribuer le plus au prior que l'on va construire pour ce composé peuvent être des composé à forte littérature (des STARs) mais qui se trouve très éloigné du composé d'intérêt. Dans le cas de M_CE5236, l'acide formique est situé à 6 réactions du composé ! Et pourtant il représente quasiment la totalit de l'information du prior. il y a donc un problème. Dans ces cas là on doit être capable de déterminer que l'on a construit le prior avec des composés très éloignés du composé d'intérêt et donc peu pertinent, ou alors, on abandonne la construction du prior dans ce cas là et on utilise le prior par défaut.
+
+La première solution est simple, il suffirait par exemple d'estimer la distance à laquelle se trouve les contributeur du composé d'intérêt. La première chose que l'on peut proposer est de :
+1) Calculer les shortest-path entre tous les composés avec Dijkstra par exemple.
+2) Estimé une moyenne, pondérée par les poids dans le prior, de la distance entre les contributeurs et le composé d'intérêt. Cette information permettrait de juger de la légitimité des contributeurs pour construire le prior.
+
+Néanmoins, parmis tout nos contributeur, l'un d'entre eux peut être une STAR un peu loin qui va biaisé cette moyenne car il contribura de manière significative au prior. Pour autant d'autre composé dans le voisinnage avec certe moins de litterature sont pourtant pertinents pour construire ce prior.
+L'idée donc de donné un indice pour estimé cela ne semble pas pratique ...
+
+La deuxième solution que j'ai imaginé est que dans mon modèle de mélange je pourrais ajouté notre prior "fictif" composé de $\nu$ articles avec une proba $\mu$ de parlé de MeSH, mais cette fois-ci non pas pour faire du shrinkage sur les proba, mais pour qu'il représente une composante de base dans les mentions qui composent le mélange. Ainsi de base, j'aurai au moins un set de $\nu$ articles dans ceux qui contribues à mon prior. Alors, les autres composés du réseau peuvent contribuer à ce prior, si ils ont suffisament de litterature, ils écrasent ce prior et prennnent le relai, sinon il ne sont pas majoritaire et le prior de base reste la composante essentielle dans le prior. Le problème avec cette solution est qu'elle va, je pense, faire re-émerger un des premier biais de la méthode. Intialement j'utilisais les poids issus du PPR et on la méthode était très conservative car dès lors qu'un des contributeur n'était pas favorable à l'association, même s'il n'avait pas beaucoup d'articles, vue que son poids était uniquement déterminé en fonction de son PPR, ils pouvait avoir une bonne influence sur le prior. Ainsi il suffisait qu'un composé avec 10 articles n'est pas vue le MeSH, bien que 5 autres des voisins soient en faveur de la relation pour que celui-ci biaise le prior en apportant au moins x% de chances que l'on ne discutte pas de ce MeSH. Avec l'utilisation des mentions et la prise en compte de la taille des corpus dans le poids, on avait réglé ce problème.
+Mais on pourrait le re-créer en ajoutant ce set d'article *imaginaires* comme composante dans le modèle de mélange. Par exemple, si 1000 articles arrivent pour construire mon prior depuis les autres composé, ce set d'article *imaginaires* représenterait quand même 10% de mon prior et vue qu'il dirait qu'il n'y a pas de relation, le problème est le même !
+
+La solution qui semble pertinente est de restreindre les contributeur au voisinage à N réactions. C'est un peu la même idée que le damping factor du PPR où l'on souhaite représenté un voisinnage de plus en plus proches, mais le problème est qu'à partir d'une $\alpha > 0$, en fait la probabilité qu'une mention partant de n'importe quel noeud pour arrivée sur n'importe quel autre noeud, est > 0 Et donc finalement tout composé contribue au prior de tout les autres. Quand on est dans des régions bien couvertes en littérature c'est pas un problème car les voisins proches sont largement marjoritaire et la contribution de composé éloigné est infime et négligeable. Mais dans des régions sans littérature, comme avec M_CE5236, ces faibles quantité de mentions qui arrive jusqu'au composé sont tout de même majoritaire.
+L'idée serait donc de restreindre les contributeur en fonction de leur distance au composé cible, par exemple on autorise seulement les composés distant à moins de 3 réactions du composé cible à contribuer au prior. Pour cela, on utiliserait par exemple la matrice des plus court chemin et on l'utiliserait pour filtrer au moment du calcule des poids.
+Ainsi, si dans un rayon de 3 réactions, aucun composé n'est pas capable de nous approté de l'inforamtion, le prior est abandonné et on utilisera le prior par défaut !
+
+Ce serait cool d'estimé un bon paramètre K comme ça en utilisant le graph que l'on à fait pour la proximité des STARs en fonction de la taille des marches ! Il faut regarder la fonction par contre je vois des trucs byzarre ... Il me dit que M_tststerone atteint M_CE5236 avec une marche de taille 4, alors que Dijktra trouve que le plus court chemin c'est 6 ... donc à revoir ...
+
+
+Alors il y une question de choix entre considéré le plus court chemin ou des marches ... L'inconvénient d'utiliser strictement le plus court chemin est que dans le cas de chaîne c'est un peu dommage car on sait que les articles vont forcément ce propager dans ce sens là et c'est peut être pertinent d'utiliser un composé même à plus de trois réactions si on se trouve dans une chaine.
+
+Après ça implique par contre de définir ce fitlre autrement avec un % peut être du nombre de marche qui atteigne le composé cible ... mais ça fait un peu redondant avec le PR et ça semble difficle de poser un threshold la dessus sans avoir un truc complètement arbitraire.
+
+Donc peut être testé en premie cet histoire de distance max que peut avoir un contributeur ça reflète un peu ce que je voulais faire avec le damping factor du PPR, mais il semble que ce ne soit pas suffisant dans certains cas. Après il faut je pense garder le PPR, car les random walks ça permet quand même d'approter plus de mentions à un voisin avec lequel on a plus de connections par exemple donc c'est cool !!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Code save proba and weights matrix
+
+# out1 = os.path.join(out_path, "proba_" + str(alpha) + ".csv")
+# probabilities.SFT.to_csv(out1, index = False)
+
+# out = os.path.join(out_path, "W_" + str(alpha) + ".csv")
+# dd = pd.DataFrame(weights, columns=g.vs["label"])
+# dd.to_csv(out, index = False)

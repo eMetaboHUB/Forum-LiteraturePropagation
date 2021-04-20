@@ -101,7 +101,7 @@ for alpha in alpha_set:
 
     out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
     o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
-    o.to_csv(out, index = False)
+    o.to_csv(out)
     
     for sample_size in sample_size_set:
         print("\n- Compute MeSH priors using sample size = " + str(sample_size))

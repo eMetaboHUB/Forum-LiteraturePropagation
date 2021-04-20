@@ -1301,23 +1301,51 @@ $p(m) = \sum_i p(m|c_i) p(ci) = \sum_i \frac{N_i^m}{Ni} \frac{N_i}{\sum_j N_j} =
 
 - Ainsi mes poids dans ma mixture : $p(c_i|I = k) = \frac{p(c_i, I=k)}{p(I=k)} = \frac{p(c_i, I=k)}{\sum_jp(c_j, I=k)} = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)}$
 
-Comment définit on $P(I = k|c_i)$ ?
+### Comment définit on $P(I = k|c_i)$ ?
 
-Dans notre analyse on ne veut pas qu'une mention du composé $c_k$ contribue au prior de ce même composé $k$. Ainsi, on souhaite que $P(I = k|c_k) = 0$
-Ainsi, toutes les publis qui allait sur $k$ sont redistribuées dans le reste du réseau. On pose donc :
-Pour $P(I = k|c_k) = 0$ et $\forall j \neq i: P(I = j|C_i) = \frac{\pi_{j,i}}{1 - \pi_{i,i}}$ On conserve $\sum_j P(I = j|C_i) = 1$
+Pour définir cette probabilité, on souhaite appliquer plusieurs contraintes :
+- 1) Un composé ne peut pas contribuer à lui-même
+- 2) chaque composé à un certain **voisinnage d'influence** c'est à dire un set de composé pour lesquels il est légitime qu'il contribue à la construction du prior. Cette deuxième contrainte à notamment due être mise en place car il se trouve que sinon, les STARs pouvant globalement contribuer à tous les éléments du réseau vont se retrouver contributeur majoritaire dans des zones où aucun voisin n'a de littéarture. Pour autant ces STARs se situent généralement bcp plus loins dans le réseau et ne sont pas pertinente pour contruire le prior de ces composés. Dans ces cas là, on préfèrera utiliser le prior par défaut. C'est pour cela que l'on définie une zone d'influence pour chaque composé.
 
-Ainsi on lorsque le noeud d'arrivé est différent du noeud de départ, on considère la probabilité d'atteindre ce noeud cible, **sachant** que ce n'est pas le noeud de départ. Et on attribue la probabilité d'atteindre le noeud de départ à 0
+La solution retenue est de créer une matrice de containte afin de sélectionner a quel autre composé, un composé peut il contribuer de manière légitime. Aussi, on empêche toujours un composé de contribuer à lui-même.
+Donc, pour contruire cette matrice de contrainte, on va demandé à ce que la probabilité d'atteindre un noeud $k$ depuis un potentiel contributeur $i$ (hors du noeud cible) soit au moins supérieure à $\frac{1}{n -1}$ (n étant le nombre total de noeud, on fait -1 car on compte pas le noeud lui-même) c'est à dire à la probabilité de sélectionner ce noeud au hazard. De manière plus formalisé, on demande donc que :
+$\frac{\pi_{k,i}}{(1 - \pi_{i,i})} > \frac{1}{n -1}$ soit que la probabilité d'atteindre $k$ depuis $i$ (sans considéré les marches retournant à $i$) est supérieure à la proba de choisir $k$ au hasard parmis tout les noeud du réseau.
 
-Ainsi, pour $i = k$:
+Ceci équivaut donc aussi à $\frac{\pi_{k,i}}{(1 - \pi_{i,i})} (n - 1) > 1$ ce qui offre une interprétation un peu plus inuitutive. Imaginons que chaque composé dispose de $n - 1$ cartons d'invitation, donc 1 pour chaque autre noeud dans le réseau, c'est comme si on simulait la propagation de ces cartons suivant la marche définie et ensuite on ne récupère que les composé qui ont reçu au moins un carton d'invitation. Ainsi les composés qui peuvent influé $k$ sont les composé pour lesquels $k$ à reçu au moins un carton d'invitation provenant d'eux.
 
-$p(c_k|I = k) = \frac{P(I=k|c_k)p(c_k)}{\sum_j P(I=k|c_j)p(c_j)} = 0$ car $P(I = k|c_k) = 0$ Le poids du composé $k$ à son propre prior est null !
+En se positionnant sur le composé cible, on va donc chercher à déterminer l'ensemble des noeuds qui semblent légitime d'après cette contrainte pour contribuer à son prior.
+On va appelé les composés qui respectent cette régle les **contributeurs** de $k$ (les noeuds pouvant influencer $k$) que l'on notera $CTB_k$. 
+Ainsi, $\forall i \in CTB_k, i \neq k: \frac{\pi_{k,i}}{(1 - \pi_{i,i})} > \frac{1}{n -1}$. Vue que l'on empêche les composés de contribuer à eux-même, le composé $k$ ne peut pas faire partie de son voisinnage d'influence donc il ne contribue toujours pas au prior !
 
-pour $i \neq k$:
+Symétriquement, on peut définir le **voisinnage d'influence**, noté $IN_i$ de chaque composé $i$ comme étant le set de composé qu'il peut légitimement influé au vue des contraintes que l'on a posé !
 
-$p(c_i|I = k) = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)} = \frac{\frac{ \pi_{k,i} N_i}{ (1 - \pi_{i,i}) N}}{\sum_j \frac{ \pi_{k,j} N_j}{ (1 - \pi_{j,j}) N}} = \frac{\frac{ \pi_{k,i}}{ (1 - \pi_{i,i})} N_i}{\sum_j \frac{ \pi_{k,j}}{ (1 - \pi_{j,j})} N_j}$
+ $\forall k \in IN_i, k \neq i: \frac{\pi_{k,i}}{(1 - \pi_{i,i})} > \frac{1}{n -1}$
 
-La matrice $pi$ contient les vecteurs de résultats du PPR rangées **en colonnes** ! Ainsi, $\pi_{k,i}$ représente la probabilité attendu d'atteindre le noeud $k$ dans le réseau pour une marche aléatoire de type  PPR partant du noeud $i$.
+On impose que $i \notin IN_i$ 
+
+
+Comme on le faisait avant, on va donc re-estimer les probabilité pour qu'elles ne se concentre sur les composé que $i$ peuvent légitimement influé. On va donc dire que :
+
+$\forall k \in IN_i: P(I = k|C_i) = \frac{\pi_{k,i}}{\sum_{v \in IN_i} \pi_{v,i}}$ On re-proportionne les probas en se basant uniquement sur le set que $i$ peut influé.
+
+$\forall k \notin IN_i: P(I = k|C_i) = 0$ avec $i \notin IN_i$ 
+
+
+C'est comme ça que donc définies les probabilités $P(I = k|C_i)$ que l'on va ensuite utilisées pour calculer les poids dns notre modèle : $P(C_i|I = k)$
+
+====================
+
+Donc réciproquement :
+
+- Ainsi, pour $i \notin CTB_k$ (dont $k$ lui-même donc):
+
+$p(c_i|I = k) = \frac{P(I=k|c_k)p(c_k)}{\sum_j P(I=k|c_j)p(c_j)} = 0$ car $P(I = k|c_k) = 0$ 
+
+- Pour $i \in CTB_k$:
+
+$p(c_i|I = k) = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)} = \frac{\frac{\pi_{k,i} }{\sum_{v \in IN_i} \pi_{v,i}} \frac{N_i}{N} }{\sum_j \frac{\pi_{k,j} }{\sum_{v \in IN_j} \pi_{v,j}} \frac{N_j}{N} } = \frac{\frac{\pi_{k,i}}{\sum_{v \in IN_i} \pi_{v,i}} N_i}{\sum_j \frac{\pi_{k,j} }{\sum_{v \in IN_j} \pi_{v,j}} N_j}$
+
+La matrice $pi$ contient les vecteurs de résultats du PPR rangées **en colonnes** ! Ainsi, $\pi_{k,i}$ représente la probabilité attendu d'atteindre le noeud $k$ dans le réseau pour une marche aléatoire de type PPR partant du noeud $i$.
 
 Donc voilà pour les poids ! :)
 
@@ -1528,27 +1556,33 @@ Après ça implique par contre de définir ce fitlre autrement avec un % peut ê
 
 Donc peut être testé en premie cet histoire de distance max que peut avoir un contributeur ça reflète un peu ce que je voulais faire avec le damping factor du PPR, mais il semble que ce ne soit pas suffisant dans certains cas. Après il faut je pense garder le PPR, car les random walks ça permet quand même d'approter plus de mentions à un voisin avec lequel on a plus de connections par exemple donc c'est cool !!
 
+=========================================
+
+Solution retenue:  La solution retenue est de créer une matrice de containte afin de sélectionner a quel autre composé, un coposé peut il contribuer de manière légitime. Aussi, on empêche toujours un composé de contribuer à lui-même.
+Donc, pour contruire cette matrice de contrainte, on va demandé à ce que la probabilité d'atteindre un noeud (hors du noeud cible) soit au moins supérieure à $\frac{1}{n -1}$ (n étant le nombre total de noeud, on fait -1 car on compte pas le noeud lui-même) c'est à dire à la probabilité de sélectionner ce noeud au hazard. De manière plus formalisé, on demande donc que :
+$\frac{\pi_{k,i}}{(1 - \pi_{i,i})} > \frac{1}{n -1}$ soit que la probabilité d'atteindre $k$ depuis $i$ (sans considéré les marches retournant à $i$) est supérieure à la proba de choisir $k$ au hasard parmis tout les noeud du réseau.
+
+Ceci équivaut donc aussi à $\frac{\pi_{k,i}}{(1 - \pi_{i,i})} (n - 1) > 1$ ce qui offre une interprétation un peu plus inuitutive. Imaginons que chaque composé dispose de $n - 1$ cartons d'invitation, donc 1 pour chaque autre noeud dans le réseau, c'est comme si on simulait la propagation de ces cartons suivant la marche définie et ensuite on ne récupère que les composé qui ont reçu au moins un carton d'invitation. Ainsi les composés qui peuvent influé $k$ sont les composé pour lesquels $k$ à re_u au moins un carton d'invitation.
+
+En se positionnant sur le composé cible, on va donc chercher à déterminer l'ensemble des noeuds qui semblent légitime d'après cette contrainte pour contribuer à son prior.
+On va appelé les composés qui respectent cette régle les **contributeurs** de $k$ (les noeuds pouvant influencer $k$) que l'on notera $IN_k$. 
+Ainsi, $\forall i \in CTB_k: \frac{\pi_{k,i}}{(1 - \pi_{i,i})} > \frac{1}{n -1}$. Vue que l'n empêche les composés de contribuer à eux-même, le composé $k$ ne peut pas faire partie de son voisinnage d'influence donc il ne contribue toujours pas au prior !
+
+Symétriquement, on peut définir le voisinnage d'influence, noté $IN_i$ de chaque composé $i$ comme étant le set de composé qu'il peut légitimement influé au vue des contraintes que l'on a posé !
+
+ $\forall k \in IN_i, k \neq i: \frac{\pi_{k,i}}{(1 - \pi_{i,i})} > \frac{1}{n -1}$
+
+Où on impose que $i \notin IN_i$ 
 
 
+Comme on le faisait avant, on va donc re-estimer les probabilité pour qu'elles ne se concentre sur les composé que $i$ peuvent légitimement influé. On va donc dire que :
+
+$\forall k \in IN_i: P(I = k|C_i) = \frac{\pi_{k,i}}{\sum_{v \in IN_i} \pi_{v,i}}$ On re-proportionne les probas en se basant uniquement sur le set que $i$ peut influé.
+
+$\forall k \notin IN_i: P(I = k|C_i) = 0$ avec obligatoirement $i \notin IN_i$ 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+C'est comme ça que don donc définies les probabilités $P(I = k|C_i)$ que l'on va ensuite utilisées pour calculer les poids dns notre modèle : $P(C_i|I = k)$
 
 
 

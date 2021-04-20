@@ -95,13 +95,13 @@ for alpha in alpha_set:
     # Compute network analysis
     print("\n- Compute weights using alpha = " + str(alpha))
     probabilities = propagation_volume(g, alpha = alpha)
-    probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"))
+    # probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"))
     weights = compute_weights(probabilities, table_species_corpora, q)
 
 
-    out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
-    o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
-    o.to_csv(out)
+    # out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
+    # o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
+    # o.to_csv(out)
     
     for sample_size in sample_size_set:
         print("\n- Compute MeSH priors using sample size = " + str(sample_size))

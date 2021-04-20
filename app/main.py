@@ -95,7 +95,7 @@ for alpha in alpha_set:
     # Compute network analysis
     print("\n- Compute weights using alpha = " + str(alpha))
     probabilities = propagation_volume(g, alpha = alpha)
-    probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"), index = False)
+    probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"))
     weights = compute_weights(probabilities, table_species_corpora, q)
 
 

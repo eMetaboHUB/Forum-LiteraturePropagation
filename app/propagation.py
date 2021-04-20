@@ -608,7 +608,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     n = corpora.pop(index)
 
     # If all weights are null, no neighborhood information:
-    if all(w == 0 for w in weights):
+    if sum(weights) == 0:
         prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
         posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = plot)
         # In case of no neighborhood information, we simply plot prior vs posterior distributions:
@@ -621,21 +621,19 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         resultat = r(posterior.mu, cdf_posterior, Log2numFC, np.NaN, Score, False)
         return resultat
 
-    # Check for other null weights, in case of low alpha (damping) for instance. We consider a weight null if weight < 1e-5. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture.
-    if not all(w > weigth_limit for w in weights):
-        to_remove = list()
-        for it in range(0, len(weights)):
-            # Check weight
-            if weights[it] <= weigth_limit:
-                # print("Warning: weight at index " + str(it) + " is null: " + labels[it] + " Low damping factor used ?")
-                to_remove.append(it)
-        
-        # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
-        for rmv in sorted(to_remove, reverse=True):
-            del weights[rmv]
-            del cooc[rmv]
-            del corpora[rmv]
-            del labels[rmv]
+    # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
+    to_remove = list()
+    for it in range(0, len(weights)):
+        # Check weight
+        if not weights[it]:
+            to_remove.append(it)
+    # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
+    for rmv in sorted(to_remove, reverse=True):
+        del weights[rmv]
+        del cooc[rmv]
+        del corpora[rmv]
+        del labels[rmv]
+    
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship

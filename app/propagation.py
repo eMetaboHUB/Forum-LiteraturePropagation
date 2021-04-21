@@ -239,7 +239,7 @@ def compute_weights(probabilities, table_species_corpora, q):
     constrains = (constrains > q) * 1
     # Apply constrain matrix on probability
     sigmas = sigmas * constrains
-    # We estimate probabilities after filtering from constrains
+    # We re-estimate probabilities after filtering from constrains
     sigmas = sigmas @ np.diag(1/(sigmas.sum(axis=0)))
     # Get vector of corpora sizes
     v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
@@ -536,21 +536,26 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.yticks(fontsize=20)
     plt.show()
 
-def plot_prior_mix_distributions(prior_mix, labels, seq):
-    """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component.
+def plot_prior_mix_distributions(prior_mix, labels, seq, top = 10):
+    """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
 
     Args:
         prior_mix (collections): A collection containing information about the  prior mixture distribution: weights, alpha and beta parameters
         labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
         seq (float): The step used in np.arange to create the x vector of probabilities.
+        top (int): The top n (maximum) of contributors that should be plotted 
     """
     x = np.arange(0, 1 + seq, seq).tolist()
     weights = prior_mix.weights
-    for it in range(0, len(weights)):
+    # To plot only the top n contributors, we first order the index of weights in decreasing order
+    ordered_i_w = np.flip(np.argsort(weights))
+    # We go trough the list of weight until we reach the n'th contributor, or the last contributor if there are les than n
+    for i in range(0, min(len(weights), top)):
+        it = ordered_i_w[i]
         f = ss.beta.pdf(x, a = prior_mix.alpha[it], b = prior_mix.beta[it])
         y = weights[it] * f
         plt.plot(x, y, label = labels[it])
-    plt.title('Prior decomposition')
+    plt.title("Top " + str(min(len(weights), top)) + " - Prior decomposition")
     plt.legend()
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)

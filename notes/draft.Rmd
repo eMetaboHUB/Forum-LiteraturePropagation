@@ -1300,6 +1300,7 @@ $p(c_i) = \frac{N_i}{\sum_j N_j}$, cette probabilité n'est plus calculé en uti
 $p(m) = \sum_i p(m|c_i) p(ci) = \sum_i \frac{N_i^m}{Ni} \frac{N_i}{\sum_j N_j} = \sum_i \frac{N_i^m}{\sum_j N_j}$
 
 - Ainsi mes poids dans ma mixture : $p(c_i|I = k) = \frac{p(c_i, I=k)}{p(I=k)} = \frac{p(c_i, I=k)}{\sum_jp(c_j, I=k)} = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)}$
+Cela représente la probabilité qu'une mention arrivé sur le composé $k$ provienne du composé $C_i$
 
 ### Comment définit on $P(I = k|c_i)$ ?
 
@@ -1343,7 +1344,11 @@ $p(c_i|I = k) = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)} = 0$ car $P(I =
 
 - Pour $i \in CTB_k$:
 
-$p(c_i|I = k) = \frac{P(I=k|c_i)p(c_i)}{\sum_j P(I=k|c_j)p(c_j)} = \frac{\frac{\pi_{k,i} }{\sum_{v \in IN_i} \pi_{v,i}} \frac{N_i}{N} }{\sum_j \frac{\pi_{k,j} }{\sum_{v \in IN_j} \pi_{v,j}} \frac{N_j}{N} } = \frac{\frac{\pi_{k,i}}{\sum_{v \in IN_i} \pi_{v,i}} N_i}{\sum_j \frac{\pi_{k,j} }{\sum_{v \in IN_j} \pi_{v,j}} N_j}$
+$p(c_i|I = k) = \frac{P(I=k|c_i)p(c_i)}{\sum_{j \in CTB_k} P(I=k|c_j)p(c_j)} = \frac{\frac{\pi_{k,i} }{\sum_{v \in IN_i} \pi_{v,i}} \frac{N_i}{N} }{\sum_{j \in CTB_k} \frac{\pi_{k,j} }{\sum_{v \in IN_j} \pi_{v,j}} \frac{N_j}{N} } = \frac{\frac{\pi_{k,i}}{\sum_{v \in IN_i} \pi_{v,i}} N_i}{\sum_{j \in CTB_k} \frac{\pi_{k,j} }{\sum_{v \in IN_j} \pi_{v,j}} N_j}$
+
+Pour calculer $P(I = k)$ au dénorminateur, on a juste besoin de faire la somme sur les $j \in CTB_k$ car si $j \notin CTB_k$, alors $P(I = k|c_j) = 0$
+
+Ainsi, on calcule les poids en utilisant uniquement les probabilités que des contributeurs légitimes envoient une de leurs mentions vers le composé cible. Néanmoins, il peut arriver que seule une sous-partie (ou voir même aucun des contributeurs légitime) n'est de mentions à partager car il ne dispose pas de littérature. A ce moment là, la somme des $p(c_i|I = k)$ pour tous les $c_i$ est nulle, c'est à dire qu'aucune mention venant des contributeurs de $k$ ne peut arrivé sur $k$ car ils n'ont pas de mention à partagé. A ce moment là, on utilise le prior par défaut. Dans ce cas précis, on peut constater que $P(I = k) = 0$ car $P(I = k) = \sum_{j \in CTB_k} P(I=k|c_j)p(c_j) = \sum_{j \in CTB_k} \frac{\pi_{k,j} }{\sum_{v \in IN_j} \pi_{v,j}} \frac{N_j}{N}$ Or si tous les $N_j = 0$ pour les $j \in CTB_k$, alors on a effectivement $p(I = k)$ et donc il est déjà impossible qu'une mention arrive sur le composé $k$
 
 La matrice $pi$ contient les vecteurs de résultats du PPR rangées **en colonnes** ! Ainsi, $\pi_{k,i}$ représente la probabilité attendu d'atteindre le noeud $k$ dans le réseau pour une marche aléatoire de type PPR partant du noeud $i$.
 

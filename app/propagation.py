@@ -598,11 +598,12 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         - Mean (float): The mean of the posterior distribution. 
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
         - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
-        - priorCDFratio: The log2 ratio of the CDF probabilities P(p <= p(M)) obtained between the initial prior and the mixture prior. When this value is high, it indicates that the studied MeSH is more frequent than usual in the neiborhood of the targeted compound. This value is correlated with the CDF. This value is NaN is the neighborhood can't provide information, as these both prior will be the same
+        - priorCDF: Same as CDF, but for the mixture prior.
+        - priorLog2FC: Same as Log2FC, but for the mixture prior.
     """
     
     # Out
-    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio", "priorLog2FC", "Score", "NeighborhoodInformation"])
+    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])
 
     weights = data["weights"].tolist()
     del weights[index]
@@ -612,7 +613,6 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     labels = data["SPECIE"].to_list()
     del labels[index]
     n = corpora.pop(index)
-
     # If all weights are null, no neighborhood information:
     if sum(weights) == 0:
         prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
@@ -644,12 +644,6 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
     prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
-    # If prior mix CDF is already estimated to 0, set log2FC to infinite
-    if not prior_mix_CDF:
-        print("Warning: prior mix CDF is estimated to 0. The value of the CDF ratio between MeSH prior and prior mix is set to Inf.")
-        prior_cdf_ratios = np.Inf
-    else:
-        prior_cdf_ratios = np.log2(ss.beta.cdf(p, alpha_prior, beta_prior)/prior_mix_CDF)
     
     # Compute prior Mean ratio
     prior_mean_ratio = np.log2(prior_mix.mu/p)
@@ -674,7 +668,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         plot_prior_mix_distributions(prior_mix, labels, seq)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios, prior_mean_ratio, Score, True)
+    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, Score, True)
 
     return resultat
 
@@ -693,7 +687,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "priorLog2FC", "Score", "NeighborhoodInformation"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])
 
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
@@ -735,7 +729,7 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "priorLog2FC", "Score", "NeighborhoodInformation"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
@@ -774,7 +768,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     Returns:
         [type]: [description]
     """
-    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "priorLog2FC", "Score", "NeighborhoodInformation"])])
+    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])])
     n = len(associations)
     
     # Browse associations

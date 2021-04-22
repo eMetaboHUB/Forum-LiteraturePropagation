@@ -554,8 +554,9 @@ def plot_prior_mix_distributions(prior_mix, labels, seq, top = 10):
         it = ordered_i_w[i]
         f = ss.beta.pdf(x, a = prior_mix.alpha[it], b = prior_mix.beta[it])
         y = weights[it] * f
-        plt.plot(x, y, label = labels[it])
+        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(prior_mix.alpha[it], 2)) + ", " + str(round(prior_mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
     plt.title("Top " + str(min(len(weights), top)) + " - Prior decomposition")
+    plt.figtext(0.995, 0.01, 'w is the weight of the component represented by the species in the beta mixture distribution', ha='right', va='bottom')
     plt.legend()
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)

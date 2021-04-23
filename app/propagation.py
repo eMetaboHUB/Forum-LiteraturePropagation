@@ -603,7 +603,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     """
     
     # Out
-    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])
+    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
     weights = data["weights"].tolist()
     del weights[index]
@@ -623,8 +623,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         # Compute additional values:
         Log2numFC = np.log2(posterior.mu/p)
         cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
-        Score = -np.log(cdf_posterior) * Log2numFC
-        resultat = r(posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, Score, False)
+        resultat = r(posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False)
         return resultat
 
     # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
@@ -660,15 +659,12 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # print(posterior_mix.beta)
 
     Log2numFC = np.log2(posterior_mix.mu/p)
-    
-    # Compute score :
-    Score = -np.log(cdf_posterior_mix) * Log2numFC
 
     if plot: 
         plot_prior_mix_distributions(prior_mix, labels, seq)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, Score, True)
+    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)
 
     return resultat
 
@@ -687,7 +683,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
@@ -729,7 +725,7 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
@@ -768,7 +764,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     Returns:
         [type]: [description]
     """
-    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "Score", "NeighborhoodInformation"])])
+    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
     n = len(associations)
     
     # Browse associations
@@ -792,6 +788,6 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
 
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-            associations.iloc[i, 2:9] = list(r)
+            associations.iloc[i, 2:8] = list(r)
             bar.update(i)
     return associations

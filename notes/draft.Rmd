@@ -1331,12 +1331,20 @@ $\forall k \in IN_i: P(I = k|C_i) = \frac{\pi_{k,i}}{\sum_{v \in IN_i} \pi_{v,i}
 
 $\forall k \notin IN_i: P(I = k|C_i) = 0$ avec $i \notin IN_i$ 
 
+Réciproquement,
+
+$\forall i \in CTB_k: P(I = k|C_i) = \frac{\pi_{k,i}}{\sum_{v \in IN_i} \pi_{v,i}}$
+
+Sinon, 
+
+$\forall i \notin CTB_k: P(I = k|C_i) = 0$ avec $k \notin CTB_k$
+
 
 C'est comme ça que donc définies les probabilités $P(I = k|C_i)$ que l'on va ensuite utilisées pour calculer les poids dns notre modèle : $P(C_i|I = k)$
 
 ====================
 
-Donc réciproquement :
+Donc :
 
 - Ainsi, pour $i \notin CTB_k$ (dont $k$ lui-même donc):
 

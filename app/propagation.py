@@ -532,10 +532,11 @@ def E(w):
         [float]: Entropy
     """
     if np.sum(w):
-        return sum([ -np.log2(p) * p for p in w if p != 0 ])
+        # If there is only one contributor, the entropy will be computed as -log2(1) and will return -0.0 in numpy. To fix this, we return the abs value of the entropy
+        return abs(-sum([ np.log2(p) * p for p in w if p != 0 ]))
     return np.NaN
 
-def compute_Entropy_matrix(weight_matrix):
+def compute_Entropy_matrix(weight_matrix, labels):
     """
     This function is used to compute the Entropy values for each compound based on the contributor's distribution. If there is no contributor, the value returned is NaN.
     Args:
@@ -546,7 +547,8 @@ def compute_Entropy_matrix(weight_matrix):
     """
     # When using list comprehension, python iter by row so we transpose the weight matrix to iter by columns
     Entropy = [E(w) for w in weight_matrix.T]
-    return Entropy
+    res = pd.DataFrame({"SPECIE": labels, "Entropy":Entropy})
+    return res
 
 def plot_distributions(prior_mix, posterior_mix):
     """This function is used to plot prior distribution against a posterior distribution

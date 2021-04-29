@@ -162,6 +162,7 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
     Returns:
         [numpy.ndarray]: Vector of probabilities to be out of the targeted node
     """
+    #TODO NEXT FOR PROBA MATRIX, USE: g.get_adjacency(attribute='weight') pour extraire la amtrice d'adj avec les poids (proba)
     # Get length
     l = A.shape[0]
     # Create restart vector on the targeted node

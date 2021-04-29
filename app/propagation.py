@@ -520,11 +520,22 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ### Computations ###
 ####################
 
+def compute_contributors_distances(weights, g, labels):
+    D = g.shortest_paths()
+    # By multiplying the weight matrix and the distance matrix element-wise, we can compute the values of the weighted average
+    m = weights * D
+    # To determine the average mean, we just need to sum these values
+    M = m.sum(axis = 0)
+    # The only way for the weighted average to be null is when all weights are null. In this case we set NaN
+    M[M == 0] = np.NaN
+    res = pd.DataFrame({"SPECIE": labels, "CtbAvgDistance":M})
+
+    return res
+
 
 def E(w):
     """
     Compute Shanon Entropy
-
     Args:
         w ([list]): a vector of probabilities
 

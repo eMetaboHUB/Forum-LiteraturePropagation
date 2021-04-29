@@ -90,6 +90,9 @@ print("- damping factor (alpha): " + str(alpha_set))
 print("- sample size: " + str(sample_size_set))
 print("- q: " + str(q))
 
+# Extract labels for supplementary tables
+l = table_species_corpora["SPECIE"]
+
 for alpha in alpha_set:
 
     # Compute network analysis
@@ -97,7 +100,8 @@ for alpha in alpha_set:
     probabilities = propagation_volume(g, alpha = alpha)
     # probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"))
     weights = compute_weights(probabilities, table_species_corpora, q)
-    df_Entropy = compute_Entropy_matrix(weights, probabilities.columns.tolist())
+    df_Entropy = compute_Entropy_matrix(weights, l)
+    df_contributors_distances = compute_contributors_distances(weights, g, l)
 
     # out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
     # o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
@@ -116,8 +120,9 @@ for alpha in alpha_set:
         if args.file and (not f.empty):
             print("\nCompute association from file: " + args.file)
             r = association_file(f, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
-            # left join to add entropy
+            # left join to add entropy, CtbAvgDistance
             r = pd.merge(r, df_Entropy, on = "SPECIE", how = "left")
+            r = pd.merge(r, df_contributors_distances, on = "SPECIE", how = "left")
             f_out_name = os.path.splitext(os.path.basename(args.file))[0]
             out = os.path.join(out_path, f_out_name + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
@@ -128,8 +133,9 @@ for alpha in alpha_set:
             print("\nCompute associations between " + args.specie + " and all MeSHs")
             index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
             r = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
-            # Add Entropy of the targeted compound
+            # Add Entropy, CtbAvgDistance of the targeted compound
             r["Entropy"] = float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"])
+            r["CtbAvgDistance"] = float(df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"])
             out = os.path.join(out_path, args.specie + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             r.to_csv(out, index = False)
@@ -140,6 +146,7 @@ for alpha in alpha_set:
             r = mesh_specie(args.mesh, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
             # Add Entropy
             r["Entropy"] = df_Entropy["Entropy"]
+            r["CtbAvgDistance"] = df_contributors_distances["CtbAvgDistance"]
             out = os.path.join(out_path, args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             r.to_csv(out, index = False)
@@ -156,7 +163,7 @@ for alpha in alpha_set:
             p = float(MeSH_info["P"])
             print("P = " + str(p))
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
-            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"])})
+            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"]), "CtbAvgDistance": float(df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"])})
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             df_.to_csv(out, index = False)

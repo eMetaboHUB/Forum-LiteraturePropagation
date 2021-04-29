@@ -520,7 +520,33 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ### Computations ###
 ####################
 
+def compute_contributors_corpora_sizes(weights, table_species_corpora, labels):
+    """
+    This function is used to compute the weighted average corpora size of the contributors for each compounds, using weights from the weight matrix
+    Args:
+        weights (np.array): the wegiht matrix
+        table_species_corpora (pd.Dataframe): The table containing corpora sizes
+        labels (list): list of species labels
+    """
+    corpora = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
+    C = weights.T @ corpora
+    # If all the weight are null, set NaN. Note that weights are necessarily null if corpora sizes for contributors are null
+    C[np.sum(weights, axis = 0) == 0] = np.NaN
+    res = pd.DataFrame({"SPECIE": labels, "CtbAvgCorporaSize": C[:, 0]})
+    
+    return res
+
 def compute_contributors_distances(weights, g, labels):
+    """
+    This function is used to compute the weighted average distance of the contributors for each compounds, using weights from the weight matrix
+    Args:
+        weights (np.array): the wegiht matrix
+        g (igraph.Graph): the compound graph
+        labels (list): list of species labels
+
+    Returns:
+        (pd.Dataframe): a DataFrame containing for each specie the average distance of the contributors, with NaN if there is no available contributors for the compound
+    """
     D = g.shortest_paths()
     # By multiplying the weight matrix and the distance matrix element-wise, we can compute the values of the weighted average
     m = weights * D
@@ -528,7 +554,7 @@ def compute_contributors_distances(weights, g, labels):
     M = m.sum(axis = 0)
     # The only way for the weighted average to be null is when all weights are null. In this case we set NaN
     M[M == 0] = np.NaN
-    res = pd.DataFrame({"SPECIE": labels, "CtbAvgDistance":M})
+    res = pd.DataFrame({"SPECIE": labels, "CtbAvgDistance": M})
 
     return res
 
@@ -552,7 +578,7 @@ def compute_Entropy_matrix(weight_matrix, labels):
     This function is used to compute the Entropy values for each compound based on the contributor's distribution. If there is no contributor, the value returned is NaN.
     Args:
         weight_matrix (np.array): the weight matrix
-
+        labels (list): list of species labels
     Returns:
         [list]: a list containing the entropy associated to the distribution of contributors for each compound
     """

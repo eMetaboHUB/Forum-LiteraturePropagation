@@ -521,6 +521,21 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ### Computations ###
 ####################
 
+def compute_contributors_number(weights, labels):
+    """This function is used to return the number of contributors
+
+    Args:
+        weights (np.array): the wegiht matrix
+        labels (list): list of species labels
+
+    Returns:
+        (pd.Dataframe): a DataFrame containing for each specie the number of contributors
+    """
+    N = np.sum((weights > 0), axis = 0)
+    res = pd.DataFrame({"SPECIE": labels, "NbCtb": N})
+    
+    return res
+
 def compute_contributors_corpora_sizes(weights, table_species_corpora, labels):
     """
     This function is used to compute the weighted average corpora size of the contributors for each compounds, using weights from the weight matrix
@@ -528,6 +543,9 @@ def compute_contributors_corpora_sizes(weights, table_species_corpora, labels):
         weights (np.array): the wegiht matrix
         table_species_corpora (pd.Dataframe): The table containing corpora sizes
         labels (list): list of species labels
+    
+    Returns:
+        (pd.Dataframe): a DataFrame containing for each specie the average corpora size of the contributors, with NaN if there is no available contributors for the compound
     """
     corpora = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
     C = weights.T @ corpora

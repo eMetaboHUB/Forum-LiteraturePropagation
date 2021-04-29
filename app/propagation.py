@@ -521,6 +521,33 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ####################
 
 
+def E(w):
+    """
+    Compute Shanon Entropy
+
+    Args:
+        w ([list]): a vector of probabilities
+
+    Returns:
+        [float]: Entropy
+    """
+    if np.sum(w):
+        return sum([ -np.log2(p) * p for p in w if p != 0 ])
+    return np.NaN
+
+def compute_Entropy_matrix(weight_matrix):
+    """
+    This function is used to compute the Entropy values for each compound based on the contributor's distribution. If there is no contributor, the value returned is NaN.
+    Args:
+        weight_matrix (np.array): the weight matrix
+
+    Returns:
+        [list]: a list containing the entropy associated to the distribution of contributors for each compound
+    """
+    # When using list comprehension, python iter by row so we transpose the weight matrix to iter by columns
+    Entropy = [E(w) for w in weight_matrix.T]
+    return Entropy
+
 def plot_distributions(prior_mix, posterior_mix):
     """This function is used to plot prior distribution against a posterior distribution
 
@@ -655,8 +682,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # print(prior_mix.beta)
     # print("========================")
     # print(posterior_mix.weights)
-    # print(posterior_mix.alpha)
-    # print(posterior_mix.beta)
+    # print(posterior_mix.alpha)
+    # print(posterior_mix.beta)
 
     Log2numFC = np.log2(posterior_mix.mu/p)
 

@@ -15,6 +15,7 @@ parser.add_argument("--file", help="Path to a file containing pairs of SPECIE an
 parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null. Default = False", type = bool, default = False, required = False, dest = 'forget')
 parser.add_argument("--alpha", help="The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
 parser.add_argument("--sample_size", help="The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100", nargs = "*", type = int, default = [100], required = False, dest = 'ss')
+parser.add_argument("--q", help="The tolerance threshold for PPR probabilities. If q is negative the default value is used. The Default = 1/(N  -1)", type = float, default = -1, required = False, dest = 'q')
 parser.add_argument("--out", help="path to the output directory", type = str, required = True, dest = 'out')
 
 
@@ -71,6 +72,11 @@ if args.file:
 
 alpha_set = args.alpha
 sample_size_set = args.ss
+q = args.q
+
+if q <= 0:
+    print("\n Set tolerance threshold to default value")
+    q = 1/(len(g.vs) - 1)
 
 if 0 in sample_size_set:
     print("\n /!\ 0 is not allowed for sample_size.")
@@ -82,14 +88,26 @@ print("\nParameters:\n")
 print("- forget: " + str(args.forget))
 print("- damping factor (alpha): " + str(alpha_set))
 print("- sample size: " + str(sample_size_set))
+print("- q: " + str(q))
 
+# Extract labels for supplementary tables
+l = table_species_corpora["SPECIE"]
 
 for alpha in alpha_set:
 
     # Compute network analysis
     print("\n- Compute weights using alpha = " + str(alpha))
     probabilities = propagation_volume(g, alpha = alpha)
-    weights = compute_weights(probabilities, table_species_corpora)
+    # probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"))
+    weights = compute_weights(probabilities, table_species_corpora, q)
+    df_Entropy = compute_Entropy_matrix(weights, l)
+    df_contributors_distances = compute_contributors_distances(weights, g, l)
+    df_contributors_corpora_sizes = compute_contributors_corpora_sizes(weights, table_species_corpora, l)
+    df_nb_ctbs = compute_contributors_number(weights, l)
+
+    # out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
+    # o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
+    # o.to_csv(out)
     
     for sample_size in sample_size_set:
         print("\n- Compute MeSH priors using sample size = " + str(sample_size))
@@ -104,6 +122,11 @@ for alpha in alpha_set:
         if args.file and (not f.empty):
             print("\nCompute association from file: " + args.file)
             r = association_file(f, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            # left join to add entropy, CtbAvgDistance, CtbAvgCorporaSize
+            r = pd.merge(r, df_Entropy, on = "SPECIE", how = "left")
+            r = pd.merge(r, df_contributors_distances, on = "SPECIE", how = "left")
+            r = pd.merge(r, df_contributors_corpora_sizes, on = "SPECIE", how = "left")
+            r = pd.merge(r, df_nb_ctbs, on = "SPECIE", how = "left")
             f_out_name = os.path.splitext(os.path.basename(args.file))[0]
             out = os.path.join(out_path, f_out_name + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
@@ -114,6 +137,11 @@ for alpha in alpha_set:
             print("\nCompute associations between " + args.specie + " and all MeSHs")
             index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
             r = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            # Add Entropy, CtbAvgDistance, CtbAvgCorporaSize, NbCtb of the targeted compound
+            r["Entropy"] = float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"])
+            r["CtbAvgDistance"] = float(df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"])
+            r["CtbAvgCorporaSize"] = float(df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"])
+            r["NbCtb"] = float(df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"])
             out = os.path.join(out_path, args.specie + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             r.to_csv(out, index = False)
@@ -122,12 +150,17 @@ for alpha in alpha_set:
         elif args.mesh and not args.specie:
             print("\nCompute associations between " + args.mesh + " and all species")
             r = mesh_specie(args.mesh, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            # Add Entropy, CtbAvgDistance, CtbAvgCorporaSize, NbCtb
+            r["Entropy"] = df_Entropy["Entropy"]
+            r["CtbAvgDistance"] = df_contributors_distances["CtbAvgDistance"]
+            r["CtbAvgCorporaSize"] = df_contributors_corpora_sizes["CtbAvgCorporaSize"]
+            r["NbCtb"] = df_nb_ctbs["NbCtb"]
             out = os.path.join(out_path, args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             r.to_csv(out, index = False)
 
         elif args.mesh and args.specie:
-            print("\nCompute associations between " + args.specie + "and" + args.mesh)
+            print("\nCompute associations between " + args.specie + " and " + args.mesh)
             index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
             table_species_corpora["weights"] = weights[:, index].tolist()
             cooc = table_coocurences[table_coocurences["MESH"] == args.mesh][["index", "COOC"]]
@@ -136,8 +169,9 @@ for alpha in alpha_set:
                 data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
             p = float(MeSH_info["P"])
+            print("P = " + str(p))
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
-            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDFratio": [res.priorCDFratio], "Score": [res.Score]})
+            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"]), "CtbAvgDistance": float(df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"]), "CtbAvgCorporaSize": float(df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"]), "NbCtb": float(df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"])})
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             df_.to_csv(out, index = False)

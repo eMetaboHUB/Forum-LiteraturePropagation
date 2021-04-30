@@ -162,10 +162,12 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
     Returns:
         [numpy.ndarray]: Vector of probabilities to be out of the targeted node
     """
+    #TODO NEXT FOR PROBA MATRIX, USE: g.get_adjacency(attribute='weight') pour extraire la amtrice d'adj avec les poids (proba)
     # Get length
     l = A.shape[0]
-    # Create restart vector by extracting probability, fromated as a column vector.
-    v = np.array([(A[i, :]/A[i, :].sum())]).T
+    # Create restart vector on the targeted node
+    v = np.zeros((l, 1))
+    v[i,0] = 1
 
     # Sink node vector, as column vector
     a = np.array([((A.sum(axis = 1) == 0) * 1)]).T
@@ -192,64 +194,55 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
         c += 1
     # print(str(c) + " iterations to convergence.")
 
-    # We are interested in probabilities when we are NOT on the targeted node. So we have to estimate probabilities without considering the moments we are on the target node.  
-    new_pi[i, 0] = 0
-    r = new_pi/np.sum(new_pi)
     # Float are basically imprecise and so after several matrix multiplications, the sum of probabilities in the vector may not equal to 1, but 0.9999999999999999 or 1.0000000000000001 for example. 
-    if np.sum(r, axis = 0, dtype = np.float16) != 1:
+    if np.sum(new_pi, axis = 0, dtype = np.float16) != 1:
         print("Warning at index " + str(i) + ": the final probability vector does not sum to 1. This may be due to float approximation errors")
 
-    return r
+    return new_pi
 
-def propagation_volume(g, alpha = 0.8, name_att = "label", direction = "both"):
+def propagation_volume(g, alpha = 0.8, name_att = "label"):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
     Args:
         g (igraph.Graph): The compound graph
         alpha (float, optional): The damping factor. Defaults to 0.8.
         name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
-        direction (str, optional): The direction og random walks that will be used to compute probabilities:
-            - SFT: StartFromTarget, for each node the resulting vector contains the probabilities to be on a particular compound node during the random walk starting from the targeted node.
-            - FOT: FinishOnTarget, for each node, the resulting vector contains the probability that a walker on the targeted node comes from a particular node. The result of the StartFromTarget propagation in used to compute the FinishOnTarget probabilities.
-            - both: The both matrix probabilities are computed are returned
 
     Returns:
-        collections.namedtuple: A named.tuple containing pandas DataFrame representing the probability matrix using SFT and/or FOT propagation.
+        numpy array: The probability matrix
     """
-    # Init tuple
-    r = collections.namedtuple("propagation", ["SFT", "FOT"])
-    # Compute for each node SFT propagation
+    # Get adjacency matrix
     A = np.array(g.get_adjacency().data)
-    full = np.zeros(A.shape)
-    for i in range(0, A.shape[0]):
-        full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
     
-    # If SFT direction
-    if direction == "SFT":
-        df_SFT = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
-        result = r(df_SFT, None)
+    # If alpha is set to 0, simply return the probability matrix from direct neighborhood, otherwise compute PPR
+    if not alpha:
+        full = A @ np.diag(1/A.sum(axis=0))
+    else:
+        full = np.zeros(A.shape)
+        for i in range(0, A.shape[0]):
+            full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
 
-    # If backward direction
-    if direction == "FOT":
-        d = np.diag(1/full.sum(axis = 1))
-        bkw = (full.T) @ d
-        df_FOT = pd.DataFrame(bkw, columns=g.vs[name_att], index=g.vs[name_att])
-        
+    df = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
     
-    # If both
-    if direction == "both":
-        d = np.diag(1/full.sum(axis = 1))
-        bkw = (full.T) @ d
-        df_SFT = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
-        df_FOT = pd.DataFrame(bkw, columns=g.vs[name_att], index=g.vs[name_att])
-        result = r(df_SFT, df_FOT)
-    
-    return result
+    return df
 
 
-def compute_weights(probabilities, table_species_corpora):
+def compute_weights(probabilities, table_species_corpora, q):
     # Compute weights
-    sigmas = probabilities.SFT.to_numpy()
+    sigmas = probabilities.to_numpy()
+    # To determine contributors of each compounds, we build a constrain matrix using the q parameter (tolerance threshold) to filter out contributors that a too far from the targeted node and also to avoid a compound to contribute itself to its prior.
+    # First we get probability from the PPR
+    constrains = copy.copy(sigmas)
+    # To filter using the tolerance threshold, we first re-estimate probability without considering self-contribution !
+    np.fill_diagonal(constrains, 0)
+    constrains = constrains @ np.diag(1/(constrains.sum(axis=0)))
+    # Test which resulting probability are higher than the tolerance threshold to create the constrain matrix. The diagonal will always be at False as we set 0 on diag previously
+    constrains = (constrains > q) * 1
+    # Apply constrain matrix on probability
+    sigmas = sigmas * constrains
+    # We re-estimate probabilities after filtering from constrains
+    sigmas = sigmas @ np.diag(1/(sigmas.sum(axis=0)))
+    # Get vector of corpora sizes
     v = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
     # Compute totals
     t = sigmas @ v
@@ -528,6 +521,90 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ### Computations ###
 ####################
 
+def compute_contributors_number(weights, labels):
+    """This function is used to return the number of contributors
+
+    Args:
+        weights (np.array): the wegiht matrix
+        labels (list): list of species labels
+
+    Returns:
+        (pd.Dataframe): a DataFrame containing for each specie the number of contributors
+    """
+    N = np.sum((weights > 0), axis = 0)
+    res = pd.DataFrame({"SPECIE": labels, "NbCtb": N})
+    
+    return res
+
+def compute_contributors_corpora_sizes(weights, table_species_corpora, labels):
+    """
+    This function is used to compute the weighted average corpora size of the contributors for each compounds, using weights from the weight matrix
+    Args:
+        weights (np.array): the wegiht matrix
+        table_species_corpora (pd.Dataframe): The table containing corpora sizes
+        labels (list): list of species labels
+    
+    Returns:
+        (pd.Dataframe): a DataFrame containing for each specie the average corpora size of the contributors, with NaN if there is no available contributors for the compound
+    """
+    corpora = np.array([table_species_corpora["TOTAL_PMID_SPECIE"]]).T
+    C = weights.T @ corpora
+    # If all the weight are null, set NaN. Note that weights are necessarily null if corpora sizes for contributors are null
+    C[np.sum(weights, axis = 0) == 0] = np.NaN
+    res = pd.DataFrame({"SPECIE": labels, "CtbAvgCorporaSize": C[:, 0]})
+    
+    return res
+
+def compute_contributors_distances(weights, g, labels):
+    """
+    This function is used to compute the weighted average distance of the contributors for each compounds, using weights from the weight matrix
+    Args:
+        weights (np.array): the wegiht matrix
+        g (igraph.Graph): the compound graph
+        labels (list): list of species labels
+
+    Returns:
+        (pd.Dataframe): a DataFrame containing for each specie the average distance of the contributors, with NaN if there is no available contributors for the compound
+    """
+    D = g.shortest_paths()
+    # By multiplying the weight matrix and the distance matrix element-wise, we can compute the values of the weighted average
+    m = weights * D
+    # To determine the average mean, we just need to sum these values
+    M = m.sum(axis = 0)
+    # The only way for the weighted average to be null is when all weights are null. In this case we set NaN
+    M[M == 0] = np.NaN
+    res = pd.DataFrame({"SPECIE": labels, "CtbAvgDistance": M})
+
+    return res
+
+
+def E(w):
+    """
+    Compute Shanon Entropy
+    Args:
+        w ([list]): a vector of probabilities
+
+    Returns:
+        [float]: Entropy
+    """
+    if np.sum(w):
+        # If there is only one contributor, the entropy will be computed as -log2(1) and will return -0.0 in numpy. To fix this, we return the abs value of the entropy
+        return abs(-sum([ np.log2(p) * p for p in w if p != 0 ]))
+    return np.NaN
+
+def compute_Entropy_matrix(weight_matrix, labels):
+    """
+    This function is used to compute the Entropy values for each compound based on the contributor's distribution. If there is no contributor, the value returned is NaN.
+    Args:
+        weight_matrix (np.array): the weight matrix
+        labels (list): list of species labels
+    Returns:
+        [list]: a list containing the entropy associated to the distribution of contributors for each compound
+    """
+    # When using list comprehension, python iter by row so we transpose the weight matrix to iter by columns
+    Entropy = [E(w) for w in weight_matrix.T]
+    res = pd.DataFrame({"SPECIE": labels, "Entropy":Entropy})
+    return res
 
 def plot_distributions(prior_mix, posterior_mix):
     """This function is used to plot prior distribution against a posterior distribution
@@ -544,21 +621,27 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.yticks(fontsize=20)
     plt.show()
 
-def plot_prior_mix_distributions(prior_mix, labels, seq):
-    """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component.
+def plot_prior_mix_distributions(prior_mix, labels, seq, top = 10):
+    """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
 
     Args:
         prior_mix (collections): A collection containing information about the  prior mixture distribution: weights, alpha and beta parameters
         labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
         seq (float): The step used in np.arange to create the x vector of probabilities.
+        top (int): The top n (maximum) of contributors that should be plotted 
     """
     x = np.arange(0, 1 + seq, seq).tolist()
     weights = prior_mix.weights
-    for it in range(0, len(weights)):
+    # To plot only the top n contributors, we first order the index of weights in decreasing order
+    ordered_i_w = np.flip(np.argsort(weights))
+    # We go trough the list of weight until we reach the n'th contributor, or the last contributor if there are les than n
+    for i in range(0, min(len(weights), top)):
+        it = ordered_i_w[i]
         f = ss.beta.pdf(x, a = prior_mix.alpha[it], b = prior_mix.beta[it])
         y = weights[it] * f
-        plt.plot(x, y, label = labels[it])
-    plt.title('Prior decomposition')
+        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(prior_mix.alpha[it], 2)) + ", " + str(round(prior_mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
+    plt.title("Top " + str(min(len(weights), top)) + " - Prior decomposition")
+    plt.figtext(0.995, 0.01, 'w is the weight of the component represented by the species in the beta mixture distribution', ha='right', va='bottom')
     plt.legend()
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
@@ -600,11 +683,12 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         - Mean (float): The mean of the posterior distribution. 
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
         - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
-        - priorCDFratio: The log2 ratio of the CDF probabilities P(p <= p(M)) obtained between the initial prior and the mixture prior. When this value is high, it indicates that the studied MeSH is more frequent than usual in the neiborhood of the targeted compound. This value is correlated with the CDF. This value is NaN is the neighborhood can't provide information, as these both prior will be the same
+        - priorCDF: Same as CDF, but for the mixture prior.
+        - priorLog2FC: Same as Log2FC, but for the mixture prior.
     """
     
     # Out
-    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
+    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
     weights = data["weights"].tolist()
     del weights[index]
@@ -614,10 +698,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     labels = data["SPECIE"].to_list()
     del labels[index]
     n = corpora.pop(index)
-
     # If all weights are null, no neighborhood information:
-    if all(w == 0 for w in weights):
-        print("Neiborhood literature information does not reach the targeted compound. You should increase the damping factor. Use default prior.")
+    if sum(weights) == 0:
         prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
         posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = plot)
         # In case of no neighborhood information, we simply plot prior vs posterior distributions:
@@ -625,35 +707,30 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
             plot_distributions(prior, posterior)
         # Compute additional values:
         Log2numFC = np.log2(posterior.mu/p)
-
-        resultat = r(posterior.mu, ss.beta.cdf(p, posterior.alpha, posterior.beta), Log2numFC, np.NaN)
+        cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
+        resultat = r(posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False)
         return resultat
 
-    # Check for other null weights, in case of low alpha (damping) for instance. We consider a weight null if weight < 1e-5
-    if not all(w > weigth_limit for w in weights):
-        to_remove = list()
-        for it in range(0, len(weights)):
-            # Check if weights == 0
-            if weights[it] <= weigth_limit:
-                # print("Warning: weight at index " + str(it) + " is null: " + labels[it] + " Low damping factor used ?")
-                to_remove.append(it)
-        
-        # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
-        for rmv in sorted(to_remove, reverse=True):
-            del weights[rmv]
-            del cooc[rmv]
-            del corpora[rmv]
-            del labels[rmv]
+    # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
+    to_remove = list()
+    for it in range(0, len(weights)):
+        # Check weight
+        if not weights[it]:
+            to_remove.append(it)
+    # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
+    for rmv in sorted(to_remove, reverse=True):
+        del weights[rmv]
+        del cooc[rmv]
+        del corpora[rmv]
+        del labels[rmv]
+    
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
     prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
     prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
-    # If prior mix CDF is already estimated to 0, set log2FC to infinite
-    if not prior_mix_CDF:
-        print("Warning: prior mix CDF is estimated to 0. The value of the CDF ratio between MeSH prior and prior mix is set to Inf.")
-        prior_cdf_ratios = np.Inf
-    else:
-        prior_cdf_ratios = np.log2(ss.beta.cdf(p, alpha_prior, beta_prior)/prior_mix_CDF)
+    
+    # Compute prior Mean ratio
+    prior_mean_ratio = np.log2(prior_mix.mu/p)
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
@@ -663,19 +740,16 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # print(prior_mix.beta)
     # print("========================")
     # print(posterior_mix.weights)
-    # print(posterior_mix.alpha)
-    # print(posterior_mix.beta)
+    # print(posterior_mix.alpha)
+    # print(posterior_mix.beta)
 
     Log2numFC = np.log2(posterior_mix.mu/p)
-    
-    # Compute score :
-    Score = -np.log(cdf_posterior_mix) * Log2numFC
 
     if plot: 
         plot_prior_mix_distributions(prior_mix, labels, seq)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_cdf_ratios, Score)
+    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)
 
     return resultat
 
@@ -694,7 +768,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
@@ -736,7 +810,7 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])
+    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
@@ -775,7 +849,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     Returns:
         [type]: [description]
     """
-    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDFratio", "Score"])])
+    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
     n = len(associations)
     
     # Browse associations
@@ -799,6 +873,6 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
 
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-            associations.iloc[i, 2:7] = list(r)
+            associations.iloc[i, 2:8] = list(r)
             bar.update(i)
     return associations

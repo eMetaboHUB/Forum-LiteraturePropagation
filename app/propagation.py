@@ -521,6 +521,28 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ### Computations ###
 ####################
 
+
+def create_vizu_data(index, probabilities, q, weights, data, cptm = "c"):
+    # Step 1: Get all potential contributors : repeat procedure for computing weights
+    _sigmas = probabilities.to_numpy()
+    _constrains = copy.copy(_sigmas)
+    np.fill_diagonal(_constrains, 0)
+    _constrains = _constrains @ np.diag(1/(_constrains.sum(axis=0)))
+    potential_contributors = _constrains[index, :] > q
+    # We also select the targeted compound:
+    potential_contributors[index] = True
+    # Get data
+    w_data = data.loc[potential_contributors, ]
+    # Force integer type before pasting data
+    w_data = w_data.astype({"TOTAL_PMID_SPECIE": int, "COOC": int})
+    # Add compartiment to specie for mapping: 
+    w_data["SPECIE"] = w_data["SPECIE"] + "_" + cptm
+    w_data["STATS"] = w_data["SPECIE"] + " (" + w_data["COOC"].astype(str) + "/" + w_data["TOTAL_PMID_SPECIE"].astype(str) + ")"
+    w_data = w_data.drop(["index", "CID", "TOTAL_PMID_SPECIE", "COOC"], axis = 1)
+    w_data = w_data.rename(columns={"SPECIE": "metaboliteDBIdentifier"})
+    w_data.loc[index]
+    return w_data
+
 def compute_contributors_number(weights, labels):
     """This function is used to return the number of contributors
 

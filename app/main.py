@@ -175,7 +175,10 @@ for alpha in alpha_set:
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             df_.to_csv(out, index = False)
-        
+            # Vizu:
+            vizu = create_vizu_data(index, probabilities, q, weights, data)
+            out_vizu = os.path.join(out_path, "vizu_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            vizu.to_csv(out_vizu, index = False, sep = "\t")
         else:
             print("Nothing to do ...")
 

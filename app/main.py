@@ -104,7 +104,6 @@ for alpha in alpha_set:
     df_contributors_distances = compute_contributors_distances(weights, g, l)
     df_contributors_corpora_sizes = compute_contributors_corpora_sizes(weights, table_species_corpora, l)
     df_nb_ctbs = compute_contributors_number(weights, l)
-
     # out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
     # o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
     # o.to_csv(out)
@@ -169,12 +168,15 @@ for alpha in alpha_set:
                 data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
             p = float(MeSH_info["P"])
-            print("P = " + str(p))
+            # print("P = " + str(p))
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
-            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"]), "CtbAvgDistance": float(df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"]), "CtbAvgCorporaSize": float(df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"]), "NbCtb": float(df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"])})
+            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"], "CtbAvgDistance": df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"], "CtbAvgCorporaSize": df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"], "NbCtb": df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"]})
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             df_.to_csv(out, index = False)
+            # Export full data
+            out_data = os.path.join(out_path, "data_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            data.to_csv(out_data, index = False)
             # Vizu:
             vizu = create_vizu_data(index, probabilities, q, weights, data)
             out_vizu = os.path.join(out_path, "vizu_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")

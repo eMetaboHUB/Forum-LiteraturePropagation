@@ -553,7 +553,7 @@ def compute_contributors_number(weights, labels):
     Returns:
         (pd.Dataframe): a DataFrame containing for each specie the number of contributors
     """
-    N = np.sum((weights > 0), axis = 0)
+    N = np.sum((weights > 0), axis = 0, dtype = np.int)
     res = pd.DataFrame({"SPECIE": labels, "NbCtb": N})
     
     return res
@@ -573,6 +573,7 @@ def compute_contributors_corpora_sizes(weights, table_species_corpora, labels):
     C = weights.T @ corpora
     # If all the weight are null, set NaN. Note that weights are necessarily null if corpora sizes for contributors are null
     C[np.sum(weights, axis = 0) == 0] = np.NaN
+    C = np.round(C, decimals = 3)
     res = pd.DataFrame({"SPECIE": labels, "CtbAvgCorporaSize": C[:, 0]})
     
     return res
@@ -595,6 +596,7 @@ def compute_contributors_distances(weights, g, labels):
     M = m.sum(axis = 0)
     # The only way for the weighted average to be null is when all weights are null. In this case we set NaN
     M[M == 0] = np.NaN
+    M = np.round(M, decimals = 3)
     res = pd.DataFrame({"SPECIE": labels, "CtbAvgDistance": M})
 
     return res
@@ -625,6 +627,7 @@ def compute_Entropy_matrix(weight_matrix, labels):
     """
     # When using list comprehension, python iter by row so we transpose the weight matrix to iter by columns
     Entropy = [E(w) for w in weight_matrix.T]
+    Entropy = np.round(Entropy, decimals = 3)
     res = pd.DataFrame({"SPECIE": labels, "Entropy":Entropy})
     return res
 

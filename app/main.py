@@ -96,17 +96,11 @@ l = table_species_corpora["SPECIE"]
 for alpha in alpha_set:
 
     # Compute network analysis
-    print("\n- Compute weights using alpha = " + str(alpha))
-    probabilities = propagation_volume(g, alpha = alpha)
-    # probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"))
-    weights = compute_weights(probabilities, table_species_corpora, q)
+    probabilities, weights = create_probabilities_and_weights(g, alpha, table_species_corpora, q)
     df_Entropy = compute_Entropy_matrix(weights, l)
     df_contributors_distances = compute_contributors_distances(weights, g, l)
     df_contributors_corpora_sizes = compute_contributors_corpora_sizes(weights, table_species_corpora, l)
     df_nb_ctbs = compute_contributors_number(weights, l)
-    # out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
-    # o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
-    # o.to_csv(out)
     
     for sample_size in sample_size_set:
         print("\n- Compute MeSH priors using sample size = " + str(sample_size))

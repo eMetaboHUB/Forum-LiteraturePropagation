@@ -256,6 +256,54 @@ def compute_weights(probabilities, table_species_corpora, q):
     # Weights are also store in columns !
     return weights
 
+
+def create_probabilities_and_weights(g, alpha, table_species_corpora, q, name_att = "label"):
+    cache_proba_dir_path = "./cache/PROBA"
+    cache_weights_dir_path = "./cache/WEIGHTS"
+    # If cache dir does not exists, create and fill it:
+    for path in [cache_proba_dir_path, cache_weights_dir_path]:
+        if not os.path.exists(path):
+            try:
+                os.makedirs(path, 0o755, exist_ok=False)
+            except OSError:
+                print ("Creation of the directory %s failed" % path)
+            else:
+                print ("Successfully created the directory %s" % path)
+    # Test if probabilities for required alpha as already been computed :
+    proba_path = os.path.join(cache_proba_dir_path, "PROBA_" + str(alpha) + ".csv")
+    if not os.path.exists(proba_path):
+        # Compute probabilities
+        print("\n- Compute probabilities using alpha = " + str(alpha))
+        probabilities = propagation_volume(g, alpha = alpha)
+        # Round probabilities with 9 decimals:
+        probabilities = probabilities.round(9)
+        # Write probabilities in cache:
+        probabilities.to_csv(proba_path, index = True, header = True)
+    else:
+        print("\n- Get probabilities with alpha = " + str(alpha) + " in cache dir")
+        probabilities = pd.read_csv(proba_path, index_col = 0, header = 0)
+    
+    # Test if probabilities for required alpha as already been computed :
+    weight_path = os.path.join(cache_weights_dir_path, "WEIGHTS_" + str(alpha) + ".csv")
+    if not os.path.exists(weight_path):
+        print("\n- Compute weights using alpha = " + str(alpha))
+        weights = compute_weights(probabilities, table_species_corpora, q)
+        # Round probabilities with 9 decimals:
+        weights = np.around(weights, 9)
+        # Write probabilities in cache:
+        df_weights = pd.DataFrame(weights, columns=g.vs[name_att], index=g.vs[name_att])
+        df_weights.to_csv(weight_path, index = True, header = True)
+    else:
+        print("\n- Get weights with alpha = " + str(alpha) + " in cache dir")
+        weights = pd.read_csv(weight_path, index_col = 0, header = 0).to_numpy()
+
+
+    return probabilities, weights
+
+
+
+
+
 ####################
 ## Beta functions ##
 ####################

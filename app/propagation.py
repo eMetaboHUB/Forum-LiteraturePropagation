@@ -709,25 +709,25 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.yticks(fontsize=20)
     plt.show()
 
-def plot_prior_mix_distributions(prior_mix, labels, seq, top = 10):
+def plot_mix_distributions(mix, labels, seq, top = 10):
     """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
 
     Args:
-        prior_mix (collections): A collection containing information about the  prior mixture distribution: weights, alpha and beta parameters
+        mix (collections): A collection containing information about the mixture distribution: weights, alpha and beta parameters
         labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
         seq (float): The step used in np.arange to create the x vector of probabilities.
         top (int): The top n (maximum) of contributors that should be plotted 
     """
     x = np.arange(0, 1 + seq, seq).tolist()
-    weights = prior_mix.weights
+    weights = mix.weights
     # To plot only the top n contributors, we first order the index of weights in decreasing order
     ordered_i_w = np.flip(np.argsort(weights))
     # We go trough the list of weight until we reach the n'th contributor, or the last contributor if there are les than n
     for i in range(0, min(len(weights), top)):
         it = ordered_i_w[i]
-        f = ss.beta.pdf(x, a = prior_mix.alpha[it], b = prior_mix.beta[it])
+        f = ss.beta.pdf(x, a = mix.alpha[it], b = mix.beta[it])
         y = weights[it] * f
-        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(prior_mix.alpha[it], 2)) + ", " + str(round(prior_mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
+        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(mix.alpha[it], 2)) + ", " + str(round(mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
     plt.title("Top " + str(min(len(weights), top)) + " - Prior decomposition")
     plt.figtext(0.995, 0.01, 'w is the weight of the component represented by the species in the beta mixture distribution', ha='right', va='bottom')
     plt.legend()
@@ -763,7 +763,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
         beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
-        plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_prior_mix_distributions and plot_distributions. Defaults to False.
+        plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_mix_distributions and plot_distributions. Defaults to False.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
 
     Returns:
@@ -834,7 +834,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     Log2numFC = np.log2(posterior_mix.mu/p)
 
     if plot: 
-        plot_prior_mix_distributions(prior_mix, labels, seq)
+        plot_mix_distributions(prior_mix, labels, seq)
+        plot_mix_distributions(posterior_mix, labels, seq)
         plot_distributions(prior_mix, posterior_mix)
     
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)

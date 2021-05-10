@@ -59,13 +59,13 @@ def import_table(path):
     """
     # Test if file exists
     if not os.path.isfile(path):
-        print("Error: Can't find a file at " + path)
+        print("\nError: Can't find a file at " + path)
         return None
     # Read table
     try:
         data = pd.read_csv(path)
     except Exception as e:
-        print("Error while reading graph file at " + path)
+        print("\nError while reading graph file at " + path)
         print(e)
         return None
     
@@ -84,6 +84,10 @@ def import_and_map_indexes(path, g, name_att = "label"):
     # Create a table to map species labels (SPECIE column) to indexes in the graph.
     label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
     data = import_table(path)
+
+    # If data or graph have not been well imported, return None
+    if (data is None) or (g is None):
+        return None
 
     # Merge
     coocurences = pd.merge(label_to_index, data, on = "SPECIE", how = "left")

@@ -34,16 +34,24 @@ out_path = args.out
 
 # Import data
 g = import_metabolic_network(args.g_path)
+if g is None:
+    print("\n /!\ Exit due to errors during data import")
+    sys.exit(1)
 
 print("> Import species corpora sizes ... ", end = '')
 table_species_corpora = import_and_map_indexes(args.specie_corpora_path, g)
-
+if table_species_corpora is None:
+    print("\n /!\ Exit due to errors during data import")
+    sys.exit(1)
 # Compute total number of cpd-articles mentions
 TOTAL_CPD_MENTIONS = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
 print("Ok")
 
 print("> Import species-MeSH co-occurences ... ", end = '')
 table_coocurences = import_and_map_indexes(args.specie_mesh_path, g)
+if table_coocurences is None:
+    print("\n /!\ Exit due to errors during data import")
+    sys.exit(1)
 print("Ok")
 
 # Compute the total number of mentions between a compound and an article, that also involved MeSHs

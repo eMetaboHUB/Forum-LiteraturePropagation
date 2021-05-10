@@ -200,13 +200,12 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
 
     return new_pi
 
-def propagation_volume(g, alpha = 0.8, name_att = "label"):
+def propagation_volume(g, alpha):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
     Args:
         g (igraph.Graph): The compound graph
-        alpha (float, optional): The damping factor. Defaults to 0.8.
-        name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
+        alpha (float, optional): The damping factor.
 
     Returns:
         numpy array: The probability matrix
@@ -221,18 +220,16 @@ def propagation_volume(g, alpha = 0.8, name_att = "label"):
         full = np.zeros(A.shape)
         for i in range(0, A.shape[0]):
             full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
-
-    df = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
     
-    return df
+    return full
 
 
 def compute_weights(probabilities, table_species_corpora, q):
     # Compute weights
-    sigmas = probabilities.to_numpy()
+    sigmas = copy.copy(probabilities)
     # To determine contributors of each compounds, we build a constrain matrix using the q parameter (tolerance threshold) to filter out contributors that a too far from the targeted node and also to avoid a compound to contribute itself to its prior.
     # First we get probability from the PPR
-    constrains = copy.copy(sigmas)
+    constrains = copy.copy(probabilities)
     # To filter using the tolerance threshold, we first re-estimate probability without considering self-contribution !
     np.fill_diagonal(constrains, 0)
     constrains = constrains @ np.diag(1/(constrains.sum(axis=0)))
@@ -258,6 +255,20 @@ def compute_weights(probabilities, table_species_corpora, q):
 
 
 def create_probabilities_and_weights(g, alpha, table_species_corpora, q, name_att = "label"):
+    """
+    This function is used to achieve the creation of the probability and weight tables, by computing the PPR on the compound graph, applying the threshold for the neighborhood of influence and then calculating the associated weights.
+    Also, this function create a cache directory to store probabiltity and weight tables for each already computed alpha, avoiding to re-compute them.
+
+    Args:
+        g (igraph.Graph): The compound graph
+        alpha (float): The damping factor.
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        q (float): The tolerance threshold for neighborhood influence
+        name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
+
+    Returns:
+        [np.array, np.array]: array for probabilities and weights
+    """
     cache_proba_dir_path = "./cache/PROBA"
     cache_weights_dir_path = "./cache/WEIGHTS"
     # If cache dir does not exists, create and fill it:
@@ -276,12 +287,13 @@ def create_probabilities_and_weights(g, alpha, table_species_corpora, q, name_at
         print("\n- Compute probabilities using alpha = " + str(alpha))
         probabilities = propagation_volume(g, alpha = alpha)
         # Round probabilities with 9 decimals:
-        probabilities = probabilities.round(9)
+        probabilities = np.around(probabilities, 9)
         # Write probabilities in cache:
-        probabilities.to_csv(proba_path, index = True, header = True)
+        df_probabilities = pd.DataFrame(probabilities, columns=g.vs[name_att], index=g.vs[name_att])
+        df_probabilities.to_csv(proba_path, index = True, header = True)
     else:
         print("\n- Get probabilities with alpha = " + str(alpha) + " in cache dir")
-        probabilities = pd.read_csv(proba_path, index_col = 0, header = 0)
+        probabilities = pd.read_csv(proba_path, index_col = 0, header = 0).to_numpy()
     
     # Test if probabilities for required alpha as already been computed :
     weight_path = os.path.join(cache_weights_dir_path, "WEIGHTS_" + str(alpha) + ".csv")
@@ -572,8 +584,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 
 def create_vizu_data(index, probabilities, q, weights, data, cptm = "c"):
     # Step 1: Get all potential contributors : repeat procedure for computing weights
-    _sigmas = probabilities.to_numpy()
-    _constrains = copy.copy(_sigmas)
+    _constrains = copy.copy(probabilities)
     np.fill_diagonal(_constrains, 0)
     _constrains = _constrains @ np.diag(1/(_constrains.sum(axis=0)))
     potential_contributors = _constrains[index, :] > q

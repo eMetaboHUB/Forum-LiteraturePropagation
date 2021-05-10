@@ -933,6 +933,14 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     Returns:
         [type]: [description]
     """
+    # Test if all provided species and MeSH are present in the network :*
+    if (sum(~f["SPECIE"].isin(table_species_corpora["SPECIE"]))) or (sum(~f["MESH"].isin(table_mesh["MESH"]))):
+        print("It seems that some species or MeSH descriptors provided in the file are not present in the graph. They will be removed !")
+        unavailable = f.loc[~f["SPECIE"].isin(table_species_corpora["SPECIE"]) | ~f["MESH"].isin(table_mesh["MESH"])]
+        print("Rows with unavailable info: \n" + unavailable.to_string())
+        # Keep only rows with available info:
+        f = f.loc[f["SPECIE"].isin(table_species_corpora["SPECIE"]) & f["MESH"].isin(table_mesh["MESH"])]
+    
     associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
     n = len(associations)
     

@@ -55,12 +55,12 @@ table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/TOTAL_CPD
 # Test if provided MeSH exists
 if args.mesh and (not args.mesh in table_mesh_corpora["MESH"].tolist()):
     print("Unknown MeSH identifier: " + args.mesh)
-    sys.exit(3)
+    sys.exit(1)
 
 # Test if provided specie exists
 if args.specie and (not args.specie in table_species_corpora["SPECIE"].tolist()):
     print("Unknown specie identifier: " + args.specie)
-    sys.exit(3)
+    sys.exit(1)
 
 # Test if provided file exists
 if args.file:
@@ -68,6 +68,12 @@ if args.file:
         f = pd.read_csv(args.file)
     except Exception as e:
         print("Error while trying to read association file. \n" + str(e))
+        sys.exit(1)
+    # Test columns:
+    if (set(f.columns.to_list()) != set(["SPECIE", "MESH"])) or f.empty:
+        print("Bad formating for association file. The file need to contain only 2 column: SPECIE and MESH")
+        sys.exit(1)
+
 
 
 alpha_set = args.alpha

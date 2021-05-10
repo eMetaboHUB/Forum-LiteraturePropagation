@@ -12,7 +12,7 @@ parser.add_argument("--specie.cooc", help="path to the species MeSH co-occurence
 parser.add_argument("--mesh", help="The studied MeSH. This argument is incompatible with the 'file' argument. The program will return all association between this MeSH and all species in the metabolic network. If the 'specie' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'mesh')
 parser.add_argument("--specie", help="The studied specie. This argument is incompatible with the 'file' argument. The program will return all association between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'specie')
 parser.add_argument("--file", help="Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH). This argument is incompatible with the 'mesh' and 'specie' arguments.", type = str, required = False, dest = 'file')
-parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null. Default = False", type = bool, default = False, required = False, dest = 'forget')
+parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null.", action='store_true')
 parser.add_argument("--alpha", help="The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
 parser.add_argument("--sample_size", help="The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100", nargs = "*", type = int, default = [100], required = False, dest = 'ss')
 parser.add_argument("--q", help="The tolerance threshold for PPR probabilities. If q is negative the default value is used. The Default = 1/(N  -1)", type = float, default = -1, required = False, dest = 'q')
@@ -104,7 +104,6 @@ for alpha in alpha_set:
     df_contributors_distances = compute_contributors_distances(weights, g, l)
     df_contributors_corpora_sizes = compute_contributors_corpora_sizes(weights, table_species_corpora, l)
     df_nb_ctbs = compute_contributors_number(weights, l)
-
     # out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
     # o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
     # o.to_csv(out)
@@ -169,13 +168,19 @@ for alpha in alpha_set:
                 data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
             p = float(MeSH_info["P"])
-            print("P = " + str(p))
+            # print("P = " + str(p))
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
-            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"]), "CtbAvgDistance": float(df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"]), "CtbAvgCorporaSize": float(df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"]), "NbCtb": float(df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"])})
+            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"], "CtbAvgDistance": df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"], "CtbAvgCorporaSize": df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"], "NbCtb": df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"]})
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             print("Export results in " + out)
             df_.to_csv(out, index = False)
-        
+            # Export full data
+            out_data = os.path.join(out_path, "data_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            data.to_csv(out_data, index = False)
+            # Vizu:
+            vizu = create_vizu_data(index, probabilities, q, weights, data)
+            out_vizu = os.path.join(out_path, "vizu_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            vizu.to_csv(out_vizu, index = False, sep = "\t")
         else:
             print("Nothing to do ...")
 

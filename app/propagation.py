@@ -162,7 +162,7 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
     Returns:
         [numpy.ndarray]: Vector of probabilities to be out of the targeted node
     """
-    #TODO NEXT FOR PROBA MATRIX, USE: g.get_adjacency(attribute='weight') pour extraire la amtrice d'adj avec les poids (proba)
+    #TODO NEXT FOR PROBA MATRIX, USE: g.get_adjacency(attribute='weight') pour extraire la matrice d'adj avec les poids (proba)
     # Get length
     l = A.shape[0]
     # Create restart vector on the targeted node
@@ -521,6 +521,28 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 ### Computations ###
 ####################
 
+
+def create_vizu_data(index, probabilities, q, weights, data, cptm = "c"):
+    # Step 1: Get all potential contributors : repeat procedure for computing weights
+    _sigmas = probabilities.to_numpy()
+    _constrains = copy.copy(_sigmas)
+    np.fill_diagonal(_constrains, 0)
+    _constrains = _constrains @ np.diag(1/(_constrains.sum(axis=0)))
+    potential_contributors = _constrains[index, :] > q
+    # We also select the targeted compound:
+    potential_contributors[index] = True
+    # Get data
+    w_data = data.loc[potential_contributors, ]
+    # Force integer type before pasting data
+    w_data = w_data.astype({"TOTAL_PMID_SPECIE": int, "COOC": int})
+    # Add compartiment to specie for mapping: 
+    w_data["SPECIE"] = w_data["SPECIE"] + "_" + cptm
+    w_data["STATS"] = w_data["SPECIE"] + " (" + w_data["COOC"].astype(str) + "/" + w_data["TOTAL_PMID_SPECIE"].astype(str) + ")"
+    w_data = w_data.drop(["index", "CID", "TOTAL_PMID_SPECIE", "COOC"], axis = 1)
+    w_data = w_data.rename(columns={"SPECIE": "metaboliteDBIdentifier"})
+    w_data.loc[index]
+    return w_data
+
 def compute_contributors_number(weights, labels):
     """This function is used to return the number of contributors
 
@@ -531,7 +553,7 @@ def compute_contributors_number(weights, labels):
     Returns:
         (pd.Dataframe): a DataFrame containing for each specie the number of contributors
     """
-    N = np.sum((weights > 0), axis = 0)
+    N = np.sum((weights > 0), axis = 0, dtype = np.int)
     res = pd.DataFrame({"SPECIE": labels, "NbCtb": N})
     
     return res
@@ -551,6 +573,7 @@ def compute_contributors_corpora_sizes(weights, table_species_corpora, labels):
     C = weights.T @ corpora
     # If all the weight are null, set NaN. Note that weights are necessarily null if corpora sizes for contributors are null
     C[np.sum(weights, axis = 0) == 0] = np.NaN
+    C = np.round(C, decimals = 3)
     res = pd.DataFrame({"SPECIE": labels, "CtbAvgCorporaSize": C[:, 0]})
     
     return res
@@ -573,6 +596,7 @@ def compute_contributors_distances(weights, g, labels):
     M = m.sum(axis = 0)
     # The only way for the weighted average to be null is when all weights are null. In this case we set NaN
     M[M == 0] = np.NaN
+    M = np.round(M, decimals = 3)
     res = pd.DataFrame({"SPECIE": labels, "CtbAvgDistance": M})
 
     return res
@@ -603,6 +627,7 @@ def compute_Entropy_matrix(weight_matrix, labels):
     """
     # When using list comprehension, python iter by row so we transpose the weight matrix to iter by columns
     Entropy = [E(w) for w in weight_matrix.T]
+    Entropy = np.round(Entropy, decimals = 3)
     res = pd.DataFrame({"SPECIE": labels, "Entropy":Entropy})
     return res
 
@@ -734,13 +759,13 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
-    # print(labels)
-    # print(prior_mix.weights)
-    # print(prior_mix.alpha)
-    # print(prior_mix.beta)
-    # print("========================")
-    # print(posterior_mix.weights)
-    # print(posterior_mix.alpha)
+    # print(labels)
+    # print(prior_mix.weights)
+    # print(prior_mix.alpha)
+    # print(prior_mix.beta)
+    # print("========================")
+    # print(posterior_mix.weights)
+    # print(posterior_mix.alpha)
     # print(posterior_mix.beta)
 
     Log2numFC = np.log2(posterior_mix.mu/p)

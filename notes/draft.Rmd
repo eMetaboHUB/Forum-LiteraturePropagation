@@ -1413,7 +1413,7 @@ Les résultats de validation montre les ROC curves par rapport aux différentes 
 
 Les effet des facteurs alpha et sample_size sont également nets.
 
-On a réalisé les barplots de TPR et FPR en utilisant différents seuil sur le Log2FC: 1,2,3
+On a réalisé les barplots de TPR et FPR en utilisant différents seuil sur le Log2FC: 1, 2, 3
 
 Globalement, le taux de True-positive et de FPR diminue avec alpha et également avec sample_size.
 

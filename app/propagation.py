@@ -831,6 +831,11 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # print(posterior_mix.alpha)
     # print(posterior_mix.beta)
 
+    # As null weight have been removed duruing computation, we use SPECIE instead of index as key
+    data["posterioir_weights"] = float(0)
+    for j in range(0, len(labels)):
+        data.loc[data["SPECIE"] == labels[j], "posterioir_weights"] = posterior_mix.weights[j]
+    
     Log2numFC = np.log2(posterior_mix.mu/p)
 
     if plot: 

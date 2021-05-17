@@ -559,10 +559,10 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
         # Compute log of W_i. Indeed sc.beta goes to 0 when alpha and beta are large which lead to a 0 division. use Log(Beta(a,b)) allow to compute W in thoose cases
         C = [sc.betaln(alpha_post[it], beta_post[it]) - sc.betaln(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
         Z = [np.log(weights_pior[it]) + C[it] for it in range(0, l)]
-        W = [np.exp((Z[it] - (sc.logsumexp(Z)))) for it in range(0, l)]
+        W = [round((np.exp((Z[it] - (sc.logsumexp(Z))))), 9) for it in range(0, l)]
     else:    
         C = [sc.beta(alpha_post[it], beta_post[it])/sc.beta(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
-        W = [(weights_pior[it] * C[it]/(np.dot(weights_pior, C))) for it in range(0, l)]
+        W = [round((weights_pior[it] * C[it]/(np.dot(weights_pior, C))), 9) for it in range(0, l)]
 
     if sampling:
         x = np.arange(0, 1 + seq, seq).tolist()

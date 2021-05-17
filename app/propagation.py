@@ -709,7 +709,7 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.yticks(fontsize=20)
     plt.show()
 
-def plot_mix_distributions(mix, labels, seq, top = 10):
+def plot_mix_distributions(mix, labels, seq, name, top = 10):
     """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
 
     Args:
@@ -728,7 +728,7 @@ def plot_mix_distributions(mix, labels, seq, top = 10):
         f = ss.beta.pdf(x, a = mix.alpha[it], b = mix.beta[it])
         y = weights[it] * f
         plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(mix.alpha[it], 2)) + ", " + str(round(mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
-    plt.title("Top " + str(min(len(weights), top)) + " - Prior decomposition")
+    plt.title("Top " + str(min(len(weights), top)) + " - " + name + " decomposition")
     plt.figtext(0.995, 0.01, 'w is the weight of the component represented by the species in the beta mixture distribution', ha='right', va='bottom')
     plt.legend()
     plt.xticks(fontsize=20)
@@ -839,8 +839,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     Log2numFC = np.log2(posterior_mix.mu/p)
 
     if plot: 
-        plot_mix_distributions(prior_mix, labels, seq)
-        plot_mix_distributions(posterior_mix, labels, seq)
+        plot_mix_distributions(prior_mix, labels, seq, "Prior components")
+        plot_mix_distributions(posterior_mix, labels, seq, "Posterior components")
         plot_distributions(prior_mix, posterior_mix)
     
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)

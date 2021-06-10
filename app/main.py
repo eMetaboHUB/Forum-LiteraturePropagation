@@ -42,6 +42,8 @@ if g is None:
 
 print("> Import species corpora sizes ... ", end = '')
 table_species_corpora = import_and_map_indexes(args.specie_corpora_path, g)
+# Fill na if some species are not indicated in the file
+table_species_corpora = table_species_corpora.fillna(0)
 if table_species_corpora is None:
     print("\n /!\ Exit due to errors during data import")
     sys.exit(1)
@@ -188,9 +190,9 @@ for alpha in alpha_set:
             out_data = os.path.join(out_path, "data_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             data.to_csv(out_data, index = False)
             # Vizu:
-            vizu = create_vizu_data(index, probabilities, q, weights, data)
-            out_vizu = os.path.join(out_path, "vizu_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
-            vizu.to_csv(out_vizu, index = False, sep = "\t")
+            # vizu = create_vizu_data(index, probabilities, q, weights, data)
+            # out_vizu = os.path.join(out_path, "vizu_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            # vizu.to_csv(out_vizu, index = False, sep = "\t")
         else:
             print("Nothing to do ...")
 

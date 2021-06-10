@@ -161,9 +161,13 @@ def propagation_volume(g, alpha):
     if g.is_directed():
         # Use weight of edges as probabilities
         P = np.array(g.get_adjacency(attribute='Weight').data)
+        # Test that all proba sum to 1. Use np.round(x, 9) to avoid float approximation errors
+        if not sum(np.round(P.sum(axis = 1), 9) == 1) == g.vcount():
+            print("Error: All the probability in the transition matrix extracted from edges' weights don't sum to 1 !\nExit")
+            sys.exit(1)
     else:
         A = np.array(g.get_adjacency().data)
-        P = np.diag(1/A.sum(axis=1)) @ A 
+        P = np.diag(1/A.sum(axis = 1)) @ A 
     
     # If alpha is set to 0, simply return the probability matrix from direct neighborhood, otherwise compute PPR
     if not alpha:

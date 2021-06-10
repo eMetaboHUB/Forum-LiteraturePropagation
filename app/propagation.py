@@ -258,13 +258,14 @@ def compute_weights(probabilities, table_species_corpora, q):
     return weights
 
 
-def create_probabilities_and_weights(g, alpha, table_species_corpora, q, name_att = "label"):
+def create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q, name_att = "label"):
     """
     This function is used to achieve the creation of the probability and weight tables, by computing the PPR on the compound graph, applying the threshold for the neighborhood of influence and then calculating the associated weights.
     Also, this function create a cache directory to store probabiltity and weight tables for each already computed alpha, avoiding to re-compute them.
 
     Args:
         g (igraph.Graph): The compound graph
+        g_name (str): Name of the graph used to create the cache directory with probabilities and weights. By default the file name with be used.
         alpha (float): The damping factor.
         table_species_corpora (pandas.DataFrame): table of specie corpora
         q (float): The tolerance threshold for neighborhood influence
@@ -273,8 +274,8 @@ def create_probabilities_and_weights(g, alpha, table_species_corpora, q, name_at
     Returns:
         [np.array, np.array]: array for probabilities and weights
     """
-    cache_proba_dir_path = "./cache/PROBA"
-    cache_weights_dir_path = "./cache/WEIGHTS"
+    cache_proba_dir_path = os.path.join("./cache", g_name,"PROBA")
+    cache_weights_dir_path = os.path.join("./cache", g_name,"WEIGHTS")
     # If cache dir does not exists, create and fill it:
     for path in [cache_proba_dir_path, cache_weights_dir_path]:
         if not os.path.exists(path):

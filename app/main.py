@@ -4,9 +4,10 @@ import os
 from propagation import *
 
 # Get arguments
-# python app/main.py --graph="tests/data/test_urea.gml" --specie.corpora="data/species_cid_pmid.csv" --specie.cooc="data/species_cid_mesh_pmid.csv" --mesh.corpora="data/mesh_pmid.csv"
+# python app/main.py --graph="data/Recon2_compound-graph.gml" --undirected --specie.corpora="data/species_cid_pmid.csv" --specie.cooc="data/species_cid_mesh_pmid.csv" --specie="M_CE6251" --mesh="D011565" --out="data/tests"  --alpha 0.4 --sample_size 100
 parser = argparse.ArgumentParser()
 parser.add_argument("--graph", help="path to the metabolic network compound graph", type = str, required = True, dest = 'g_path')
+parser.add_argument("--undirected", help="Is the graph undirected ?(Cf. doc)", action='store_true')
 parser.add_argument("--specie.corpora", help="path to the species corpus size file ", type = str, required = True, dest = 'specie_corpora_path')
 parser.add_argument("--specie.cooc", help="path to the species MeSH co-occurences file ", type = str, required = True, dest = 'specie_mesh_path')
 parser.add_argument("--mesh", help="The studied MeSH. This argument is incompatible with the 'file' argument. The program will return all association between this MeSH and all species in the metabolic network. If the 'specie' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'mesh')
@@ -33,7 +34,8 @@ if args.file and (args.specie or args.mesh):
 out_path = args.out
 
 # Import data
-g = import_metabolic_network(args.g_path)
+g_name = os.path.splitext(os.path.basename(args.g_path))[0]
+g = import_metabolic_network(args.g_path, undirected = args.undirected)
 if g is None:
     print("\n /!\ Exit due to errors during data import")
     sys.exit(1)
@@ -110,7 +112,7 @@ l = table_species_corpora["SPECIE"]
 for alpha in alpha_set:
 
     # Compute network analysis
-    probabilities, weights = create_probabilities_and_weights(g, alpha, table_species_corpora, q)
+    probabilities, weights = create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q)
     df_Entropy = compute_Entropy_matrix(weights, l)
     df_contributors_distances = compute_contributors_distances(weights, g, l)
     df_contributors_corpora_sizes = compute_contributors_corpora_sizes(weights, table_species_corpora, l)

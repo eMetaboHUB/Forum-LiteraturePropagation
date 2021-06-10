@@ -34,16 +34,24 @@ out_path = args.out
 
 # Import data
 g = import_metabolic_network(args.g_path)
+if g is None:
+    print("\n /!\ Exit due to errors during data import")
+    sys.exit(1)
 
 print("> Import species corpora sizes ... ", end = '')
 table_species_corpora = import_and_map_indexes(args.specie_corpora_path, g)
-
+if table_species_corpora is None:
+    print("\n /!\ Exit due to errors during data import")
+    sys.exit(1)
 # Compute total number of cpd-articles mentions
 TOTAL_CPD_MENTIONS = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
 print("Ok")
 
 print("> Import species-MeSH co-occurences ... ", end = '')
 table_coocurences = import_and_map_indexes(args.specie_mesh_path, g)
+if table_coocurences is None:
+    print("\n /!\ Exit due to errors during data import")
+    sys.exit(1)
 print("Ok")
 
 # Compute the total number of mentions between a compound and an article, that also involved MeSHs
@@ -55,12 +63,12 @@ table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/TOTAL_CPD
 # Test if provided MeSH exists
 if args.mesh and (not args.mesh in table_mesh_corpora["MESH"].tolist()):
     print("Unknown MeSH identifier: " + args.mesh)
-    sys.exit(3)
+    sys.exit(1)
 
 # Test if provided specie exists
 if args.specie and (not args.specie in table_species_corpora["SPECIE"].tolist()):
     print("Unknown specie identifier: " + args.specie)
-    sys.exit(3)
+    sys.exit(1)
 
 # Test if provided file exists
 if args.file:
@@ -68,6 +76,12 @@ if args.file:
         f = pd.read_csv(args.file)
     except Exception as e:
         print("Error while trying to read association file. \n" + str(e))
+        sys.exit(1)
+    # Test columns:
+    if (set(f.columns.to_list()) != set(["SPECIE", "MESH"])) or f.empty:
+        print("Bad formating for association file. The file need to contain only 2 column: SPECIE and MESH")
+        sys.exit(1)
+
 
 
 alpha_set = args.alpha
@@ -96,17 +110,11 @@ l = table_species_corpora["SPECIE"]
 for alpha in alpha_set:
 
     # Compute network analysis
-    print("\n- Compute weights using alpha = " + str(alpha))
-    probabilities = propagation_volume(g, alpha = alpha)
-    # probabilities.to_csv(os.path.join(out_path, "PROBA_" + str(alpha) + ".csv"))
-    weights = compute_weights(probabilities, table_species_corpora, q)
+    probabilities, weights = create_probabilities_and_weights(g, alpha, table_species_corpora, q)
     df_Entropy = compute_Entropy_matrix(weights, l)
     df_contributors_distances = compute_contributors_distances(weights, g, l)
     df_contributors_corpora_sizes = compute_contributors_corpora_sizes(weights, table_species_corpora, l)
     df_nb_ctbs = compute_contributors_number(weights, l)
-    # out = os.path.join(out_path, "W_" + str(alpha) + ".csv") # + "_" + str(q)
-    # o = pd.DataFrame(weights, columns=g.vs["label"], index=g.vs["label"])
-    # o.to_csv(out)
     
     for sample_size in sample_size_set:
         print("\n- Compute MeSH priors using sample size = " + str(sample_size))
@@ -168,7 +176,7 @@ for alpha in alpha_set:
                 data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
             p = float(MeSH_info["P"])
-            # print("P = " + str(p))
+            print("P = " + str(p))
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
             df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"], "CtbAvgDistance": df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"], "CtbAvgCorporaSize": df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"], "NbCtb": df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"]})
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")

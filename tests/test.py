@@ -8,7 +8,7 @@ class TestPropagationMethods(unittest.TestCase):
     def setUpClass(cls):
         cls.g = import_metabolic_network("tests/data/test_urea.gml")
         cls.table_specie = table_species_corpora = import_and_map_indexes("tests/data/species_cid_pmid_full.csv", cls.g)
-        cls.probabilities = propagation_volume(cls.g)
+        cls.probabilities = propagation_volume(cls.g, 0.8)
         cls.q = 1/(len(cls.g.vs) - 1)
         cls.weights = compute_weights(cls.probabilities, cls.table_specie, cls.q)
         cls.prior_mix_uninf = create_prior_beta_mix(weights = [0.5, 0.5], cooc = [1, 3], corpora = [4, 4], seq = 0.001, alpha_prior = 1, beta_prior = 1)
@@ -23,7 +23,8 @@ class TestPropagationMethods(unittest.TestCase):
 
     def test_propagation_volume(self):
         SFT_ref = pd.read_csv("tests/data/SFT_ref.csv", index_col = 0)
-        pd.testing.assert_frame_equal(self.probabilities, SFT_ref)
+        test = pd.DataFrame(self.probabilities, columns=self.g.vs["label"], index=self.g.vs["label"])
+        pd.testing.assert_frame_equal(test, SFT_ref)
     
     def test_comput_weights(self):
         W_ref = pd.read_csv("tests/data/W_ref_0.8.csv", index_col = 0)

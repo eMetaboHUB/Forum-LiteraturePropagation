@@ -59,13 +59,13 @@ def import_table(path):
     """
     # Test if file exists
     if not os.path.isfile(path):
-        print("Error: Can't find a file at " + path)
+        print("\nError: Can't find a file at " + path)
         return None
     # Read table
     try:
         data = pd.read_csv(path)
     except Exception as e:
-        print("Error while reading graph file at " + path)
+        print("\nError while reading graph file at " + path)
         print(e)
         return None
     
@@ -84,6 +84,10 @@ def import_and_map_indexes(path, g, name_att = "label"):
     # Create a table to map species labels (SPECIE column) to indexes in the graph.
     label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
     data = import_table(path)
+
+    # If data or graph have not been well imported, return None
+    if (data is None) or (g is None):
+        return None
 
     # Merge
     coocurences = pd.merge(label_to_index, data, on = "SPECIE", how = "left")
@@ -200,13 +204,12 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
 
     return new_pi
 
-def propagation_volume(g, alpha = 0.8, name_att = "label"):
+def propagation_volume(g, alpha):
     """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
 
     Args:
         g (igraph.Graph): The compound graph
-        alpha (float, optional): The damping factor. Defaults to 0.8.
-        name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
+        alpha (float, optional): The damping factor.
 
     Returns:
         numpy array: The probability matrix
@@ -221,18 +224,16 @@ def propagation_volume(g, alpha = 0.8, name_att = "label"):
         full = np.zeros(A.shape)
         for i in range(0, A.shape[0]):
             full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
-
-    df = pd.DataFrame(full, columns=g.vs[name_att], index=g.vs[name_att])
     
-    return df
+    return full
 
 
 def compute_weights(probabilities, table_species_corpora, q):
     # Compute weights
-    sigmas = probabilities.to_numpy()
+    sigmas = copy.copy(probabilities)
     # To determine contributors of each compounds, we build a constrain matrix using the q parameter (tolerance threshold) to filter out contributors that a too far from the targeted node and also to avoid a compound to contribute itself to its prior.
     # First we get probability from the PPR
-    constrains = copy.copy(sigmas)
+    constrains = copy.copy(probabilities)
     # To filter using the tolerance threshold, we first re-estimate probability without considering self-contribution !
     np.fill_diagonal(constrains, 0)
     constrains = constrains @ np.diag(1/(constrains.sum(axis=0)))
@@ -255,6 +256,69 @@ def compute_weights(probabilities, table_species_corpora, q):
     
     # Weights are also store in columns !
     return weights
+
+
+def create_probabilities_and_weights(g, alpha, table_species_corpora, q, name_att = "label"):
+    """
+    This function is used to achieve the creation of the probability and weight tables, by computing the PPR on the compound graph, applying the threshold for the neighborhood of influence and then calculating the associated weights.
+    Also, this function create a cache directory to store probabiltity and weight tables for each already computed alpha, avoiding to re-compute them.
+
+    Args:
+        g (igraph.Graph): The compound graph
+        alpha (float): The damping factor.
+        table_species_corpora (pandas.DataFrame): table of specie corpora
+        q (float): The tolerance threshold for neighborhood influence
+        name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
+
+    Returns:
+        [np.array, np.array]: array for probabilities and weights
+    """
+    cache_proba_dir_path = "./cache/PROBA"
+    cache_weights_dir_path = "./cache/WEIGHTS"
+    # If cache dir does not exists, create and fill it:
+    for path in [cache_proba_dir_path, cache_weights_dir_path]:
+        if not os.path.exists(path):
+            try:
+                os.makedirs(path, 0o755, exist_ok=False)
+            except OSError:
+                print ("Creation of the directory %s failed" % path)
+            else:
+                print ("Successfully created the directory %s" % path)
+    # Test if probabilities for required alpha as already been computed :
+    proba_path = os.path.join(cache_proba_dir_path, "PROBA_" + str(alpha) + ".csv")
+    if not os.path.exists(proba_path):
+        # Compute probabilities
+        print("\n- Compute probabilities using alpha = " + str(alpha))
+        probabilities = propagation_volume(g, alpha = alpha)
+        # Round probabilities with 9 decimals:
+        probabilities = np.around(probabilities, 9)
+        # Write probabilities in cache:
+        df_probabilities = pd.DataFrame(probabilities, columns=g.vs[name_att], index=g.vs[name_att])
+        df_probabilities.to_csv(proba_path, index = True, header = True)
+    else:
+        print("\n- Get probabilities with alpha = " + str(alpha) + " in cache dir")
+        probabilities = pd.read_csv(proba_path, index_col = 0, header = 0).to_numpy()
+    
+    # Test if probabilities for required alpha as already been computed :
+    weight_path = os.path.join(cache_weights_dir_path, "WEIGHTS_" + str(alpha) + ".csv")
+    if not os.path.exists(weight_path):
+        print("\n- Compute weights using alpha = " + str(alpha))
+        weights = compute_weights(probabilities, table_species_corpora, q)
+        # Round probabilities with 9 decimals:
+        weights = np.around(weights, 9)
+        # Write probabilities in cache:
+        df_weights = pd.DataFrame(weights, columns=g.vs[name_att], index=g.vs[name_att])
+        df_weights.to_csv(weight_path, index = True, header = True)
+    else:
+        print("\n- Get weights with alpha = " + str(alpha) + " in cache dir")
+        weights = pd.read_csv(weight_path, index_col = 0, header = 0).to_numpy()
+
+
+    return probabilities, weights
+
+
+
+
 
 ####################
 ## Beta functions ##
@@ -495,10 +559,10 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
         # Compute log of W_i. Indeed sc.beta goes to 0 when alpha and beta are large which lead to a 0 division. use Log(Beta(a,b)) allow to compute W in thoose cases
         C = [sc.betaln(alpha_post[it], beta_post[it]) - sc.betaln(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
         Z = [np.log(weights_pior[it]) + C[it] for it in range(0, l)]
-        W = [np.exp((Z[it] - (sc.logsumexp(Z)))) for it in range(0, l)]
+        W = [round((np.exp((Z[it] - (sc.logsumexp(Z))))), 9) for it in range(0, l)]
     else:    
         C = [sc.beta(alpha_post[it], beta_post[it])/sc.beta(alpha_prior[it], beta_prior[it]) for it in range(0, l)]
-        W = [(weights_pior[it] * C[it]/(np.dot(weights_pior, C))) for it in range(0, l)]
+        W = [round((weights_pior[it] * C[it]/(np.dot(weights_pior, C))), 9) for it in range(0, l)]
 
     if sampling:
         x = np.arange(0, 1 + seq, seq).tolist()
@@ -524,8 +588,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
 
 def create_vizu_data(index, probabilities, q, weights, data, cptm = "c"):
     # Step 1: Get all potential contributors : repeat procedure for computing weights
-    _sigmas = probabilities.to_numpy()
-    _constrains = copy.copy(_sigmas)
+    _constrains = copy.copy(probabilities)
     np.fill_diagonal(_constrains, 0)
     _constrains = _constrains @ np.diag(1/(_constrains.sum(axis=0)))
     potential_contributors = _constrains[index, :] > q
@@ -646,26 +709,26 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.yticks(fontsize=20)
     plt.show()
 
-def plot_prior_mix_distributions(prior_mix, labels, seq, top = 10):
+def plot_mix_distributions(mix, labels, seq, name, top = 10):
     """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
 
     Args:
-        prior_mix (collections): A collection containing information about the  prior mixture distribution: weights, alpha and beta parameters
+        mix (collections): A collection containing information about the mixture distribution: weights, alpha and beta parameters
         labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
         seq (float): The step used in np.arange to create the x vector of probabilities.
         top (int): The top n (maximum) of contributors that should be plotted 
     """
     x = np.arange(0, 1 + seq, seq).tolist()
-    weights = prior_mix.weights
+    weights = mix.weights
     # To plot only the top n contributors, we first order the index of weights in decreasing order
     ordered_i_w = np.flip(np.argsort(weights))
     # We go trough the list of weight until we reach the n'th contributor, or the last contributor if there are les than n
     for i in range(0, min(len(weights), top)):
         it = ordered_i_w[i]
-        f = ss.beta.pdf(x, a = prior_mix.alpha[it], b = prior_mix.beta[it])
+        f = ss.beta.pdf(x, a = mix.alpha[it], b = mix.beta[it])
         y = weights[it] * f
-        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(prior_mix.alpha[it], 2)) + ", " + str(round(prior_mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
-    plt.title("Top " + str(min(len(weights), top)) + " - Prior decomposition")
+        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(mix.alpha[it], 2)) + ", " + str(round(mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
+    plt.title("Top " + str(min(len(weights), top)) + " - " + name + " decomposition")
     plt.figtext(0.995, 0.01, 'w is the weight of the component represented by the species in the beta mixture distribution', ha='right', va='bottom')
     plt.legend()
     plt.xticks(fontsize=20)
@@ -700,7 +763,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
         beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
-        plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_prior_mix_distributions and plot_distributions. Defaults to False.
+        plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_mix_distributions and plot_distributions. Defaults to False.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
 
     Returns:
@@ -768,10 +831,16 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # print(posterior_mix.alpha)
     # print(posterior_mix.beta)
 
+    # As null weight have been removed duruing computation, we use SPECIE instead of index as key
+    data["posterioir_weights"] = float(0)
+    for j in range(0, len(labels)):
+        data.loc[data["SPECIE"] == labels[j], "posterioir_weights"] = posterior_mix.weights[j]
+    
     Log2numFC = np.log2(posterior_mix.mu/p)
 
     if plot: 
-        plot_prior_mix_distributions(prior_mix, labels, seq)
+        plot_mix_distributions(prior_mix, labels, seq, "Prior components")
+        plot_mix_distributions(posterior_mix, labels, seq, "Posterior components")
         plot_distributions(prior_mix, posterior_mix)
     
     resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)
@@ -874,6 +943,14 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     Returns:
         [type]: [description]
     """
+    # Test if all provided species and MeSH are present in the network :*
+    if (sum(~f["SPECIE"].isin(table_species_corpora["SPECIE"]))) or (sum(~f["MESH"].isin(table_mesh["MESH"]))):
+        print("It seems that some species or MeSH descriptors provided in the file are not present in the graph. They will be removed !")
+        unavailable = f.loc[~f["SPECIE"].isin(table_species_corpora["SPECIE"]) | ~f["MESH"].isin(table_mesh["MESH"])]
+        print("Rows with unavailable info: \n" + unavailable.to_string())
+        # Keep only rows with available info:
+        f = f.loc[f["SPECIE"].isin(table_species_corpora["SPECIE"]) & f["MESH"].isin(table_mesh["MESH"])]
+    
     associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
     n = len(associations)
     

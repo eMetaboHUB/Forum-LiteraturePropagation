@@ -43,9 +43,15 @@ def import_metabolic_network(path, undirected = True, format = "gml", largest_co
     if undirected:
         print("> Used as undirected")
         g.to_undirected()
+    else:
+        print("> Used as directed")
     if largest_comp:
         print("> Extract largest component")
         g = g.clusters().giant()
+    # Test if the graph is connected
+    if not g.is_connected():
+        print("The graph needs to be connected: there is a path from any point to any other point in the graph")
+        sys.exit(1)
     return g
 
 def import_table(path):
@@ -98,67 +104,14 @@ def import_and_map_indexes(path, g, name_att = "label"):
 ### Propagation ###
 ###################
 
-def compute_PR(A, i, alpha, epsilon = 1e-9):
-    """
-    This function is used to determine the vector probability using a PPR approach applied on the graph without the targeted node, only considering its neighbours.
-    Args:
-        A ([numpy.ndarray]): Graph adjacency matrix
-        i ([int]): Index of the target node
-        alpha (float): The damping factor. WARGNING alpha is [0, 1[. '1' is excluded because we need restart probabilies to ensure the graph connexion !
-        epsilon ([float], optional): Tolerance for convergence. Defaults to 1e-9.
-
-    Returns:
-        [numpy.ndarray]: Vector of stationary probabilities (as column vector)
-    """
-    # Get length
-    l = A.shape[0]
-    # Create restart vector by extracting probability, fromated as a column vector.
-    v = np.array([(A[i, :]/A[i, :].sum())]).T
-
-    # Delete row and column associated with the targeted index
-    v = np.delete(v, i, 0)
-    truncate_A = np.delete(np.delete(A, i, 0), i, 1)
-    
-    # Sink node vector, as column vector
-    a = np.array([((truncate_A.sum(axis = 1) == 0) * 1)]).T
-    
-    # For sink nodes, the diagonal element is 0 instead of 1 for non-sink nodes. Adding the vector a to diagonal elements, ensure that we will not divide by 0 for sink nodes
-    z = truncate_A.sum(axis = 1) + a.T
-    d = np.diag(1/z[0])
-    
-    # Get probability matrix
-    P = d @ truncate_A
-    e = np.ones((l - 1, 1))
-    M = alpha * P + (alpha * a + (1 - alpha) * e) @ v.T
-    
-    # Apply Power method
-    # Use transpose of M in power method
-    c = 1
-    M = M.T
-    pi = v
-    new_pi = M @ v
-    while(np.linalg.norm(pi - new_pi) > epsilon):
-        pi = new_pi
-        new_pi = M @ pi
-        c += 1
-    # print(str(c) + " iterations to convergence.")
-
-    # Insert 0 at targeted index
-    r = np.insert(new_pi, i, 0, axis = 0)
-    # Float are basically imprecise and so after several matrix multiplications, the sum of probabilities in the vector may not equal to 1, but 0.9999999999999999 or 1.0000000000000001 for example. 
-    if np.sum(r, axis = 0, dtype = np.float16) != 1:
-        print("Warning at index " + str(i) + ": the final probability vector does not sum to 1. This may be due to float approximation errors")
-
-    return r
-
-def compute_PR_2(A, i, alpha, epsilon = 1e-9):
+def compute_PR(P, i, alpha, epsilon = 1e-9):
     """
     This function is used to determine the vector probability using a PPR approach applied on the graph without the targeted node, only considering its neighbours.
     In this second approach we do not remove the targeted node to prevent the creation of pseudo sub-components while the damping factor get close to 1.
     We compute the PPR using all the network, also restarting from the neighborhood of the target compound.
     Then, we re-estimate the probability vector, setting the probability to be on the targeted node at 0, to represent the proportion of time passed out of the targeted node.
     Args:
-        A ([numpy.ndarray]): Graph adjacency matrix
+        P ([numpy.ndarray]): Transition probability matrix of the graph
         i ([int]): Index of the target node
         alpha (float): The damping factor. WARGNING alpha is [0, 1[. '1' is excluded because we need restart probabilies to ensure the graph connexion !
         epsilon ([float], optional): Tolerance for convergence. Defaults to 1e-9.
@@ -166,25 +119,15 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
     Returns:
         [numpy.ndarray]: Vector of probabilities to be out of the targeted node
     """
-    #TODO NEXT FOR PROBA MATRIX, USE: g.get_adjacency(attribute='weight') pour extraire la matrice d'adj avec les poids (proba)
     # Get length
-    l = A.shape[0]
+    l = P.shape[0]
     # Create restart vector on the targeted node
     v = np.zeros((l, 1))
     v[i,0] = 1
 
-    # Sink node vector, as column vector
-    a = np.array([((A.sum(axis = 1) == 0) * 1)]).T
-    
-    # For sink nodes, the diagonal element is 0 instead of 1 for non-sink nodes. Adding the vector a to diagonal elements, ensure that we will not divide by 0 for sink nodes
-    # For the time, we use undirected graphs so there is no reason to have sink nodes, but it could happens if we use directed graphs
-    z = A.sum(axis = 1) + a.T
-    d = np.diag(1/z[0])
-    
-    # Get probability matrix
-    P = d @ A
+    # No need to deal with sink nodes as we only consider connected graphs
     e = np.ones((l, 1))
-    M = alpha * P + (alpha * a + (1 - alpha) * e) @ v.T
+    M = alpha * P + ((1 - alpha) * e) @ v.T
     
     # Apply Power method
     # Use transpose of M in power method
@@ -205,7 +148,7 @@ def compute_PR_2(A, i, alpha, epsilon = 1e-9):
     return new_pi
 
 def propagation_volume(g, alpha):
-    """This function is used to compute the PPR, excluding the targeted node itself, for each node of the graph
+    """This function is used to compute the PPR for all nodes.
 
     Args:
         g (igraph.Graph): The compound graph
@@ -215,15 +158,20 @@ def propagation_volume(g, alpha):
         numpy array: The probability matrix
     """
     # Get adjacency matrix
-    A = np.array(g.get_adjacency().data)
+    if g.is_directed():
+        # Use weight of edges as probabilities
+        P = np.array(g.get_adjacency(attribute='Weight').data)
+    else:
+        A = np.array(g.get_adjacency().data)
+        P = np.diag(1/A.sum(axis=1)) @ A 
     
     # If alpha is set to 0, simply return the probability matrix from direct neighborhood, otherwise compute PPR
     if not alpha:
-        full = A @ np.diag(1/A.sum(axis=0))
+            full = P
     else:
-        full = np.zeros(A.shape)
-        for i in range(0, A.shape[0]):
-            full[:, i] = compute_PR_2(A, i, alpha)[:, 0]
+        full = np.zeros(P.shape)
+        for i in range(0, P.shape[0]):
+            full[:, i] = compute_PR(P, i, alpha)[:, 0]
     
     return full
 

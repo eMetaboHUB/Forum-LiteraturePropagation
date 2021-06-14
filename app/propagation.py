@@ -155,7 +155,7 @@ def propagation_volume(g, alpha):
         alpha (float, optional): The damping factor.
 
     Returns:
-        numpy array: The probability matrix
+        numpy array: The probability matrix. Probability vectors are stored in columns ! For instance, P_{A,B} = Probability that a mention starting from B reach A
     """
     # Get adjacency matrix
     if g.is_directed():
@@ -169,9 +169,9 @@ def propagation_volume(g, alpha):
         A = np.array(g.get_adjacency().data)
         P = np.diag(1/A.sum(axis = 1)) @ A 
     
-    # If alpha is set to 0, simply return the probability matrix from direct neighborhood, otherwise compute PPR
+    # If alpha is set to 0, simply return the probability matrix from direct neighborhood in columns using transpose, otherwise compute PPR
     if not alpha:
-            full = P
+            full = P.T
     else:
         full = np.zeros(P.shape)
         for i in range(0, P.shape[0]):

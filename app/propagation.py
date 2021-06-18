@@ -740,16 +740,16 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     """
     
     # Out
-    r = collections.namedtuple("out", ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
+    r = collections.namedtuple("out", ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
     weights = data["weights"].tolist()
     del weights[index]
     cooc = data["COOC"].tolist()
-    k = cooc.pop(index)
+    k = int(cooc.pop(index))
     corpora = data["TOTAL_PMID_SPECIE"].tolist()
     labels = data["SPECIE"].to_list()
     del labels[index]
-    n = corpora.pop(index)
+    n = int(corpora.pop(index))
     # If all weights are null, no neighborhood information:
     if sum(weights) == 0:
         prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
@@ -760,7 +760,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         # Compute additional values:
         Log2numFC = np.log2(posterior.mu/p)
         cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
-        resultat = r(posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False)
+        resultat = r(n, k, posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False)
         return resultat
 
     # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
@@ -807,7 +807,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         plot_mix_distributions(posterior_mix, labels, seq, "Posterior components")
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = r(posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)
+    resultat = r(n, k, posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)
 
     return resultat
 
@@ -826,7 +826,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
+    df_ = pd.DataFrame(index = indexes, columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
@@ -868,7 +868,7 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
+    df_ = pd.DataFrame(index = indexes, columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
@@ -915,7 +915,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
         # Keep only rows with available info:
         f = f.loc[f["SPECIE"].isin(table_species_corpora["SPECIE"]) & f["MESH"].isin(table_mesh["MESH"])]
     
-    associations = pd.concat([f, pd.DataFrame(columns = ["Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
+    associations = pd.concat([f, pd.DataFrame(columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
     n = len(associations)
     
     # Browse associations
@@ -939,6 +939,6 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
 
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-            associations.iloc[i, 2:8] = list(r)
+            associations.iloc[i, 2:10] = list(r)
             bar.update(i)
     return associations

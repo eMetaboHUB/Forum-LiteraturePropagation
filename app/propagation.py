@@ -181,6 +181,17 @@ def propagation_volume(g, alpha):
 
 
 def compute_weights(probabilities, table_species_corpora, q):
+    """This function is used to compute the weight matrix. The weight matrix contains in columns the contributions of each compounds on the prior on the targeted compound. 
+    For instance, W_{A,B} = proportion (probability) that a mention arrived on B, comes from A
+
+    Args:
+        probabilities (np.array): The PPR pobability matrix (Cf. propagation_volume)
+        table_species_corpora (pandas.DataFrame): A Dataframe containing the corpus size of each compounds
+        q (float): The tolerance threshold. If the probability P_{A,B}, that a mention starting from B reach A is lower than the tolerance threshold, we consider that the compound B is not legitimate to contribute to the prior of A.
+
+    Returns:
+        [np.array]: The weight matrix 
+    """
     # Compute weights
     sigmas = copy.copy(probabilities)
     # To determine contributors of each compounds, we build a constrain matrix using the q parameter (tolerance threshold) to filter out contributors that a too far from the targeted node and also to avoid a compound to contribute itself to its prior.

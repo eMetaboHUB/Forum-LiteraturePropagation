@@ -1378,7 +1378,12 @@ La matrice $pi$ contient les vecteurs de résultats du PPR rangées **en colonne
 Donc voilà pour les poids ! :)
 
 - Indépendance conditionnelle de  $p(m|c_i, I=k) = p(m|c_i)$
-En effet, si on voulait déterminer $p(m|c_i, I=k)$ on ferait $p(m|c_i, I=k) = p(m|c_i) = \frac{N_i^m}{N_i} = $
+En fait l'indépendance conditionnielle nous dis que : $P(m, I = k | c_i) = P(m| c_i) P(I = k | c_i)$. C'est à dire que les évènement $m$ et $I = k$ sont indépendant conditonnellement par rapport $c_i$. Littéralement, cela nous dit que la probabilité qu'une mention parlant de $c_i$, mentionne le MeSH $m$ et arrive sur le composé $k$ ($I = k$) est égal à la proba qu'une mention de $c_i$ parle de $m$, multiplié par la proba qu'une mention de $c_i$ arrive sur $k$. le fait que la mention parle de $m$ n'influe pas les proba qu'elle arrive sur $k$ et inversement !
+
+Ainsi:  $P(m|c_i, I=k) = \frac{P(m, c_i, I=k)}{P(c_i, I=k)} = \frac{P(m, I=k | c_i) P(c_i)}{P(I = k|c_i)P(c_i)} = \frac{p P(m| c_i) P(I = k | c_i) P(c_i)}{P(I = k|c_i)P(c_i)} = P(m| c_i)$
+
+
+En effet, si on voulait déterminer $p(m|c_i, I=k)$ on ferait $p(m|c_i, I=k) = p(m|c_i) = \frac{N_i^m}{N_i}$
 
 Donc finalement avec toutes ses probabilités, on va pouvoir faire la même chose ! C'est juste que maintenant notre prior parle en terme de mentions et non plus d'articles mais l'idée d'indépendance qu'il soutient est toujours la même. Sous hypothèse d'indépendance $p(m|c_i) = p(m)$, le fait que la mention implique/provienne du composé $c_i$ n'a aucun effet sur le fait qu'elle implique le MeSH $m$, donc on peut toujours mettre notre $\mu$ à $p(m)$
 
@@ -1399,6 +1404,8 @@ Une autre chose à bien voir est que même si l'on utilise la taille de corpus d
 
 
 L'avantage par rappport à l'ancienne version est que l'on perd le coté ultra conservateur de la méthode. Avant, sachant que les poids était simplement calculé en fonction du PPR, un métabolite avec 10 articles associés pouvait avoir autant de poids dans le prior qu'un composé avec 10000 article. Ce qui fait que même dans des cas où 9 voisins sur 10 par exemple indiquaient un lien avec le MeSH, il suffisant qu'un seul des voisins ne l'indique pas pourque le modèle rejette l'association. Maintenant que les poids de le modèle sont calculé en fonction de la littérature, il faudra que ce dernier voisin est beaucoup de littérature pour faire penché la balance.
+
+
 
 
 ### Loi géométrique et longueur moyenne des marches
@@ -1609,14 +1616,9 @@ Cf. le google-sheet - "Exemple propagation"
 
 
 
+### TESTER ou non sur d'autres réseau ?
 
+Dans un premier temps je dirai que non ... Si Fabien ou autre n'en voit pas l'utilité je ne pense pas ...
 
-
-## Code save proba and weights matrix
-
-# out1 = os.path.join(out_path, "proba_" + str(alpha) + ".csv")
-# probabilities.SFT.to_csv(out1, index = False)
-
-# out = os.path.join(out_path, "W_" + str(alpha) + ".csv")
-# dd = pd.DataFrame(weights, columns=g.vs["label"])
-# dd.to_csv(out, index = False)
+L'idée est avant tout d'utiliser cette paroche pour prédire des biomakers donc en utilisant la littérature associées aux maladies. La méthode fonctionne avec toute la littérature mais il parait déjà moins pertinent d'essayer de prédire une fonction biologique (e.g vasodilateur) à partir du réseau. Là où autant on peut dire que si un précurseur est impliqu" dans une maladie alors on peut également regarder son produit, pour prédire une fonction biologique le lien est moins fort ...
+Sachant que la majorité de la littérature PubMed est orienté autour de l'homme, la souris et le rat, en tout cas particulièrement pour ce qui est de la littérature sur les maladies, on pourrait testé sur ces réseaux car ils sont relativement proches. Beaucoup d'étude sur des maladies sont réalisés sur la souris et le rat donc pourquoi pas. Par contre sur un réseau comme la levure par exemple, ça parait étrange de testé car on propagerait de la littérature associé à une maladie sur le réseau de la levure, mais ce serait une maladie humaine qui n'affecte pas la levure, donc le contexte n'est je pense pas adapté.

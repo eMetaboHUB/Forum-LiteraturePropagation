@@ -815,7 +815,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         # We need to keep the same color palette between the both plots
         # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict
         set_contributors = set([labels[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [labels[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
-        palette = dict(zip(set_contributors, cm.rainbow(np.linspace(0,1,len(set_contributors)))))
+        palette = dict(zip(set_contributors, cm.tab10(np.linspace(0,1,len(set_contributors)))))
         plot_mix_distributions(prior_mix, labels, seq, "Prior components", palette, top)
         plot_mix_distributions(posterior_mix, labels, seq, "Posterior components", palette, top)
         plot_distributions(prior_mix, posterior_mix)

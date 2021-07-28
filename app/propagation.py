@@ -9,6 +9,7 @@ import scipy.special as sc
 import scipy.stats as ss
 import progressbar
 import matplotlib.pyplot as plt
+from matplotlib import cm
 np.set_printoptions(suppress=True)
 
 
@@ -673,13 +674,14 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.yticks(fontsize=20)
     plt.show()
 
-def plot_mix_distributions(mix, labels, seq, name, top = 10):
+def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
     """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
 
     Args:
         mix (collections): A collection containing information about the mixture distribution: weights, alpha and beta parameters
         labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
         seq (float): The step used in np.arange to create the x vector of probabilities.
+        color_palette (dict):  A dict containing as key the label of the specie and as value a np.array of 4 elements representing the associated color in RGBA format
         top (int): The top n (maximum) of contributors that should be plotted 
     """
     x = np.arange(0, 1 + seq, seq).tolist()
@@ -691,7 +693,7 @@ def plot_mix_distributions(mix, labels, seq, name, top = 10):
         it = ordered_i_w[i]
         f = ss.beta.pdf(x, a = mix.alpha[it], b = mix.beta[it])
         y = weights[it] * f
-        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(mix.alpha[it], 2)) + ", " + str(round(mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)))
+        plt.plot(x, y, label = labels[it] + ": Beta(" + str(round(mix.alpha[it], 2)) + ", " + str(round(mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)), color = color_palette[labels[it]])
     plt.title("Top " + str(min(len(weights), top)) + " - " + name + " decomposition")
     plt.figtext(0.995, 0.01, 'w is the weight of the component represented by the species in the beta mixture distribution', ha='right', va='bottom')
     plt.legend()
@@ -802,9 +804,15 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     
     Log2numFC = np.log2(posterior_mix.mu/p)
 
-    if plot: 
-        plot_mix_distributions(prior_mix, labels, seq, "Prior components")
-        plot_mix_distributions(posterior_mix, labels, seq, "Posterior components")
+    if plot:
+        # We set the top to top 10: 
+        top = 10
+        # We need to keep the same color palette between the both plots
+        # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict
+        set_contributors = set([labels[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [labels[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
+        palette = dict(zip(set_contributors, cm.rainbow(np.linspace(0,1,len(set_contributors)))))
+        plot_mix_distributions(prior_mix, labels, seq, "Prior components", palette, top)
+        plot_mix_distributions(posterior_mix, labels, seq, "Posterior components", palette, top)
         plot_distributions(prior_mix, posterior_mix)
     
     resultat = r(n, k, posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)

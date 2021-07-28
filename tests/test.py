@@ -7,7 +7,7 @@ class TestPropagationMethods(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.g = import_metabolic_network("tests/data/test_urea.gml")
-        cls.table_specie = table_species_corpora = import_and_map_indexes("tests/data/species_cid_pmid_full.csv", cls.g)
+        cls.table_specie = table_species_corpora = import_and_map_indexes("tests/data/species_cid_pmid_full.csv", cls.g, "label")
         cls.probabilities = propagation_volume(cls.g, 0.8)
         cls.q = 1/(len(cls.g.vs) - 1)
         cls.weights = compute_weights(cls.probabilities, cls.table_specie, cls.q)

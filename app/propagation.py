@@ -570,7 +570,8 @@ def create_vizu_data(index, probabilities, q, weights, data, cptm = "c"):
     # Add compartiment to specie for mapping: 
     w_data["SPECIE"] = w_data["SPECIE"] + "_" + cptm
     w_data["STATS"] = w_data["SPECIE"] + " (" + w_data["COOC"].astype(str) + "/" + w_data["TOTAL_PMID_SPECIE"].astype(str) + ")"
-    w_data = w_data.drop(["index", "CID", "TOTAL_PMID_SPECIE", "COOC"], axis = 1)
+    # w_data = w_data.drop(["index", "CID", "TOTAL_PMID_SPECIE", "COOC"], axis = 1)
+    w_data = w_data[["SPECIE", "weights", "posterioir_weights", "STATS"]]
     w_data = w_data.rename(columns={"SPECIE": "metaboliteDBIdentifier"})
     w_data.loc[index]
     return w_data

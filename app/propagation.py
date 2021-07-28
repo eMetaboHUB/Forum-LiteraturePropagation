@@ -78,27 +78,31 @@ def import_table(path):
     
     return data
 
-def import_and_map_indexes(path, g, name_att = "label"):
+def import_and_map_indexes(path, g, id_att):
     """This function is used to import tables related to species. It also add a new column containing the species index in the graph g.
     Args:
         path (string): path to the table to import
         g (igraph.Graph): The compound graph
-        name_att (str, optional): The name of the vertex attribute containing names in the graph. Defaults to "label".
+        id_att (str): The name of the vertex attribute containing the specie identifier (eg. M_m0001c) in the graph.
 
     Returns:
         (pandas.DataFrame): The imported table with a new column, index, indicating the species index in the graph
     """
     # Create a table to map species labels (SPECIE column) to indexes in the graph.
-    label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[name_att]})
+    label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[id_att]})
     data = import_table(path)
 
     # If data or graph have not been well imported, return None
     if (data is None) or (g is None):
         return None
 
+    # Test if merge is possible :
+    if not len(list(set(data["SPECIE"]).intersection(label_to_index["SPECIE"]))):
+        print("\nERROR: No 'SPECIE' idenfiers in the raw data (" + path + ") is matching with identifiers in the graph (id_att = " + id_att + ").")
+        return None
     # Merge
     coocurences = pd.merge(label_to_index, data, on = "SPECIE", how = "left")
-    
+
     return coocurences
 
 ###################
@@ -222,7 +226,7 @@ def compute_weights(probabilities, table_species_corpora, q):
     return weights
 
 
-def create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q, name_att = "label"):
+def create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q, id_att):
     """
     This function is used to achieve the creation of the probability and weight tables, by computing the PPR on the compound graph, applying the threshold for the neighborhood of influence and then calculating the associated weights.
     Also, this function create a cache directory to store probabiltity and weight tables for each already computed alpha, avoiding to re-compute them.
@@ -233,7 +237,7 @@ def create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q,
         alpha (float): The damping factor.
         table_species_corpora (pandas.DataFrame): table of specie corpora
         q (float): The tolerance threshold for neighborhood influence
-        name_att (str, optional): The name of the vertex attribute containing names. Defaults to "label".
+        id_att (str): The name of the vertex attribute containing the specie identifier (eg. M_m0001c) in the graph.
 
     Returns:
         [np.array, np.array]: array for probabilities and weights
@@ -258,7 +262,7 @@ def create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q,
         # Round probabilities with 9 decimals:
         probabilities = np.around(probabilities, 9)
         # Write probabilities in cache:
-        df_probabilities = pd.DataFrame(probabilities, columns=g.vs[name_att], index=g.vs[name_att])
+        df_probabilities = pd.DataFrame(probabilities, columns=g.vs[id_att], index=g.vs[id_att])
         df_probabilities.to_csv(proba_path, index = True, header = True)
     else:
         print("\n- Get probabilities with alpha = " + str(alpha) + " in cache dir")
@@ -272,7 +276,7 @@ def create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q,
         # Round probabilities with 9 decimals:
         weights = np.around(weights, 9)
         # Write probabilities in cache:
-        df_weights = pd.DataFrame(weights, columns=g.vs[name_att], index=g.vs[name_att])
+        df_weights = pd.DataFrame(weights, columns=g.vs[id_att], index=g.vs[id_att])
         df_weights.to_csv(weight_path, index = True, header = True)
     else:
         print("\n- Get weights with alpha = " + str(alpha) + " in cache dir")

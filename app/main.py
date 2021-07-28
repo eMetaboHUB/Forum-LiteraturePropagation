@@ -13,10 +13,11 @@ parser.add_argument("--specie.cooc", help="path to the species MeSH co-occurence
 parser.add_argument("--mesh", help="The studied MeSH. This argument is incompatible with the 'file' argument. The program will return all association between this MeSH and all species in the metabolic network. If the 'specie' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'mesh')
 parser.add_argument("--specie", help="The studied specie. This argument is incompatible with the 'file' argument. The program will return all association between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.", type = str, required = False, dest = 'specie')
 parser.add_argument("--file", help="Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH). This argument is incompatible with the 'mesh' and 'specie' arguments.", type = str, required = False, dest = 'file')
-parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are set to null.", action='store_true')
+parser.add_argument("--forget", help="Only the prior from neighborhood will be used in the computation, observations of treated species are 'forgot'.", action='store_true')
 parser.add_argument("--alpha", help="The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
 parser.add_argument("--sample_size", help="The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100", nargs = "*", type = int, default = [100], required = False, dest = 'ss')
 parser.add_argument("--q", help="The tolerance threshold for PPR probabilities. If q is negative the default value is used. The Default = 1/(N  -1)", type = float, default = -1, required = False, dest = 'q')
+parser.add_argument("--id_att", help=" The name of the vertex attribute containing the specie identifier (eg. M_m0001c) in the graph. These identifiers must match with those provided in the 'SPECIE' column of specie.corpora and specie.cooc files. Default is the 'label' attribute", type = str, default = "label", required = False, dest = 'id_att')
 parser.add_argument("--out", help="path to the output directory", type = str, required = True, dest = 'out')
 
 
@@ -41,18 +42,20 @@ if g is None:
     sys.exit(1)
 
 print("> Import species corpora sizes ... ", end = '')
-table_species_corpora = import_and_map_indexes(args.specie_corpora_path, g)
-# Fill na if some species are not indicated in the file
-table_species_corpora = table_species_corpora.fillna(0)
+table_species_corpora = import_and_map_indexes(args.specie_corpora_path, g, args.id_att)
 if table_species_corpora is None:
     print("\n /!\ Exit due to errors during data import")
     sys.exit(1)
+
+# Fill na if some species are not indicated in the file
+table_species_corpora = table_species_corpora.fillna(0)
+
 # Compute total number of cpd-articles mentions
 TOTAL_CPD_MENTIONS = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
 print("Ok")
 
 print("> Import species-MeSH co-occurences ... ", end = '')
-table_coocurences = import_and_map_indexes(args.specie_mesh_path, g)
+table_coocurences = import_and_map_indexes(args.specie_mesh_path, g, args.id_att)
 if table_coocurences is None:
     print("\n /!\ Exit due to errors during data import")
     sys.exit(1)
@@ -114,7 +117,7 @@ l = table_species_corpora["SPECIE"]
 for alpha in alpha_set:
 
     # Compute network analysis
-    probabilities, weights = create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q)
+    probabilities, weights = create_probabilities_and_weights(g, g_name, alpha, table_species_corpora, q, args.id_att)
     df_Entropy = compute_Entropy_matrix(weights, l)
     df_contributors_distances = compute_contributors_distances(weights, g, l)
     df_contributors_corpora_sizes = compute_contributors_corpora_sizes(weights, table_species_corpora, l)

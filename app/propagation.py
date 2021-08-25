@@ -955,3 +955,16 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
             associations.iloc[i, 2:10] = list(r)
             bar.update(i)
     return associations
+
+def add_names(result, species_name_path, mesh_name_path):
+    # Add species' names if provided
+    if species_name_path:
+        species_name = pd.read_csv(species_name_path)
+        print(species_name)
+        result = pd.merge(result, species_name, on = "SPECIE", how = "left")
+    # Add MESHs' names if provided
+    if mesh_name_path:
+        mesh_name = pd.read_csv(mesh_name_path)
+        print(mesh_name)
+        result = pd.merge(result, mesh_name, on = "MESH", how = "left")
+    return result

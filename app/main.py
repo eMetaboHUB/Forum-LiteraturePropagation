@@ -17,7 +17,9 @@ parser.add_argument("--forget", help="Only the prior from neighborhood will be u
 parser.add_argument("--alpha", help="The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1", nargs = "*", type = float, default = [0.1], required = False, dest = 'alpha')
 parser.add_argument("--sample_size", help="The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100", nargs = "*", type = int, default = [100], required = False, dest = 'ss')
 parser.add_argument("--q", help="The tolerance threshold for PPR probabilities. If q is negative the default value is used. The Default = 1/(N  -1)", type = float, default = -1, required = False, dest = 'q')
-parser.add_argument("--id_att", help=" The name of the vertex attribute containing the specie identifier (eg. M_m0001c) in the graph. These identifiers must match with those provided in the 'SPECIE' column of specie.corpora and specie.cooc files. Default is the 'label' attribute", type = str, default = "label", required = False, dest = 'id_att')
+parser.add_argument("--id_att", help=" The name of the vertex attribute containing the SPECIE identifier (eg. M_m0001c) in the graph. These identifiers must match with those provided in the 'SPECIE' column of specie.corpora and specie.cooc files. Default is the 'label' attribute", type = str, default = "label", required = False, dest = 'id_att')
+parser.add_argument("--species_name_path", help="path to the file containing species names in a .csv format. First column should be named 'SPECIE' and contains the SPECIE identifiers (eg. M_m0001c) and the second column should be named 'SPECIE_NAME' and contains the species' chemical names", type = str, required = False, dest = 'species_name_path')
+parser.add_argument("--meshs_name_path", help="path to the file containing species names in a .csv format. First column should be named 'MESH' and contains the MESH identifiers (eg. D000017) and the second column should be named 'MESH_NAME' and contains the MeSH labels", type = str, required = False, dest = 'meshs_name_path')
 parser.add_argument("--out", help="path to the output directory", type = str, required = True, dest = 'out')
 
 
@@ -187,6 +189,9 @@ for alpha in alpha_set:
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True)
             df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "TOTAL_PMID_SPECIE": [res.TOTAL_PMID_SPECIE], "COOC": [res.COOC], "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"], "CtbAvgDistance": df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"], "CtbAvgCorporaSize": df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"], "NbCtb": df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"]})
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            # Add labels to result if provided
+            df_ = add_names(df_, args.species_name_path, args.meshs_name_path)
+            data = add_names(data, args.species_name_path, None)
             print("Export results in " + out)
             df_.to_csv(out, index = False)
             # Export full data

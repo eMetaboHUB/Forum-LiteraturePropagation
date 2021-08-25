@@ -145,6 +145,7 @@ for alpha in alpha_set:
             r = pd.merge(r, df_nb_ctbs, on = "SPECIE", how = "left")
             f_out_name = os.path.splitext(os.path.basename(args.file))[0]
             out = os.path.join(out_path, f_out_name + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            r = add_names(r, args.species_name_path, args.meshs_name_path)
             print("Export results in " + out)
             r.to_csv(out, index = False)
 
@@ -159,6 +160,8 @@ for alpha in alpha_set:
             r["CtbAvgCorporaSize"] = float(df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"])
             r["NbCtb"] = float(df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"])
             out = os.path.join(out_path, args.specie + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            # Add labels to result if provided
+            r = add_names(r, None, args.meshs_name_path)
             print("Export results in " + out)
             r.to_csv(out, index = False)
         
@@ -172,6 +175,8 @@ for alpha in alpha_set:
             r["CtbAvgCorporaSize"] = df_contributors_corpora_sizes["CtbAvgCorporaSize"]
             r["NbCtb"] = df_nb_ctbs["NbCtb"]
             out = os.path.join(out_path, args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
+            # Add labels to result if provided
+            r = add_names(r, args.species_name_path, None)
             print("Export results in " + out)
             r.to_csv(out, index = False)
 

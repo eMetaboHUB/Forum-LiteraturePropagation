@@ -687,7 +687,7 @@ def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
         labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
         seq (float): The step used in np.arange to create the x vector of probabilities.
         color_palette (dict):  A dict containing as key the label of the specie and as value a np.array of 4 elements representing the associated color in RGBA format
-        top (int): The top n (maximum) of contributors that should be plotted 
+        top (int): The top n (maximum) of contributors that should be plotted
     """
     x = np.arange(0, 1 + seq, seq).tolist()
     weights = mix.weights
@@ -723,7 +723,7 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5):
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None):
     """This function is used to compute the complete analysis for a Compound - MeSH relation.
     If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh_V2 is used, otherwise we will used the prior mixture.
 
@@ -736,6 +736,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
         plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_mix_distributions and plot_distributions. Defaults to False.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
+        species_name_path (str): Path to the file containing species' names
 
     Returns:
         [collection]: A collection with:
@@ -810,10 +811,15 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     Log2numFC = np.log2(posterior_mix.mu/p)
 
     if plot:
+        # If names have been provided, use them instead of species labels in Figures:
+        if species_name_path:
+            species_name = pd.read_csv(species_name_path)
+            df_l = pd.merge(pd.DataFrame({"SPECIE": labels}), species_name, on = "SPECIE", how = "left")
+            labels = df_l["SPECIE_NAME"]
         # We set the top to top 10: 
         top = 10
         # We need to keep the same color palette between the both plots
-        # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict
+        # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict (so max number of contributors displayed is 20)
         set_contributors = set([labels[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [labels[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
         palette = dict(zip(set_contributors, cm.tab20(np.linspace(0,1,len(set_contributors)))))
         plot_mix_distributions(prior_mix, labels, seq, "Prior components", palette, top)
@@ -960,11 +966,9 @@ def add_names(result, species_name_path, mesh_name_path):
     # Add species' names if provided
     if species_name_path:
         species_name = pd.read_csv(species_name_path)
-        print(species_name)
         result = pd.merge(result, species_name, on = "SPECIE", how = "left")
     # Add MESHs' names if provided
     if mesh_name_path:
         mesh_name = pd.read_csv(mesh_name_path)
-        print(mesh_name)
         result = pd.merge(result, mesh_name, on = "MESH", how = "left")
     return result

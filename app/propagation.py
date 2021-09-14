@@ -678,7 +678,7 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     # for personalised fig
-    # plt.axis((-0.005, 0.1, 0, 700))
+    plt.axis((-0.005, 0.1, 0, 300))
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
 
@@ -708,7 +708,7 @@ def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     # for personalised fig
-    # plt.axis((-0.005, 0.1, 0, 700))
+    plt.axis((-0.005, 0.1, 0, 300))
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
 

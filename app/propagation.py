@@ -18,7 +18,7 @@ np.set_printoptions(suppress=True)
 ###### Utils ######
 ###################
 
-def import_metabolic_network(path, undirected = True, format = "gml", largest_comp = True):
+def import_metabolic_network(path, undirected = True, format = "gml"):
     """This function is used to import an metabolic network, by default as undirected
 
     Args:
@@ -46,9 +46,8 @@ def import_metabolic_network(path, undirected = True, format = "gml", largest_co
         g.to_undirected()
     else:
         print("> Used as directed")
-    if largest_comp:
-        print("> Extract largest component")
-        g = g.clusters().giant()
+    print("> Extract largest component")
+    g = g.clusters().giant()
     # Test if the graph is connected
     if not g.is_connected():
         print("The graph needs to be connected: there is a path from any point to any other point in the graph")

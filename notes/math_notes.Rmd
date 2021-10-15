@@ -1104,3 +1104,46 @@ Dans un premier temps je dirai que non ... Si Fabien ou autre n'en voit pas l'ut
 
 L'idée est avant tout d'utiliser cette paroche pour prédire des biomakers donc en utilisant la littérature associées aux maladies. La méthode fonctionne avec toute la littérature mais il parait déjà moins pertinent d'essayer de prédire une fonction biologique (e.g vasodilateur) à partir du réseau. Là où autant on peut dire que si un précurseur est impliqu" dans une maladie alors on peut également regarder son produit, pour prédire une fonction biologique le lien est moins fort ...
 Sachant que la majorité de la littérature PubMed est orienté autour de l'homme, la souris et le rat, en tout cas particulièrement pour ce qui est de la littérature sur les maladies, on pourrait testé sur ces réseaux car ils sont relativement proches. Beaucoup d'étude sur des maladies sont réalisés sur la souris et le rat donc pourquoi pas. Par contre sur un réseau comme la levure par exemple, ça parait étrange de testé car on propagerait de la littérature associé à une maladie sur le réseau de la levure, mais ce serait une maladie humaine qui n'affecte pas la levure, donc le contexte n'est je pense pas adapté.
+
+
+
+### CDF to Odds
+
+Une nouvelle feature qui a été proposé est le Odds: où $Odds = \frac{1-CDF}{CDF}$ ce qui nous donne le "cote" entre le fait que "la probabilité qu'un article discuttant de mon composé discutte aussi de mon MeSH" ($p$) **soit supérieur** à "la fréquence générale de ce MeSH dans des mentions de composés dans des articles" ($\mu$), soit $P(p > \mu) = 1-CDF$ par rapport à la probabilité qui soit inférieur à cette fréquence ($CDF$)
+
+- Différence avec le Odds ratio: 
+Le Odds ratio est un rapport de cotes entre les cotes obtenus sous la condition *test* et les cotes obtenues dans l'autre condition, souvent employé pour mesuré l'indépendance ou dans des tests exposures/control. Il s'agit donc des cotes obtenues pour l'exposure, normalisé par les cotes controls.
+Dans notre cas, on test si la variable aléatoire $p$ est supérieure à $\mu$, pour nous rapprocher d'une mesure d'indépendance. Mais, on ne normalise pas par rapport unc condition control qui serait dans notre cas la distribution de $p$ lorsque l'on ne parle pas de composés, car on ne peut pas obtenir cette distribution dans notre framework.
+En fait dans notre cas c'est déjà un peu pris en compte ! La normalisation dans le odds est là pour contrôler et déterminer si les odds observés pour ma condition test sont réellement significatif, il servent donc de background. Or dans notre cas, dans notre Odd, on compare directement $p$ à $\mu$ et ainsi $\mu$ la fréqunce générale dans la population joue ce rôle. Elle nous permet de nous fixer par rapport à un background, la fréquence générale du MeSH et ainsi regarder si notre densité de proba se trouve plus à gauche ou à droite de cete proba ! Donc je pense que cela joue un peu le rôle de la normalisation dans le odd ratio, en tout cas je pense que l'on peut aussi l'interpréter pour estimer la force d'une association.
+
+Ensuite, le fait de calculer le Odds: où $Odds = \frac{1-CDF}{CDF}$, je trouve que ça permet de représenter à la fois la signficativité: si il est > 1 c'est que la majorité de mon posterior est pour $P(p > \mu)$. Je pense que cette valeur peut à la fois remplacer la CDF et le Log2FC en donnant une valeur résumant les 2.
+
+On pourrait aussi calculé le Lod(Odds) ça se fait beaucoup.
+
+
+
+### SKEWNESS
+
+La skewneess d'une distibution se définie comme l'asymétrie d'une distribuion. Pour la distribution $Beta$, celle-ci n'est symétrique que $\alpha = \beta$ où on a donc mean = mode = 1/2 par ailleurs. Dès que l'quilibre $\alpha$, $\beta$ se perd, on voit apparaitre un déséquilibre dans la distribution.
+
+![Skewness](Relationship_between_mean_and_median_under_different_skewness.png)
+
+On parle de positive Skewness, lorsque que la queue droite de la distribution est plus longue que la queue gauche. A ce moment là, on a un déséquilibre de la masse de probabilité vers la gauche. Comme on peut le voir la mediane est inférieure à la moyenne. Or si la mediane ezst la valeur séparant 50% de la masse de la distribution, alors si la median est inférieure à la moyenne, on sait qu'il y a **plus** de 50% de la distribution qui est inférieure à la moyenne. 
+
+C'est l'inverse pour la Negative Skewness
+
+
+Ce que l'on sait (Cf. Wikipedia Beta Skewness) également c'est que lorsque $\alpha$ ou $\mu$ (associé à la distibution Beta) tend vers 0, alors la Skewness est positive et si $\alpha$ ou $\mu$ tend vers 1, alors c'est une Skewess negative. 
+
+
+Or dans notre cas, on est exclusivement dans des cas où la fréquence générale des MeSH est $\le 0.5$ ! Ainsi notre premier prior qui est appliqué sur les contributeurs et possède comme moyenne $\mu$, la fréquence générale du MeSH a forcément une Skewness positive ! Ce qui signifie que la mojarité de la masse de proba est à gauche (inférieure) de la moyenne $\mu$. Ce comportement est valable que $\alpha$ soit > ou $\le$ à 1 comme dans nos cas ;)
+
+Ainsi lorsque je pose ma distribution par défaut, finalement celle-ci impose une CDF "non-significative" par nature. En effet, la moyenne $\mu$ de ma distribution étant la fréquence $\mu$ générale du MeSH dans ma littérature, si j'ai une Skewness positive alors on sait que $P(p \le \mu)$ > 0.5, Donc Odds et CDF contre l'hypothèse.
+Ceci implique que dès que la fréquence de mon MeSH est $\le 0.5$ alors si je n'ai aucune observation je rejetterai toujours mon hypothèse, en tout cas j'aurait une CDF > 0.5 ou un Odds $\le 0$.
+
+Ce comportement est intérressant et fait même du sens par rapport à notre hypothèse : Plus un MeSH est rare (soit $\mu \rightarrow 0$) plus la CDF du prior de base est grande, donc plus on rejette ! Ainsi plus un MeSH est rare plus par défaut on ne s'attend pas à être associé avec lui et il va falloir amené des observations pour faire dévier ce prior. En revanche, plus la fréquence du MeSH augmente plus la CDF va diminuer et donc plus apriori on est enclin a considérer que l'on pourrait y être associé.
+
+Cette comportementest important car en effet on ne voudrait pas considérer les même chances aprior d'être associé à un MeSH très rare ou à un MeSH très fréquent. De base c'est plus de chance d'être associé à *Neoplasm* par exemple qu'une maladie rare. Le fait que la distribution Beta soit déséquilibrer prend en compte cela naturellement. **Ce déséquilibre indique que: Plus la fréquence générale d'un MeSH est faible moins j'ai de chance que ma probabilité d'en parler soit supérieure à sa fréquence générale, a priori (et inversement)**
+
+
+

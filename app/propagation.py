@@ -720,16 +720,15 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         species_name_path (str): Path to the file containing species' names
 
     Returns:
-        [collection]: A collection with:
+        [dict]: A dictionnary with:
+        - TOTAL_PMID_SPECIE (int): The total number of mentions for the targeted compound
+        - COOC (int): The total number of co-occurences between the targeted compound and the MeSH
         - Mean (float): The mean of the posterior distribution. 
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
         - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
         - priorCDF: Same as CDF, but for the mixture prior.
         - priorLog2FC: Same as Log2FC, but for the mixture prior.
     """
-    
-    # Out
-    r = collections.namedtuple("out", ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
     weights = data["weights"].tolist()
     del weights[index]
@@ -749,7 +748,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         # Compute additional values:
         Log2numFC = np.log2(posterior.mu/p)
         cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
-        resultat = r(n, k, posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False)
+        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False]))
         return resultat
 
     # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
@@ -799,7 +798,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         plot_mix_distributions(posterior_mix, labels, seq, "Posterior components", palette, top)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = r(n, k, posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)
+    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True]))
 
     return resultat
 
@@ -818,7 +817,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
+    store = []
 
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
@@ -841,9 +840,10 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
             
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
-            df_.loc[i] = r
+            store.append(r)
             bar.update(i)
     
+    df_ = pd.DataFrame(store)     
     df_.insert(0, "MESH", mesh_list)
     return(df_)
 
@@ -860,7 +860,7 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
+    store = []
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
@@ -879,9 +879,10 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
             
             # Computation
             r = computation(i, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
-            df_.loc[i] = r
+            store.append(r)
             bar.update(i)
     
+    df_ = pd.DataFrame(store)
     df_.insert(0, "SPECIE", specie_list)
     return(df_)
 
@@ -907,14 +908,14 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
         # Keep only rows with available info:
         f = f.loc[f["SPECIE"].isin(table_species_corpora["SPECIE"]) & f["MESH"].isin(table_mesh["MESH"])]
     
-    associations = pd.concat([f, pd.DataFrame(columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
-    n = len(associations)
+    store = []
+    n = f.shape[0]
     
     # Browse associations
     with progressbar.ProgressBar(max_value = n) as bar:
         for i in range(0, n):
-            specie = str(associations.iloc[[i], 0].item())
-            mesh = str(associations.iloc[[i], 1].item())
+            specie = str(f.iloc[[i], 0].item())
+            mesh = str(f.iloc[[i], 1].item())
             index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
             # Prepare data
             table_species_corpora["weights"] = weights[:, index].tolist()
@@ -931,8 +932,10 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
 
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-            associations.iloc[i, 2:10] = list(r)
+            store.append(r)
             bar.update(i)
+    
+    associations = pd.concat([f, pd.DataFrame(store)], axis = 1)
     return associations
 
 def add_names(result, species_name_path, mesh_name_path):

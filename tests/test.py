@@ -66,10 +66,10 @@ class TestPropagationMethods(unittest.TestCase):
         alpha_prior = 2.2140002880219223
         beta_prior = 997.7859997119781
         res = computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False)
-        self.assertEqual(np.round(res.CDF, 9), 0.002127064)
-        self.assertEqual(np.round(res.Log2FC, 9), 3.216560006)
-        self.assertEqual(np.round(res.priorCDF, 9), 0.008455974)
-        self.assertEqual(np.round(res.priorLog2FC, 9), 4.054079044)
+        self.assertEqual(np.round(res['CDF'], 9), 0.002127064)
+        self.assertEqual(np.round(res['Log2FC'], 9), 3.216560006)
+        self.assertEqual(np.round(res['priorCDF'], 9), 0.008455974)
+        self.assertEqual(np.round(res['priorLog2FC'], 9), 4.054079044)
 
     def test_intial_prior(self):
         self.assertEqual(round(self.prior_mix.f[775], 7), 0.0049983)

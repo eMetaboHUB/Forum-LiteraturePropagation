@@ -88,7 +88,7 @@ if args.file:
         sys.exit(1)
     # Test columns:
     if (set(f.columns.to_list()) != set(["SPECIE", "MESH"])) or f.empty:
-        print("Bad formating for association file. The file need to contain only 2 column: SPECIE and MESH")
+        print("Bad formating for association file. The file need to contain only 2 columns: SPECIE and MESH")
         sys.exit(1)
 
 
@@ -155,10 +155,10 @@ for alpha in alpha_set:
             index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
             r = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
             # Add Entropy, CtbAvgDistance, CtbAvgCorporaSize, NbCtb of the targeted compound
-            r["Entropy"] = float(df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"])
-            r["CtbAvgDistance"] = float(df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"])
-            r["CtbAvgCorporaSize"] = float(df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"])
-            r["NbCtb"] = float(df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"])
+            r["Entropy"] = float(df_Entropy.loc[index, "Entropy"])
+            r["CtbAvgDistance"] = float(df_contributors_distances.loc[index, "CtbAvgDistance"])
+            r["CtbAvgCorporaSize"] = float(df_contributors_corpora_sizes.loc[index, "CtbAvgCorporaSize"])
+            r["NbCtb"] = float(df_nb_ctbs.loc[index, "NbCtb"])
             out = os.path.join(out_path, args.specie + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             # Add labels to result if provided
             r = add_names(r, None, args.meshs_name_path)
@@ -192,7 +192,11 @@ for alpha in alpha_set:
             p = float(MeSH_info["P"])
             print("P = " + str(p))
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True, species_name_path = args.species_name_path)
-            df_ = pd.DataFrame({"SPECIE": args.specie, "MESH": args.mesh, "TOTAL_PMID_SPECIE": [res.TOTAL_PMID_SPECIE], "COOC": [res.COOC], "Mean": [res.Mean], "CDF": [res.CDF], "Log2FC": [res.Log2FC], "priorCDF": [res.priorCDF], "priorLog2FC": [res.priorLog2FC], "NeighborhoodInformation": [res.NeighborhoodInformation], "Entropy": df_Entropy[df_Entropy["SPECIE"] == args.specie]["Entropy"], "CtbAvgDistance": df_contributors_distances[df_contributors_distances["SPECIE"] == args.specie]["CtbAvgDistance"], "CtbAvgCorporaSize": df_contributors_corpora_sizes[df_contributors_corpora_sizes["SPECIE"] == args.specie]["CtbAvgCorporaSize"], "NbCtb": df_nb_ctbs[df_nb_ctbs["SPECIE"] == args.specie]["NbCtb"]})
+            df_ = pd.concat([pd.DataFrame([{"SPECIE": args.specie, "MESH": args.mesh}]), pd.DataFrame([res])], axis = 1)
+            df_["Entropy"] = df_Entropy.loc[index, "Entropy"]
+            df_["CtbAvgDistance"] = df_contributors_distances.loc[index, "CtbAvgDistance"]
+            df_["CtbAvgCorporaSize"] = df_contributors_corpora_sizes.loc[index, "CtbAvgCorporaSize"]
+            df_["NbCtb"] = df_nb_ctbs.loc[index,"NbCtb"]
             out = os.path.join(out_path, args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")
             # Add labels to result if provided
             df_ = add_names(df_, args.species_name_path, args.meshs_name_path)

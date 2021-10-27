@@ -704,7 +704,28 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None):
+def compute_odds(cdf, as_log = True):
+    """
+    This function is used to compute the odds or log(odds) from the CDF.
+    The success probability is defined as (1-CDF) so P(p > mu)
+    If CDF = 0, reports infinite odds, for logs and classic. 
+    Args:
+        cdf (float): The computed CDF from *computation* (P(p <= mu))
+        as_log (bool, optional): Return classic odds or log(odds). Defaults to True.
+
+    Returns:
+        [type]: [description]
+    """
+    if cdf == 0:
+        return np.Inf
+    if cdf == 1:
+        return -np.Inf
+    if not as_log:
+        return (1-cdf)/cdf
+    return np.log((1-cdf)/cdf)
+
+
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None, update_data = False):
     """This function is used to compute the complete analysis for a Compound - MeSH relation.
     If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh is used, otherwise we will used the prior mixture.
 
@@ -717,7 +738,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
         plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_mix_distributions and plot_distributions. Defaults to False.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
-        species_name_path (str): Path to the file containing species' names
+        species_name_path (str): Path to the file containing species' names for figures legend
+        update_data (boolean, optional): Does the data table need to be updated with posterior weights, cdf, etc of each contributors (for export)
 
     Returns:
         [dict]: A dictionnary with:
@@ -748,7 +770,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         # Compute additional values:
         Log2numFC = np.log2(posterior.mu/p)
         cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
-        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False]))
+        Log_odds = compute_odds(cdf_posterior)
+        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, np.NaN, np.NaN, False]))
         return resultat
 
     # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
@@ -774,13 +797,14 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
-
-    # As null weight have been removed duruing computation, we use SPECIE instead of index as key
-    data["posterioir_weights"] = float(0)
-    for j in range(0, len(labels)):
-        data.loc[data["SPECIE"] == labels[j], "posterioir_weights"] = posterior_mix.weights[j]
-    
+    Log_odds = compute_odds(cdf_posterior_mix)
     Log2numFC = np.log2(posterior_mix.mu/p)
+
+    if update_data:
+        # As null weight have been removed duruing computation, we use SPECIE instead of index as key
+        data["posterioir_weights"] = float(0)
+        for j in range(0, len(labels)):
+            data.loc[data["SPECIE"] == labels[j], "posterioir_weights"] = posterior_mix.weights[j]
 
     if plot:
         # If names have been provided, use them instead of species labels in Figures:
@@ -798,7 +822,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         plot_mix_distributions(posterior_mix, labels, seq, "Posterior components", palette, top)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True]))
+    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, Log2numFC, prior_mix_CDF, prior_mean_ratio, True]))
 
     return resultat
 

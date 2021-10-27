@@ -191,7 +191,7 @@ for alpha in alpha_set:
             MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
             p = float(MeSH_info["P"])
             print("P = " + str(p))
-            res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True, species_name_path = args.species_name_path)
+            res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = True, species_name_path = args.species_name_path, update_data = True)
             df_ = pd.concat([pd.DataFrame([{"SPECIE": args.specie, "MESH": args.mesh}]), pd.DataFrame([res])], axis = 1)
             df_["Entropy"] = df_Entropy.loc[index, "Entropy"]
             df_["CtbAvgDistance"] = df_contributors_distances.loc[index, "CtbAvgDistance"]

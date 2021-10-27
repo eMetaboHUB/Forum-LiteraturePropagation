@@ -128,7 +128,7 @@ for alpha in alpha_set:
     for sample_size in sample_size_set:
         print("\n- Compute MeSH priors using sample size = " + str(sample_size))
         # Compute prior parameters:
-        mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh_V2, sample_size = sample_size)
+        mesh_priors = table_mesh_corpora["P"].apply(estimate_prior_distribution_mesh, sample_size = sample_size)
         mesh_priors = pd.DataFrame(mesh_priors.tolist(), columns = ["alpha_prior", "beta_prior"])
         table_mesh_corpora_work = pd.concat([table_mesh_corpora, mesh_priors], axis = 1)
         

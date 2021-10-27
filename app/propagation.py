@@ -327,7 +327,7 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
 
     return res
 
-def estimate_prior_distribution_mesh_V2(mu, sample_size):
+def estimate_prior_distribution_mesh(mu, sample_size):
     """This function is used to estimate the prior distribution of the probability that a mention of a compound in an article, also involved the studied MeSH.
     This prior distribution is based on the independance hypothesis. 
     Args:
@@ -347,36 +347,12 @@ def estimate_prior_distribution_mesh_V2(mu, sample_size):
     result = r(alpha, beta)
     return result
 
-def estimate_prior_distribution_mesh(mesh_corpora):
-    
-    r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
-    
-    if not mesh_corpora:
-        result = r(1, 1)
-        return result
-    # Model parameters: 
-    mu_intercept = -14.2634974
-    mu_factor = 0.8363094
-    sigma_intercept = -13.1256575
-    sigma_factor = 0.7598162
-    
-    # Compute estimates:
-    mu = sc.expit(mu_intercept + mu_factor * np.log(mesh_corpora))
-    sigma = np.exp(sigma_intercept + sigma_factor * np.log(mesh_corpora))
-
-    # Return parameters:
-    alpha = mu/sigma
-    beta = (1 - mu)/sigma
-
-    result = r(alpha, beta)
-    return result
-
 def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
     """This function is used to compute the density of a simple prior distribution, no mixture.
 
     Args:
-        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
-        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
+        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
         seq (float): The step used in np.arange to create the x vector of probabilities, only when sampling is True.
         sampling (bool, optional): Does the function have to compute a sampling of density values ?
 
@@ -409,8 +385,8 @@ def simple_posterior(cooc, corpora, alpha_prior, beta_prior, seq, sampling = Tru
     Args:
         cooc (list): The co-occurence between the specie in the graph and a particular MeSH descriptor  
         corpora (list): The corpus size related to the specie in the graph
-        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
-        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
+        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
         seq (float): The step used in np.arange to create the x vector of probabilities, only when sampling is True.
         sampling (bool, optional): Does the function have to compute a sampling of density values ?
 
@@ -730,14 +706,14 @@ def compute_mix_CDF(p, weights, alpha, beta):
 
 def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None):
     """This function is used to compute the complete analysis for a Compound - MeSH relation.
-    If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh_V2 is used, otherwise we will used the prior mixture.
+    If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh is used, otherwise we will used the prior mixture.
 
     Args:
         index (integer): the index of the specie if the metabolic network
         data (pandas.DataFrame): data related to corpus size of each compound in the metabolic network and their co-occurence with the studied MeSH 
         p (float): The general probability to observed a mention of a compound in an article, also involving the MeSH.
-        alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
-        beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
+        alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh)
+        beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh)
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
         plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_mix_distributions and plot_distributions. Defaults to False.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.

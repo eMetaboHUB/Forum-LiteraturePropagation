@@ -774,7 +774,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, np.NaN, np.NaN, False]))
         return resultat
 
-    # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
+    # Null weights have to be removed before the computation as we will use the log(weights) during the computation.
     to_remove = list()
     for it in range(0, len(weights)):
         # Check weight
@@ -803,8 +803,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     if update_data:
         # As null weight have been removed duruing computation, we use SPECIE instead of index as key
         data["posterioir_weights"] = float(0)
+        data["CDF"] = np.NaN
         for j in range(0, len(labels)):
             data.loc[data["SPECIE"] == labels[j], "posterioir_weights"] = posterior_mix.weights[j]
+            data.loc[data["SPECIE"] == labels[j], "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j]) 
 
     if plot:
         # If names have been provided, use them instead of species labels in Figures:

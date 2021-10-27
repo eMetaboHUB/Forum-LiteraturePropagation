@@ -44,7 +44,7 @@ if g is None:
     sys.exit(1)
 
 print("> Import species corpora sizes ... ", end = '')
-table_species_corpora = import_and_map_indexes(args.specie_corpora_path, g, args.id_att)
+table_species_corpora = import_and_map(args.specie_corpora_path, g, args.id_att)
 if table_species_corpora is None:
     print("\n /!\ Exit due to errors during data import")
     sys.exit(1)
@@ -57,7 +57,7 @@ TOTAL_CPD_MENTIONS = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
 print("Ok")
 
 print("> Import species-MeSH co-occurences ... ", end = '')
-table_coocurences = import_and_map_indexes(args.specie_mesh_path, g, args.id_att)
+table_coocurences = import_and_map(args.specie_mesh_path, g, args.id_att)
 if table_coocurences is None:
     print("\n /!\ Exit due to errors during data import")
     sys.exit(1)
@@ -152,8 +152,8 @@ for alpha in alpha_set:
         # If only a specie has been provided
         elif args.specie and not args.mesh:
             print("\nCompute associations between " + args.specie + " and all MeSHs")
-            index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
-            r = specie_mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            index = table_species_corpora[table_species_corpora["SPECIE"] == args.specie].index[0]
+            r = specie2mesh(index, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
             # Add Entropy, CtbAvgDistance, CtbAvgCorporaSize, NbCtb of the targeted compound
             r["Entropy"] = float(df_Entropy.loc[index, "Entropy"])
             r["CtbAvgDistance"] = float(df_contributors_distances.loc[index, "CtbAvgDistance"])
@@ -168,7 +168,7 @@ for alpha in alpha_set:
         # If only a mesh has been provided
         elif args.mesh and not args.specie:
             print("\nCompute associations between " + args.mesh + " and all species")
-            r = mesh_specie(args.mesh, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            r = mesh2specie(args.mesh, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
             # Add Entropy, CtbAvgDistance, CtbAvgCorporaSize, NbCtb
             r["Entropy"] = df_Entropy["Entropy"]
             r["CtbAvgDistance"] = df_contributors_distances["CtbAvgDistance"]
@@ -182,12 +182,12 @@ for alpha in alpha_set:
 
         elif args.mesh and args.specie:
             print("\nCompute associations between " + args.specie + " and " + args.mesh)
-            index = int(table_species_corpora[table_species_corpora["SPECIE"] == args.specie]["index"])
+            index = table_species_corpora[table_species_corpora["SPECIE"] == args.specie].index[0]
             table_species_corpora["weights"] = weights[:, index].tolist()
-            cooc = table_coocurences[table_coocurences["MESH"] == args.mesh][["index", "COOC"]]
-            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            cooc = table_coocurences[table_coocurences["MESH"] == args.mesh][["SPECIE", "COOC"]]
+            data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
             if args.forget:
-                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+                data.loc[index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
             p = float(MeSH_info["P"])
             print("P = " + str(p))

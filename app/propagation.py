@@ -77,7 +77,7 @@ def import_table(path):
     
     return data
 
-def import_and_map_indexes(path, g, id_att):
+def import_and_map(path, g, id_att):
     """This function is used to import tables related to species. It also add a new column containing the species index in the graph g.
     Args:
         path (string): path to the table to import
@@ -85,10 +85,10 @@ def import_and_map_indexes(path, g, id_att):
         id_att (str): The name of the vertex attribute containing the specie identifier (eg. M_m0001c) in the graph.
 
     Returns:
-        (pandas.DataFrame): The imported table with a new column, index, indicating the species index in the graph
+        (pandas.DataFrame): The imported tabke, keeping species that are present in the graph
     """
     # Create a table to map species labels (SPECIE column) to indexes in the graph.
-    label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[id_att]})
+    graph_table = pd.DataFrame({"SPECIE": g.vs[id_att]})
     data = import_table(path)
 
     # If data or graph have not been well imported, return None
@@ -96,11 +96,11 @@ def import_and_map_indexes(path, g, id_att):
         return None
 
     # Test if merge is possible :
-    if not len(list(set(data["SPECIE"]).intersection(label_to_index["SPECIE"]))):
+    if not len(list(set(data["SPECIE"]).intersection(graph_table["SPECIE"]))):
         print("\nERROR: No 'SPECIE' idenfiers in the raw data (" + path + ") is matching with identifiers in the graph (id_att = " + id_att + ").")
         return None
     # Merge
-    coocurences = pd.merge(label_to_index, data, on = "SPECIE", how = "left")
+    coocurences = pd.merge(graph_table, data, on = "SPECIE", how = "left")
 
     return coocurences
 
@@ -829,7 +829,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     return resultat
 
 
-def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, forget):
+def specie2mesh(index, table_cooc, table_species_corpora, weights, table_mesh, forget):
     """This function is used to computed associations from a specific specie against all available MeSHs.
 
     Args:
@@ -852,13 +852,13 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
         for i in indexes:
             mesh = mesh_list[i]
             # Get cooc vector. It only contains species that have at least one article, need to left join.
-            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["SPECIE", "COOC"]]
             # Get data
-            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
             
             # If forget option is true, remove observation of the studied specie
             if forget:
-                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+                data.loc[index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             
             # Get MeSH info
             MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
@@ -873,7 +873,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     df_.insert(0, "MESH", mesh_list)
     return(df_)
 
-def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, forget):
+def mesh2specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, forget):
     """This function is used to computed associations from a specific MeSH against all available species.
 
     Args:
@@ -890,18 +890,18 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
-    cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+    cooc = table_cooc[table_cooc["MESH"] == mesh][["SPECIE", "COOC"]]
     p = float(MeSH_info["P"])
     
     # Browser all species
     with progressbar.ProgressBar(max_value=len(indexes)) as bar:
         for i in indexes:
             table_species_corpora["weights"] = weights[:, i].tolist()
-            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
             
             # If forget option is true, remove observation of the studied specie
             if forget:
-                data.loc[data["index"] == i, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+                data.loc[i, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             
             # Computation
             r = computation(i, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
@@ -942,15 +942,15 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
         for i in range(0, n):
             specie = str(f.iloc[[i], 0].item())
             mesh = str(f.iloc[[i], 1].item())
-            index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
+            index = table_species_corpora[table_species_corpora["SPECIE"] == specie].index[0]
             # Prepare data
             table_species_corpora["weights"] = weights[:, index].tolist()
-            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
-            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["SPECIE", "COOC"]]
+            data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
             
             # If forget option is true, remove observation of the studied specie
             if forget:
-                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+                data.loc[index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             
             # Get MeSH info
             MeSH_info = table_mesh[table_mesh["MESH"] == mesh]

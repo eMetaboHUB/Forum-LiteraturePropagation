@@ -4,10 +4,12 @@ import pandas as pd
 import numpy as np
 import copy
 import collections
+import warnings
 import scipy.special as sc
 import scipy.stats as ss
 import progressbar
 import matplotlib.pyplot as plt
+import plotly
 from matplotlib import cm
 np.set_printoptions(suppress=True)
 
@@ -488,7 +490,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
             - f (list): Densities 
             - mu (float): Mean of the distribution 
     """
-    r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu"])
+    r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu", "l_mu"])
     l = len(weights_pior)
     x = None
     y = None
@@ -518,7 +520,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
     mu_i = [(alpha_post[it]/(alpha_post[it] + beta_post[it])) for it in range(0, l)]
     mu = np.dot(W, mu_i)
 
-    mix = r(alpha_post, beta_post, W, x, y, mu)
+    mix = r(alpha_post, beta_post, W, x, y, mu, mu_i)
     
     return mix
 
@@ -703,27 +705,37 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def compute_odds(cdf, as_log = True):
+def compute_log_odds(cdf):
     """
-    This function is used to compute the odds or log(odds) from the CDF.
+    This function is used to compute the log(odds) from the CDF.
     The success probability is defined as (1-CDF) so P(p > mu)
-    If CDF = 0, reports infinite odds, for logs and classic. 
+    If CDF = 0, reports infinite odds.
+    If CDF = 1, reports -infinite odds 
     Args:
         cdf (float): The computed CDF from *computation* (P(p <= mu))
-        as_log (bool, optional): Return classic odds or log(odds). Defaults to True.
 
     Returns:
         [type]: [description]
     """
-    # CDF is rounded to avoid float approximation errors while passing through the log
-    cdf = np.round(cdf, 6)
-    if cdf == 0:
-        return np.Inf
-    if cdf == 1:
-        return -np.Inf
-    if not as_log:
-        return (1-cdf)/cdf
-    return np.log((1-cdf)/cdf)
+    # Due to float approximation, while computing the CDF of the mixture, it could appears > 1 due to approximation. To avoid issues with log next, we set it to 1. Rounding would not help.
+    if cdf > 1:
+        cdf = 1
+
+    with np.errstate(all='print'):
+        log_odds = np.log((1 - cdf)) - np.log(cdf)
+    
+    return log_odds
+
+def contributions_plot(data, names, limit = 0.95, on = "posterioir_weights"):
+    _data = data.copy()
+    _data["CDF"] = np.log()
+    _data["name"] = names
+    _data.sort_values(by = 'posterioir_weights', inplace=True, ascending = False, ignore_index = True)
+    cumsum = np.cumsum(_data["posterioir_weights"].tolist())
+    l = np.argmin(abs(cumsum - limit))
+    _data.drop(index = _data.index[(l + 1):], inplace = True)
+    _data.loc[-1] = ["others", np.NaN, np.NaN, np.NaN, (1 - cumsum[l]), np.NaN, "others"]
+    print(_data)
 
 
 def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None, update_data = False):
@@ -776,7 +788,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
 
         # Compute Log(odds) from the CDF
-        Log_odds = compute_odds(cdf_posterior)
+        Log_odds = compute_log_odds(cdf_posterior)
 
         resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, np.NaN, np.NaN, False]))
         return resultat
@@ -802,7 +814,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
 
     # Compute Log(odds) from the CDF
-    Log_odds = compute_odds(cdf_posterior_mix)
+    Log_odds = compute_log_odds(cdf_posterior_mix)
 
     # Compute Log2FC from the posterior mixture
     post_Log2FC = np.log2(posterior_mix.mu/p)
@@ -813,9 +825,13 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         # As null weight have been removed during computation, we use SPECIE instead of index as key
         data["posterioir_weights"] = float(0)
         data["CDF"] = np.NaN
+        data["LogOdds"] = np.NaN
+        data["Log2FC"] = np.NaN
         for j in data.index:
             data.loc[j, "posterioir_weights"] = posterior_mix.weights[j]
-            data.loc[j, "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j]) 
+            data.loc[j, "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j])
+            data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
+            data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
 
     # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
     if plot:
@@ -823,8 +839,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         # If names have been provided, use them instead of species labels in Figures:
         if species_name_path:
             species_name = pd.read_csv(species_name_path)
-            species_name = species_name[species_name["SPECIE"].isin(data["SPECIE"].tolist())]
-            names = species_name["SPECIE_NAME"].tolist()
+            _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on = "SPECIE", how = "left")
+            names = _df_names["SPECIE_NAME"].tolist()
         
         # We set the top to top 10: 
         top = 10

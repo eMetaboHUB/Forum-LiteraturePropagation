@@ -1,6 +1,5 @@
 import sys, os
 import igraph as ig
-import cairo
 import pandas as pd
 import numpy as np
 import copy
@@ -653,7 +652,7 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     # for personalised fig
-    # plt.axis((-0.005, 0.1, 0, 400))
+    plt.axis((-0.005, 0.1, 0, 400))
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
 
@@ -683,7 +682,7 @@ def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     # for personalised fig
-    # plt.axis((-0.005, 0.1, 0, 400))
+    plt.axis((-0.005, 0.1, 0, 400))
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
 
@@ -716,6 +715,8 @@ def compute_odds(cdf, as_log = True):
     Returns:
         [type]: [description]
     """
+    # CDF is rounded to avoid float approximation errors while passing through the log
+    cdf = np.round(cdf, 6)
     if cdf == 0:
         return np.Inf
     if cdf == 1:
@@ -752,80 +753,94 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         - priorLog2FC: Same as Log2FC, but for the mixture prior.
     """
 
-    weights = data["weights"].tolist()
-    del weights[index]
-    cooc = data["COOC"].tolist()
-    k = int(cooc.pop(index))
-    corpora = data["TOTAL_PMID_SPECIE"].tolist()
-    labels = data["SPECIE"].to_list()
-    del labels[index]
-    n = int(corpora.pop(index))
-    # If all weights are null, no neighborhood information:
-    if sum(weights) == 0:
+    # Get data and remove the line corresponding to the targeted specie in data
+    k = int(data.loc[index, "COOC"])
+    n = int(data.loc[index, "TOTAL_PMID_SPECIE"])
+    data.drop(index = index, inplace = True)
+    
+    # If all weights are null, no neighborhood information.
+    if sum(data["weights"]) == 0:
+        
+        # use initial prior
         prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
         posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = plot)
+
         # In case of no neighborhood information, we simply plot prior vs posterior distributions:
         if plot:
             plot_distributions(prior, posterior)
-        # Compute additional values:
+        
+        # Compute Log2FC:
         Log2numFC = np.log2(posterior.mu/p)
+
+        # Compute the CDF from the posterior distribution
         cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
+
+        # Compute Log(odds) from the CDF
         Log_odds = compute_odds(cdf_posterior)
+
         resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, np.NaN, np.NaN, False]))
         return resultat
 
     # Null weights have to be removed before the computation as we will use the log(weights) during the computation.
-    to_remove = list()
-    for it in range(0, len(weights)):
-        # Check weight
-        if not weights[it]:
-            to_remove.append(it)
-    # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
-    for rmv in sorted(to_remove, reverse=True):
-        del weights[rmv]
-        del cooc[rmv]
-        del corpora[rmv]
-        del labels[rmv]
+    to_remove = data[data["weights"] == 0].index
+    data.drop(index = to_remove, inplace = True)
+    data.reset_index(drop = True, inplace = True)
     
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
-    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
+    prior_mix = create_prior_beta_mix(data["weights"].tolist(), data["COOC"].tolist(), data["TOTAL_PMID_SPECIE"].tolist(), seq, alpha_prior, beta_prior, sampling = plot)
+    
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
     prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
     
-    # Compute prior Mean ratio
-    prior_mean_ratio = np.log2(prior_mix.mu/p)
+    # Compute Log2FC ratio from prior mixture
+    prior_Log2FC = np.log2(prior_mix.mu/p)
+    
     # Posterior mix:
     posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
+    
+    # Compute CDF of the posterior distibution
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
-    Log_odds = compute_odds(cdf_posterior_mix)
-    Log2numFC = np.log2(posterior_mix.mu/p)
 
+    # Compute Log(odds) from the CDF
+    Log_odds = compute_odds(cdf_posterior_mix)
+
+    # Compute Log2FC from the posterior mixture
+    post_Log2FC = np.log2(posterior_mix.mu/p)
+
+    # If the inputs are a specific specie with a specific MeSH, we need export the data table
     if update_data:
-        # As null weight have been removed duruing computation, we use SPECIE instead of index as key
+
+        # As null weight have been removed during computation, we use SPECIE instead of index as key
         data["posterioir_weights"] = float(0)
         data["CDF"] = np.NaN
-        for j in range(0, len(labels)):
-            data.loc[data["SPECIE"] == labels[j], "posterioir_weights"] = posterior_mix.weights[j]
-            data.loc[data["SPECIE"] == labels[j], "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j]) 
+        for j in data.index:
+            data.loc[j, "posterioir_weights"] = posterior_mix.weights[j]
+            data.loc[j, "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j]) 
 
+    # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
     if plot:
+
         # If names have been provided, use them instead of species labels in Figures:
         if species_name_path:
             species_name = pd.read_csv(species_name_path)
-            df_l = pd.merge(pd.DataFrame({"SPECIE": labels}), species_name, on = "SPECIE", how = "left")
-            labels = df_l["SPECIE_NAME"]
+            species_name = species_name[species_name["SPECIE"].isin(data["SPECIE"].tolist())]
+            names = species_name["SPECIE_NAME"].tolist()
+        
         # We set the top to top 10: 
         top = 10
-        # We need to keep the same color palette between the both plots
+
         # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict (so max number of contributors displayed is 20)
-        set_contributors = set([labels[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [labels[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
-        palette = dict(zip(set_contributors, cm.tab20(np.linspace(0,1,len(set_contributors)))))
-        plot_mix_distributions(prior_mix, labels, seq, "Prior components", palette, top)
-        plot_mix_distributions(posterior_mix, labels, seq, "Posterior components", palette, top)
+        set_contributors = set([names[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [names[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
+        
+        # We need to keep the same color palette between the both plots
+        palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
+        
+        # Plot
+        plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
+        plot_mix_distributions(posterior_mix, names, seq, "Posterior components", palette, top)
         plot_distributions(prior_mix, posterior_mix)
     
-    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, Log2numFC, prior_mix_CDF, prior_mean_ratio, True]))
-
+    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, post_Log2FC, prior_mix_CDF, prior_Log2FC, True]))
     return resultat
 
 

@@ -796,7 +796,6 @@ def contributions_plot(data, names, limit = 0.99):
     _data.loc[_data.LogOdds >= np.log(100), "w_LogOdds"] = np.log(100)
     _data.loc[_data.LogOdds <= np.log(0.01), "w_LogOdds"] = np.log(0.01)
     _data["LogOdds"] = [str(v) for v in np.round(_data["LogOdds"], 2)]
-    print(_data)
     fig = px.bar(_data, y = "y",
         x = "posterioir_weights",
         color="w_LogOdds",
@@ -818,21 +817,25 @@ def contributions_plot(data, names, limit = 0.99):
     # fig.show()
     return fig
 
-def generate_html_report(out_path, figs, section_titles):
-    html_content = """
+def generate_html_report(out_path, figs, section_titles, resultat):
+    contributors = "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs = False, output_type='div') for i in range(len(figs))])
+    res = "<p>".join(["<b>" + k + ": </b> " + str(v) for k, v in resultat.items()])
+    html_template = f"""
     <html>
     <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
     <body>
         <h1>NEIGHBORHOOD CONTRIBUTION: HTML REPORT</h1>
-    %s
+        <h2> RESULTS</h2>
+        {res}
+        <h2> CONTRIBUTORS </h2>
+        {contributors}
     </body>
     </html>
     """
-    html_content = html_content % "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs = False, output_type='div') for i in range(len(figs))])
     with open(out_path, "w") as f:
-        f.write(html_content)
+        f.write(html_template)
 
 
 def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = None, weigth_limit = 1e-5, species_name_path = None, update_data = False):
@@ -873,12 +876,6 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
         # use initial prior
         prior = simple_prior(alpha_prior, beta_prior, seq, sampling = report)
         posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = report)
-
-        # In case of no neighborhood information, we simply plot prior vs posterior distributions:
-        if report:
-            # plot_distributions(prior, posterior)
-            f1 = plot_distributions_plotly(prior, posterior)
-            generate_html_report(report, [f1], ["Prior .VS. Posterior"])
         
         # Compute Log2FC:
         Log2numFC = np.log2(posterior.mu/p)
@@ -890,6 +887,13 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
         Log_odds = compute_log_odds(cdf_posterior)
 
         resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, np.NaN, np.NaN, False]))
+        
+        # In case of no neighborhood information, we simply plot prior vs posterior distributions:
+        if report:
+            # plot_distributions(prior, posterior)
+            f1 = plot_distributions_plotly(prior, posterior)
+            generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat)
+
         return resultat
 
     # Null weights have to be removed before the computation as we will use the log(weights) during the computation.
@@ -932,6 +936,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
             data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
             data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
 
+    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, post_Log2FC, prior_mix_CDF, prior_Log2FC, True]))
+
     # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
     if report:
 
@@ -962,9 +968,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
         f4 = contributions_plot(data, names)
 
         # Generate report:
-        generate_html_report(report, [f1, f2, f3, f4], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Contributions"])
+        generate_html_report(report, [f1, f2, f3, f4], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Contributions"], resultat)
     
-    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, post_Log2FC, prior_mix_CDF, prior_Log2FC, True]))
     return resultat
 
 

@@ -21,15 +21,15 @@ class TestPropagationMethods(unittest.TestCase):
         cls.table_mesh_corpora["P"] = cls.table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/(cls.table_species_corpora['TOTAL_PMID_SPECIE'].sum())
 
         # PROBA
-        cls.probabilities = propagation_volume(cls.g, 0.4)
-        cls.probabilities = np.around(cls.probabilities, 9)
-        # cls.probabilities = pd.read_csv("tests/data/Human1/1.7/validation/PROBA_0.4.csv", index_col = 0, header = 0).to_numpy()
+        # cls.probabilities = propagation_volume(cls.g, 0.4)
+        # cls.probabilities = np.around(cls.probabilities, 9)
+        cls.probabilities = pd.read_csv("tests/data/Human1/1.7/validation/PROBA_0.4.csv", index_col = 0, header = 0).to_numpy()
 
         # WEIGHTS
         cls.q = 1/(len(cls.g.vs) - 1)
-        cls.weights = compute_weights(cls.probabilities, cls.table_species_corpora, cls.q)
-        cls.weights = np.around(cls.weights, 9)
-        # cls.weights = pd.read_csv("tests/data/Human1/1.7/validation/WEIGHTS_0.4.csv", index_col = 0, header = 0).to_numpy()
+        # cls.weights = compute_weights(cls.probabilities, cls.table_species_corpora, cls.q)
+        # cls.weights = np.around(cls.weights, 9)
+        cls.weights = pd.read_csv("tests/data/Human1/1.7/validation/WEIGHTS_0.4.csv", index_col = 0, header = 0).to_numpy()
 
         # TEST PRIOR/POSTERIOR MIX FUNCTIONS
         
@@ -65,7 +65,7 @@ class TestPropagationMethods(unittest.TestCase):
         p = 0.002214000288021922
         alpha_prior = 2.2140002880219223
         beta_prior = 997.7859997119781
-        res = computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False)
+        res = computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = False)
         self.assertEqual(np.round(res['CDF'], 9), 0.002127064)
         self.assertEqual(np.round(res['Log2FC'], 9), 3.216560006)
         self.assertEqual(np.round(res['priorCDF'], 9), 0.008455974)

@@ -4,11 +4,14 @@ import pandas as pd
 import numpy as np
 import copy
 import collections
+import plotly.express as px
 import warnings
 import scipy.special as sc
 import scipy.stats as ss
 import progressbar
+import matplotlib
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import plotly
 from matplotlib import cm
 np.set_printoptions(suppress=True)
@@ -649,7 +652,7 @@ def plot_distributions(prior_mix, posterior_mix):
     """
     plt.plot(prior_mix.x, prior_mix.f, label = "prior", color = "blue")
     plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior", color = "red")
-    plt.title('Differences between prior mix and posterior mix distribution ')
+    plt.title('Differences between prior mix and posterior mix distribution')
     plt.legend()
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
@@ -657,6 +660,31 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.axis((-0.005, 0.1, 0, 400))
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
+
+def plot_distributions_plotly(prior_mix, posterior_mix):
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x = prior_mix.x,
+            y = prior_mix.f,
+            line = dict(color = "blue"),
+            name = "Prior"
+            )
+        )
+    fig.add_trace(
+        go.Scatter(
+            x = posterior_mix.x,
+            y = posterior_mix.f,
+            line = dict(color = "red"),
+            name = "Posterior"
+        )
+    )
+    fig.update_layout(title = "Differences between prior mix and posterior mix distribution",
+        xaxis_title = "Probability",
+        yaxis_title = "Density",
+        template = "simple_white")
+    fig.show()
+    return fig
 
 def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
     """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
@@ -688,6 +716,32 @@ def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
 
+
+def plot_mix_distributions_plotly(mix, labels, seq, name, color_palette, top):
+    fig = go.Figure()
+    x = np.arange(0, 1 + seq, seq).tolist()
+    weights = mix.weights
+    # To plot only the top n contributors, we first order the index of weights in decreasing order
+    ordered_i_w = np.flip(np.argsort(weights))
+    # We go trough the list of weight until we reach the n'th contributor, or the last contributor if there are les than n
+    for i in range(0, min(len(weights), top)):
+        it = ordered_i_w[i]
+        f = ss.beta.pdf(x, a = mix.alpha[it], b = mix.beta[it])
+        y = weights[it] * f
+        fig.add_trace(
+            go.Scatter(
+                x = x,
+                y = y,
+                line = dict(color = matplotlib.colors.rgb2hex(color_palette[labels[it]])),
+                name = labels[it] + ": Beta(" + str(round(mix.alpha[it], 2)) + ", " + str(round(mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)),
+                hovertemplate = "<b>Contributor:</b>"+ labels[it] + "<extra></extra>")
+            )
+    fig.update_layout(title = "Top " + str(min(len(weights), top)) + " - " + name + " decomposition",
+        xaxis_title = "Probability",
+        yaxis_title = "Density",
+        template = "simple_white")
+    fig.show()
+    return fig
 
 def compute_mix_CDF(p, weights, alpha, beta):
     """This function is used to compute the CDF of a mixture distribution
@@ -726,16 +780,43 @@ def compute_log_odds(cdf):
     
     return log_odds
 
-def contributions_plot(data, names, limit = 0.95, on = "posterioir_weights"):
+def contributions_plot(data, names, limit = 0.99):
     _data = data.copy()
-    _data["CDF"] = np.log()
+    _data["y"] = "contributors"
     _data["name"] = names
-    _data.sort_values(by = 'posterioir_weights', inplace=True, ascending = False, ignore_index = True)
+    _data.sort_values(by = 'posterioir_weights', inplace = True, ascending = False, ignore_index = True)
     cumsum = np.cumsum(_data["posterioir_weights"].tolist())
     l = np.argmin(abs(cumsum - limit))
+    others_median = np.median(_data.loc[_data.index[(l + 1):], "LogOdds"])
+    others_COOC = np.median(_data.loc[_data.index[(l + 1):], "COOC"])
+    others_TOTAL_PMID_SPECIE = np.median(_data.loc[_data.index[(l + 1):], "TOTAL_PMID_SPECIE"])
     _data.drop(index = _data.index[(l + 1):], inplace = True)
-    _data.loc[-1] = ["others", np.NaN, np.NaN, np.NaN, (1 - cumsum[l]), np.NaN, "others"]
+    _data.loc[-1] = ["others", others_TOTAL_PMID_SPECIE, np.NaN, others_COOC, (1 - cumsum[l]), np.NaN, others_median, np.NaN, "contributors", "others"]
+    _data["w_LogOdds"] = _data["LogOdds"]
+    _data.loc[_data.LogOdds >= np.log(100), "w_LogOdds"] = np.log(100)
+    _data.loc[_data.LogOdds <= np.log(0.01), "w_LogOdds"] = np.log(0.01)
+    _data["LogOdds"] = [str(v) for v in np.round(_data["LogOdds"], 2)]
     print(_data)
+    fig = px.bar(_data, y = "y",
+        x = "posterioir_weights",
+        color="w_LogOdds",
+        orientation="h",
+        hover_data = dict({"TOTAL_PMID_SPECIE": ":.", "COOC": ":.", "posterioir_weights": ":.2f", "LogOdds": True, "w_LogOdds": False, "y": False}),
+        hover_name="name",
+        height=800,
+        range_color=[np.log(0.01), np.log(100)],
+        facet_col_spacing = 1,
+        color_continuous_scale = [(0, "blue"), (0.5, "white"), (1, "red")],
+        template = "seaborn",
+        labels = {"y": '', "posterioir_weights": "Posterior weights"})
+    fig.update_layout(coloraxis_colorbar=dict(title = "Contributor Odds (in log scale)",
+        tickvals = [np.log(0.01), np.log(0.02), np.log(0.1), 0, np.log(10), np.log(50), np.log(100)],
+        ticktext = ["<= 0.01", "0.02", "0.1", "0", "10", "50", ">= 100"],
+        len = 5))
+    fig.update_traces(marker_line_color='rgb(0,0,0)', marker_line_width = 1, opacity = 1)
+    fig.update_xaxes(range=[0, 1])
+    fig.show()
+    return fig
 
 
 def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None, update_data = False):
@@ -852,9 +933,15 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
         
         # Plot
-        plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
-        plot_mix_distributions(posterior_mix, names, seq, "Posterior components", palette, top)
-        plot_distributions(prior_mix, posterior_mix)
+        # plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
+        plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
+        # plot_mix_distributions(posterior_mix, names, seq, "Posterior components", palette, top)
+        plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
+        # plot_distributions(prior_mix, posterior_mix)
+        plot_distributions_plotly(prior_mix, posterior_mix)
+
+        # Contribution plot
+        contributions_plot(data, names)
     
     resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, post_Log2FC, prior_mix_CDF, prior_Log2FC, True]))
     return resultat

@@ -683,7 +683,7 @@ def plot_distributions_plotly(prior_mix, posterior_mix):
         xaxis_title = "Probability",
         yaxis_title = "Density",
         template = "simple_white")
-    fig.show()
+    # fig.show()
     return fig
 
 def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
@@ -740,7 +740,7 @@ def plot_mix_distributions_plotly(mix, labels, seq, name, color_palette, top):
         xaxis_title = "Probability",
         yaxis_title = "Density",
         template = "simple_white")
-    fig.show()
+    # fig.show()
     return fig
 
 def compute_mix_CDF(p, weights, alpha, beta):
@@ -775,7 +775,7 @@ def compute_log_odds(cdf):
     if cdf > 1:
         cdf = 1
 
-    with np.errstate(all='print'):
+    with np.errstate(all='ignore'):
         log_odds = np.log((1 - cdf)) - np.log(cdf)
     
     return log_odds
@@ -815,11 +815,27 @@ def contributions_plot(data, names, limit = 0.99):
         len = 5))
     fig.update_traces(marker_line_color='rgb(0,0,0)', marker_line_width = 1, opacity = 1)
     fig.update_xaxes(range=[0, 1])
-    fig.show()
+    # fig.show()
     return fig
 
+def generate_html_report(out_path, figs, section_titles):
+    html_content = """
+    <html>
+    <head>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    </head>
+    <body>
+        <h1>NEIGHBORHOOD CONTRIBUTION: HTML REPORT</h1>
+    %s
+    </body>
+    </html>
+    """
+    html_content = html_content % "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs = False, output_type='div') for i in range(len(figs))])
+    with open(out_path, "w") as f:
+        f.write(html_content)
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None, update_data = False):
+
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = None, weigth_limit = 1e-5, species_name_path = None, update_data = False):
     """This function is used to compute the complete analysis for a Compound - MeSH relation.
     If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh is used, otherwise we will used the prior mixture.
 
@@ -830,10 +846,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh)
         beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh)
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
-        plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_mix_distributions and plot_distributions. Defaults to False.
+        report (optional): Path to output the html report. Defaults to None.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
         species_name_path (str): Path to the file containing species' names for figures legend
-        update_data (boolean, optional): Does the data table need to be updated with posterior weights, cdf, etc of each contributors (for export)
+        update_data (bool, optional): Does the data table need to be updated with posterior weights, cdf, etc of each contributors (for export)
 
     Returns:
         [dict]: A dictionnary with:
@@ -855,13 +871,14 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     if sum(data["weights"]) == 0:
         
         # use initial prior
-        prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
-        posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = plot)
+        prior = simple_prior(alpha_prior, beta_prior, seq, sampling = report)
+        posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = report)
 
         # In case of no neighborhood information, we simply plot prior vs posterior distributions:
-        if plot:
+        if report:
             # plot_distributions(prior, posterior)
-            plot_distributions_plotly(prior, posterior)
+            f1 = plot_distributions_plotly(prior, posterior)
+            generate_html_report(report, [f1], ["Prior .VS. Posterior"])
         
         # Compute Log2FC:
         Log2numFC = np.log2(posterior.mu/p)
@@ -881,7 +898,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     data.reset_index(drop = True, inplace = True)
     
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
-    prior_mix = create_prior_beta_mix(data["weights"].tolist(), data["COOC"].tolist(), data["TOTAL_PMID_SPECIE"].tolist(), seq, alpha_prior, beta_prior, sampling = plot)
+    prior_mix = create_prior_beta_mix(data["weights"].tolist(), data["COOC"].tolist(), data["TOTAL_PMID_SPECIE"].tolist(), seq, alpha_prior, beta_prior, sampling = report)
     
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
     prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
@@ -890,7 +907,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
     prior_Log2FC = np.log2(prior_mix.mu/p)
     
     # Posterior mix:
-    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
+    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = report)
     
     # Compute CDF of the posterior distibution
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
@@ -916,7 +933,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
             data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
 
     # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
-    if plot:
+    if report:
 
         # If names have been provided, use them instead of species labels in Figures:
         if species_name_path:
@@ -935,14 +952,17 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
         
         # Plot
         # plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
-        plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
+        f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
         # plot_mix_distributions(posterior_mix, names, seq, "Posterior components", palette, top)
-        plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
+        f2 = plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
         # plot_distributions(prior_mix, posterior_mix)
-        plot_distributions_plotly(prior_mix, posterior_mix)
+        f3 = plot_distributions_plotly(prior_mix, posterior_mix)
 
         # Contribution plot
-        contributions_plot(data, names)
+        f4 = contributions_plot(data, names)
+
+        # Generate report:
+        generate_html_report(report, [f1, f2, f3, f4], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Contributions"])
     
     resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, post_Log2FC, prior_mix_CDF, prior_Log2FC, True]))
     return resultat
@@ -1076,7 +1096,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
             p = float(MeSH_info["P"])
 
             # Computation
-            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
             store.append(r)
             bar.update(i)
     

@@ -860,7 +860,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = Fa
 
         # In case of no neighborhood information, we simply plot prior vs posterior distributions:
         if plot:
-            plot_distributions(prior, posterior)
+            # plot_distributions(prior, posterior)
+            plot_distributions_plotly(prior, posterior)
         
         # Compute Log2FC:
         Log2numFC = np.log2(posterior.mu/p)

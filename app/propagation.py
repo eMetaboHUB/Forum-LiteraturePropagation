@@ -819,7 +819,7 @@ def contributions_plot(data, names, limit = 0.99):
 
 def generate_html_report(out_path, figs, section_titles, resultat):
     contributors = "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs = False, output_type='div') for i in range(len(figs))])
-    res = "<p>".join(["<b>" + k + ": </b> " + str(v) for k, v in resultat.items()])
+    res = "<p>".join(["<b>" + k + ": </b> " + "{:.2e}".format(v) if isinstance(v, float) else "<b>" + k + ": </b> " + str(v) for k, v in resultat.items()])
     html_template = f"""
     <html>
     <head>

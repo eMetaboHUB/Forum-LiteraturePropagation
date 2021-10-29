@@ -662,6 +662,13 @@ def plot_distributions(prior_mix, posterior_mix):
     plt.show()
 
 def plot_distributions_plotly(prior_mix, posterior_mix):
+    """This function is used to plot prior distribution against a posterior distribution
+    The figure is computed using plotly.
+    
+    Args:
+        prior_mix (collection): A collection containing information about a prior distribution with x probabilties and associated densities from create_prior_beta_mix or simple_prior with the samping = True
+        posterior_mix (collection): A collection containing information about a posterior distribution with x probabilties and associated densities from create_posterior_beta_mix or simple_posterior with the samping = True
+    """
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
@@ -718,6 +725,16 @@ def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
 
 
 def plot_mix_distributions_plotly(mix, labels, seq, name, color_palette, top):
+    """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
+    The figure is computed using plotly.
+
+    Args:
+        mix (collections): A collection containing information about the mixture distribution: weights, alpha and beta parameters
+        labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
+        seq (float): The step used in np.arange to create the x vector of probabilities.
+        color_palette (dict):  A dict containing as key the label of the specie and as value a np.array of 4 elements representing the associated color in RGBA format
+        top (int): The top n (maximum) of contributors that should be plotted
+    """
     fig = go.Figure()
     x = np.arange(0, 1 + seq, seq).tolist()
     weights = mix.weights
@@ -781,17 +798,37 @@ def compute_log_odds(cdf):
     return log_odds
 
 def contributions_plot(data, names, limit = 0.99):
+    """This function is used to produce the contribution plot
+
+    Args:
+        data (pandas.DataFrame): Data from computation 
+        names (list): A list of names
+        limit (float, optional): The limit from which contributors will be assigned to the 'others' category by computing the cumulative sum of their posterior weights. Defaults to 0.99.
+
+    Returns:
+        [plotly]: The figure
+    """
+    # First make a copy of data to keep the original clean
     _data = data.copy()
     _data["y"] = "contributors"
     _data["name"] = names
+
+    # Sort by posterior weights and determine contributors that belong the the 'others' category
     _data.sort_values(by = 'posterioir_weights', inplace = True, ascending = False, ignore_index = True)
     cumsum = np.cumsum(_data["posterioir_weights"].tolist())
     l = np.argmin(abs(cumsum - limit))
+    
+    # Compute stats for the 'others' category
     others_median = np.median(_data.loc[_data.index[(l + 1):], "LogOdds"])
     others_COOC = np.median(_data.loc[_data.index[(l + 1):], "COOC"])
     others_TOTAL_PMID_SPECIE = np.median(_data.loc[_data.index[(l + 1):], "TOTAL_PMID_SPECIE"])
+
+    # Replace 'others' contributors by the 'others' line  
     _data.drop(index = _data.index[(l + 1):], inplace = True)
     _data.loc[-1] = ["others", others_TOTAL_PMID_SPECIE, np.NaN, others_COOC, (1 - cumsum[l]), np.NaN, others_median, np.NaN, "contributors", "others"]
+
+    # To manage the color scale, we have to make a copy of Log_Odds. As many contributors could have very high or small LogOdds (eg. Inf or -Inf) we restrict their values to a range of -100 - 100 (in Odds, not LogOdds)
+    # For contributors that have an Odds higher than 100 or lower than -100, we replace their value by le limit (100 or -100) to restrict the color scale.
     _data["w_LogOdds"] = _data["LogOdds"]
     _data.loc[_data.LogOdds >= np.log(100), "w_LogOdds"] = np.log(100)
     _data.loc[_data.LogOdds <= np.log(0.01), "w_LogOdds"] = np.log(0.01)
@@ -808,6 +845,8 @@ def contributions_plot(data, names, limit = 0.99):
         color_continuous_scale = [(0, "blue"), (0.5, "white"), (1, "red")],
         template = "seaborn",
         labels = {"y": '', "posterioir_weights": "Posterior weights"})
+    
+    # The 'len' attribute in important
     fig.update_layout(coloraxis_colorbar=dict(title = "Contributor Odds (in log scale)",
         tickvals = [np.log(0.01), np.log(0.02), np.log(0.1), 0, np.log(10), np.log(50), np.log(100)],
         ticktext = ["<= 0.01", "0.02", "0.1", "0", "10", "50", ">= 100"],
@@ -815,9 +854,19 @@ def contributions_plot(data, names, limit = 0.99):
     fig.update_traces(marker_line_color='rgb(0,0,0)', marker_line_width = 1, opacity = 1)
     fig.update_xaxes(range=[0, 1])
     # fig.show()
+
     return fig
 
 def generate_html_report(out_path, figs, section_titles, resultat):
+    """This function is used to produce the HTML report
+
+    Args:
+        out_path (str): the path to write the html report
+        figs (list): A list of figures 
+        section_titles (list): A list of section titles for the figures
+        resultat (dict): The result dict with CDF, LogOdds, etc ...
+    """
+    
     contributors = "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs = False, output_type='div') for i in range(len(figs))])
     res = "<p>".join(["<b>" + k + ": </b> " + "{:.2e}".format(v) if isinstance(v, float) else "<b>" + k + ": </b> " + str(v) for k, v in resultat.items()])
     html_template = f"""
@@ -834,6 +883,7 @@ def generate_html_report(out_path, figs, section_titles, resultat):
     </body>
     </html>
     """
+
     with open(out_path, "w") as f:
         f.write(html_template)
 
@@ -860,6 +910,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
         - COOC (int): The total number of co-occurences between the targeted compound and the MeSH
         - Mean (float): The mean of the posterior distribution. 
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
+        - LogOdds (float): The logarithm of the Odds, computed from the CDF
         - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
         - priorCDF: Same as CDF, but for the mixture prior.
         - priorLog2FC: Same as Log2FC, but for the mixture prior.

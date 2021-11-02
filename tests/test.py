@@ -12,11 +12,11 @@ class TestPropagationMethods(unittest.TestCase):
         cls.g = import_metabolic_network("tests/data/Human1/1.7/init/Human-GEM_1.7_CarbonSkeletonGraph.gml", undirected = False)
         
         # Table species corpora
-        cls.table_species_corpora = import_and_map_indexes("tests/data/Human1/1.7/init/species_pmids_Human1_1.7.csv", cls.g, "label")
+        cls.table_species_corpora = import_and_map("tests/data/Human1/1.7/init/species_pmids_Human1_1.7.csv", cls.g, "label")
         cls.table_species_corpora = cls.table_species_corpora.fillna(0)
         
         # Table species - MeSH
-        cls.table_coocurences = import_and_map_indexes("tests/data/Human1/1.7/init/species_mesh_pmids_Human1_1.7.csv", cls.g, "label")
+        cls.table_coocurences = import_and_map("tests/data/Human1/1.7/init/species_mesh_pmids_Human1_1.7.csv", cls.g, "label")
         cls.table_mesh_corpora = cls.table_coocurences.groupby('MESH', as_index=False)[['COOC']].sum().rename(columns={"COOC": "TOTAL_CPD_MENTION_MESH"})
         cls.table_mesh_corpora["P"] = cls.table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/(cls.table_species_corpora['TOTAL_PMID_SPECIE'].sum())
 
@@ -65,11 +65,11 @@ class TestPropagationMethods(unittest.TestCase):
         p = 0.002214000288021922
         alpha_prior = 2.2140002880219223
         beta_prior = 997.7859997119781
-        res = computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False)
-        self.assertEqual(np.round(res.CDF, 9), 0.002127064)
-        self.assertEqual(np.round(res.Log2FC, 9), 3.216560006)
-        self.assertEqual(np.round(res.priorCDF, 9), 0.008455974)
-        self.assertEqual(np.round(res.priorLog2FC, 9), 4.054079044)
+        res = computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = False)
+        self.assertEqual(np.round(res['CDF'], 9), 0.002127064)
+        self.assertEqual(np.round(res['Log2FC'], 9), 3.216560006)
+        self.assertEqual(np.round(res['priorCDF'], 9), 0.008455974)
+        self.assertEqual(np.round(res['priorLog2FC'], 9), 4.054079044)
 
     def test_intial_prior(self):
         self.assertEqual(round(self.prior_mix.f[775], 7), 0.0049983)

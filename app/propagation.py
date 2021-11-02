@@ -1,14 +1,18 @@
 import sys, os
 import igraph as ig
-import cairo
 import pandas as pd
 import numpy as np
 import copy
 import collections
+import plotly.express as px
+import warnings
 import scipy.special as sc
 import scipy.stats as ss
 import progressbar
+import matplotlib
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly
 from matplotlib import cm
 np.set_printoptions(suppress=True)
 
@@ -77,7 +81,7 @@ def import_table(path):
     
     return data
 
-def import_and_map_indexes(path, g, id_att):
+def import_and_map(path, g, id_att):
     """This function is used to import tables related to species. It also add a new column containing the species index in the graph g.
     Args:
         path (string): path to the table to import
@@ -85,10 +89,10 @@ def import_and_map_indexes(path, g, id_att):
         id_att (str): The name of the vertex attribute containing the specie identifier (eg. M_m0001c) in the graph.
 
     Returns:
-        (pandas.DataFrame): The imported table with a new column, index, indicating the species index in the graph
+        (pandas.DataFrame): The imported tabke, keeping species that are present in the graph
     """
     # Create a table to map species labels (SPECIE column) to indexes in the graph.
-    label_to_index = pd.DataFrame({"index": range(0, len(g.vs)), "SPECIE": g.vs[id_att]})
+    graph_table = pd.DataFrame({"SPECIE": g.vs[id_att]})
     data = import_table(path)
 
     # If data or graph have not been well imported, return None
@@ -96,11 +100,11 @@ def import_and_map_indexes(path, g, id_att):
         return None
 
     # Test if merge is possible :
-    if not len(list(set(data["SPECIE"]).intersection(label_to_index["SPECIE"]))):
+    if not len(list(set(data["SPECIE"]).intersection(graph_table["SPECIE"]))):
         print("\nERROR: No 'SPECIE' idenfiers in the raw data (" + path + ") is matching with identifiers in the graph (id_att = " + id_att + ").")
         return None
     # Merge
-    coocurences = pd.merge(label_to_index, data, on = "SPECIE", how = "left")
+    coocurences = pd.merge(graph_table, data, on = "SPECIE", how = "left")
 
     return coocurences
 
@@ -327,7 +331,7 @@ def observation_uninformative_prior(k, n, seq, sampling = True):
 
     return res
 
-def estimate_prior_distribution_mesh_V2(mu, sample_size):
+def estimate_prior_distribution_mesh(mu, sample_size):
     """This function is used to estimate the prior distribution of the probability that a mention of a compound in an article, also involved the studied MeSH.
     This prior distribution is based on the independance hypothesis. 
     Args:
@@ -347,36 +351,12 @@ def estimate_prior_distribution_mesh_V2(mu, sample_size):
     result = r(alpha, beta)
     return result
 
-def estimate_prior_distribution_mesh(mesh_corpora):
-    
-    r = collections.namedtuple("prior_mesh", ["alpha", "beta"])
-    
-    if not mesh_corpora:
-        result = r(1, 1)
-        return result
-    # Model parameters: 
-    mu_intercept = -14.2634974
-    mu_factor = 0.8363094
-    sigma_intercept = -13.1256575
-    sigma_factor = 0.7598162
-    
-    # Compute estimates:
-    mu = sc.expit(mu_intercept + mu_factor * np.log(mesh_corpora))
-    sigma = np.exp(sigma_intercept + sigma_factor * np.log(mesh_corpora))
-
-    # Return parameters:
-    alpha = mu/sigma
-    beta = (1 - mu)/sigma
-
-    result = r(alpha, beta)
-    return result
-
 def simple_prior(alpha_prior, beta_prior, seq, sampling = True):
     """This function is used to compute the density of a simple prior distribution, no mixture.
 
     Args:
-        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
-        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
+        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
         seq (float): The step used in np.arange to create the x vector of probabilities, only when sampling is True.
         sampling (bool, optional): Does the function have to compute a sampling of density values ?
 
@@ -409,8 +389,8 @@ def simple_posterior(cooc, corpora, alpha_prior, beta_prior, seq, sampling = Tru
     Args:
         cooc (list): The co-occurence between the specie in the graph and a particular MeSH descriptor  
         corpora (list): The corpus size related to the specie in the graph
-        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
-        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh_V2)
+        alpha_prior (float): The alpha parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
+        beta_prior (float): The beta parameter of the prior probability distribution (Cf. estimate_prior_distribution_mesh)
         seq (float): The step used in np.arange to create the x vector of probabilities, only when sampling is True.
         sampling (bool, optional): Does the function have to compute a sampling of density values ?
 
@@ -513,7 +493,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
             - f (list): Densities 
             - mu (float): Mean of the distribution 
     """
-    r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu"])
+    r = collections.namedtuple("posteriormix", ["alpha", "beta", "weights", "x", "f", "mu", "l_mu"])
     l = len(weights_pior)
     x = None
     y = None
@@ -543,7 +523,7 @@ def create_posterior_beta_mix(k, n, weights_pior, alpha_prior, beta_prior, seq, 
     mu_i = [(alpha_post[it]/(alpha_post[it] + beta_post[it])) for it in range(0, l)]
     mu = np.dot(W, mu_i)
 
-    mix = r(alpha_post, beta_post, W, x, y, mu)
+    mix = r(alpha_post, beta_post, W, x, y, mu, mu_i)
     
     return mix
 
@@ -672,14 +652,46 @@ def plot_distributions(prior_mix, posterior_mix):
     """
     plt.plot(prior_mix.x, prior_mix.f, label = "prior", color = "blue")
     plt.plot(posterior_mix.x, posterior_mix.f, label = "Posterior", color = "red")
-    plt.title('Differences between prior mix and posterior mix distribution ')
+    plt.title('Differences between prior mix and posterior mix distribution')
     plt.legend()
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     # for personalised fig
-    # plt.axis((-0.005, 0.1, 0, 400))
+    plt.axis((-0.005, 0.1, 0, 400))
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
+
+def plot_distributions_plotly(prior_mix, posterior_mix):
+    """This function is used to plot prior distribution against a posterior distribution
+    The figure is computed using plotly.
+    
+    Args:
+        prior_mix (collection): A collection containing information about a prior distribution with x probabilties and associated densities from create_prior_beta_mix or simple_prior with the samping = True
+        posterior_mix (collection): A collection containing information about a posterior distribution with x probabilties and associated densities from create_posterior_beta_mix or simple_posterior with the samping = True
+    """
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x = prior_mix.x,
+            y = prior_mix.f,
+            line = dict(color = "blue"),
+            name = "Prior"
+            )
+        )
+    fig.add_trace(
+        go.Scatter(
+            x = posterior_mix.x,
+            y = posterior_mix.f,
+            line = dict(color = "red"),
+            name = "Posterior"
+        )
+    )
+    fig.update_layout(title = "Differences between prior mix and posterior mix distribution",
+        xaxis_title = "Probability",
+        yaxis_title = "Density",
+        template = "simple_white")
+    # fig.show()
+    return fig
 
 def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
     """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
@@ -707,10 +719,46 @@ def plot_mix_distributions(mix, labels, seq, name, color_palette, top):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     # for personalised fig
-    # plt.axis((-0.005, 0.1, 0, 400))
+    plt.axis((-0.005, 0.1, 0, 400))
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08)
     plt.show()
 
+
+def plot_mix_distributions_plotly(mix, labels, seq, name, color_palette, top):
+    """This function is used to plot distribution of each components of a prior mixture distribution. The function compute itself the densities of each component. Since there could be dozens of contributors, we only plot the top n (top argument) for clarity.
+    The figure is computed using plotly.
+
+    Args:
+        mix (collections): A collection containing information about the mixture distribution: weights, alpha and beta parameters
+        labels (list): A list of compound (or specie) labels associated to each component of the mixture. 
+        seq (float): The step used in np.arange to create the x vector of probabilities.
+        color_palette (dict):  A dict containing as key the label of the specie and as value a np.array of 4 elements representing the associated color in RGBA format
+        top (int): The top n (maximum) of contributors that should be plotted
+    """
+    fig = go.Figure()
+    x = np.arange(0, 1 + seq, seq).tolist()
+    weights = mix.weights
+    # To plot only the top n contributors, we first order the index of weights in decreasing order
+    ordered_i_w = np.flip(np.argsort(weights))
+    # We go trough the list of weight until we reach the n'th contributor, or the last contributor if there are les than n
+    for i in range(0, min(len(weights), top)):
+        it = ordered_i_w[i]
+        f = ss.beta.pdf(x, a = mix.alpha[it], b = mix.beta[it])
+        y = weights[it] * f
+        fig.add_trace(
+            go.Scatter(
+                x = x,
+                y = y,
+                line = dict(color = matplotlib.colors.rgb2hex(color_palette[labels[it]])),
+                name = labels[it] + ": Beta(" + str(round(mix.alpha[it], 2)) + ", " + str(round(mix.beta[it], 2)) + ") - w = " + str(round(weights[it],2)),
+                hovertemplate = "<b>Contributor:</b>"+ labels[it] + "<extra></extra>")
+            )
+    fig.update_layout(title = "Top " + str(min(len(weights), top)) + " - " + name + " decomposition",
+        xaxis_title = "Probability",
+        yaxis_title = "Density",
+        template = "simple_white")
+    # fig.show()
+    return fig
 
 def compute_mix_CDF(p, weights, alpha, beta):
     """This function is used to compute the CDF of a mixture distribution
@@ -728,107 +776,255 @@ def compute_mix_CDF(p, weights, alpha, beta):
     cdf = np.dot(weights, cdf_i)
     return cdf
 
-def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, plot = False, weigth_limit = 1e-5, species_name_path = None):
+def compute_log_odds(cdf):
+    """
+    This function is used to compute the log(odds) from the CDF.
+    The success probability is defined as (1-CDF) so P(p > mu)
+    If CDF = 0, reports infinite odds.
+    If CDF = 1, reports -infinite odds 
+    Args:
+        cdf (float): The computed CDF from *computation* (P(p <= mu))
+
+    Returns:
+        [type]: [description]
+    """
+    # Due to float approximation, while computing the CDF of the mixture, it could appears > 1 due to approximation. To avoid issues with log next, we set it to 1. Rounding would not help.
+    if cdf > 1:
+        cdf = 1
+
+    with np.errstate(all='ignore'):
+        log_odds = np.log((1 - cdf)) - np.log(cdf)
+    
+    return log_odds
+
+def contributions_plot(data, names, limit = 0.99):
+    """This function is used to produce the contribution plot
+
+    Args:
+        data (pandas.DataFrame): Data from computation 
+        names (list): A list of names
+        limit (float, optional): The limit from which contributors will be assigned to the 'others' category by computing the cumulative sum of their posterior weights. Defaults to 0.99.
+
+    Returns:
+        [plotly]: The figure
+    """
+    # First make a copy of data to keep the original clean
+    _data = data.copy()
+    _data["y"] = "contributors"
+    _data["name"] = names
+
+    # Sort by posterior weights and determine contributors that belong the the 'others' category
+    _data.sort_values(by = 'posterioir_weights', inplace = True, ascending = False, ignore_index = True)
+    cumsum = np.cumsum(_data["posterioir_weights"].tolist())
+    l = np.argmin(abs(cumsum - limit))
+    
+    # Compute stats for the 'others' category
+    others_median = np.median(_data.loc[_data.index[(l + 1):], "LogOdds"])
+    others_COOC = np.median(_data.loc[_data.index[(l + 1):], "COOC"])
+    others_TOTAL_PMID_SPECIE = np.median(_data.loc[_data.index[(l + 1):], "TOTAL_PMID_SPECIE"])
+
+    # Replace 'others' contributors by the 'others' line  
+    _data.drop(index = _data.index[(l + 1):], inplace = True)
+    _data.loc[-1] = ["others", others_TOTAL_PMID_SPECIE, np.NaN, others_COOC, (1 - cumsum[l]), np.NaN, others_median, np.NaN, "contributors", "others"]
+
+    # To manage the color scale, we have to make a copy of Log_Odds. As many contributors could have very high or small LogOdds (eg. Inf or -Inf) we restrict their values to a range of -100 - 100 (in Odds, not LogOdds)
+    # For contributors that have an Odds higher than 100 or lower than -100, we replace their value by le limit (100 or -100) to restrict the color scale.
+    _data["w_LogOdds"] = _data["LogOdds"]
+    _data.loc[_data.LogOdds >= np.log(100), "w_LogOdds"] = np.log(100)
+    _data.loc[_data.LogOdds <= np.log(0.01), "w_LogOdds"] = np.log(0.01)
+    _data["LogOdds"] = [str(v) for v in np.round(_data["LogOdds"], 2)]
+    fig = px.bar(_data, y = "y",
+        x = "posterioir_weights",
+        color="w_LogOdds",
+        orientation="h",
+        hover_data = dict({"TOTAL_PMID_SPECIE": ":.", "COOC": ":.", "posterioir_weights": ":.2f", "LogOdds": True, "w_LogOdds": False, "y": False}),
+        hover_name="name",
+        height=800,
+        range_color=[np.log(0.01), np.log(100)],
+        facet_col_spacing = 1,
+        color_continuous_scale = [(0, "blue"), (0.5, "white"), (1, "red")],
+        template = "seaborn",
+        labels = {"y": '', "posterioir_weights": "Posterior weights"})
+    
+    # The 'len' attribute in important
+    fig.update_layout(coloraxis_colorbar=dict(title = "Contributor Odds (in log scale)",
+        tickvals = [np.log(0.01), np.log(0.02), np.log(0.1), 0, np.log(10), np.log(50), np.log(100)],
+        ticktext = ["<= 0.01", "0.02", "0.1", "0", "10", "50", ">= 100"],
+        len = 5))
+    fig.update_traces(marker_line_color='rgb(0,0,0)', marker_line_width = 1, opacity = 1)
+    fig.update_xaxes(range=[0, 1])
+    # fig.show()
+
+    return fig
+
+def generate_html_report(out_path, figs, section_titles, resultat):
+    """This function is used to produce the HTML report
+
+    Args:
+        out_path (str): the path to write the html report
+        figs (list): A list of figures 
+        section_titles (list): A list of section titles for the figures
+        resultat (dict): The result dict with CDF, LogOdds, etc ...
+    """
+    
+    contributors = "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs = False, output_type='div') for i in range(len(figs))])
+    res = "<p>".join(["<b>" + k + ": </b> " + "{:.2e}".format(v) if isinstance(v, float) else "<b>" + k + ": </b> " + str(v) for k, v in resultat.items()])
+    html_template = f"""
+    <html>
+    <head>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    </head>
+    <body>
+        <h1>NEIGHBORHOOD CONTRIBUTION: HTML REPORT</h1>
+        <h2> RESULTS</h2>
+        {res}
+        <h2> CONTRIBUTORS </h2>
+        {contributors}
+    </body>
+    </html>
+    """
+
+    with open(out_path, "w") as f:
+        f.write(html_template)
+
+
+def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = None, weigth_limit = 1e-5, species_name_path = None, update_data = False):
     """This function is used to compute the complete analysis for a Compound - MeSH relation.
-    If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh_V2 is used, otherwise we will used the prior mixture.
+    If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh is used, otherwise we will used the prior mixture.
 
     Args:
         index (integer): the index of the specie if the metabolic network
         data (pandas.DataFrame): data related to corpus size of each compound in the metabolic network and their co-occurence with the studied MeSH 
         p (float): The general probability to observed a mention of a compound in an article, also involving the MeSH.
-        alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
-        beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh_V2)
+        alpha_prior (float): The alpha parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh)
+        beta_prior (float): The beta parameter of the MeSH's prior distribution (Cf. estimate_prior_distribution_mesh)
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
-        plot (bool, optional): Does the function has to plot prior and posterior distributions ?. See plot_mix_distributions and plot_distributions. Defaults to False.
+        report (optional): Path to output the html report. Defaults to None.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
-        species_name_path (str): Path to the file containing species' names
+        species_name_path (str): Path to the file containing species' names for figures legend
+        update_data (bool, optional): Does the data table need to be updated with posterior weights, cdf, etc of each contributors (for export)
 
     Returns:
-        [collection]: A collection with:
+        [dict]: A dictionnary with:
+        - TOTAL_PMID_SPECIE (int): The total number of mentions for the targeted compound
+        - COOC (int): The total number of co-occurences between the targeted compound and the MeSH
         - Mean (float): The mean of the posterior distribution. 
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
+        - LogOdds (float): The logarithm of the Odds, computed from the CDF
         - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
         - priorCDF: Same as CDF, but for the mixture prior.
         - priorLog2FC: Same as Log2FC, but for the mixture prior.
     """
-    
-    # Out
-    r = collections.namedtuple("out", ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
 
-    weights = data["weights"].tolist()
-    del weights[index]
-    cooc = data["COOC"].tolist()
-    k = int(cooc.pop(index))
-    corpora = data["TOTAL_PMID_SPECIE"].tolist()
-    labels = data["SPECIE"].to_list()
-    del labels[index]
-    n = int(corpora.pop(index))
-    # If all weights are null, no neighborhood information:
-    if sum(weights) == 0:
-        prior = simple_prior(alpha_prior, beta_prior, seq, sampling = plot)
-        posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = plot)
-        # In case of no neighborhood information, we simply plot prior vs posterior distributions:
-        if plot:
-            plot_distributions(prior, posterior)
-        # Compute additional values:
+    # Get data and remove the line corresponding to the targeted specie in data
+    k = int(data.loc[index, "COOC"])
+    n = int(data.loc[index, "TOTAL_PMID_SPECIE"])
+    data.drop(index = index, inplace = True)
+    
+    # If all weights are null, no neighborhood information.
+    if sum(data["weights"]) == 0:
+        
+        # use initial prior
+        prior = simple_prior(alpha_prior, beta_prior, seq, sampling = report)
+        posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = report)
+        
+        # Compute Log2FC:
         Log2numFC = np.log2(posterior.mu/p)
+
+        # Compute the CDF from the posterior distribution
         cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
-        resultat = r(n, k, posterior.mu, cdf_posterior, Log2numFC, np.NaN, np.NaN, False)
+
+        # Compute Log(odds) from the CDF
+        Log_odds = compute_log_odds(cdf_posterior)
+
+        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, np.NaN, np.NaN, False]))
+        
+        # In case of no neighborhood information, we simply plot prior vs posterior distributions:
+        if report:
+            # plot_distributions(prior, posterior)
+            f1 = plot_distributions_plotly(prior, posterior)
+            generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat)
+
         return resultat
 
-    # Null weights have to be removed before the computation as we cill the log(weights) during the computation.
-    to_remove = list()
-    for it in range(0, len(weights)):
-        # Check weight
-        if not weights[it]:
-            to_remove.append(it)
-    # Once the list of items to be deleted is complete, we remove them. We need to delete them in reverse order so that we don't throw off the subsequent indexes.
-    for rmv in sorted(to_remove, reverse=True):
-        del weights[rmv]
-        del cooc[rmv]
-        del corpora[rmv]
-        del labels[rmv]
+    # Null weights have to be removed before the computation as we will use the log(weights) during the computation.
+    to_remove = data[data["weights"] == 0].index
+    data.drop(index = to_remove, inplace = True)
+    data.reset_index(drop = True, inplace = True)
     
     # Use initial prior on MeSH (uninformative or from glm) to build a prior mix using neighboors' observations
-    prior_mix = create_prior_beta_mix(weights, cooc, corpora, seq, alpha_prior, beta_prior, sampling = plot)
+    prior_mix = create_prior_beta_mix(data["weights"].tolist(), data["COOC"].tolist(), data["TOTAL_PMID_SPECIE"].tolist(), seq, alpha_prior, beta_prior, sampling = report)
+    
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
     prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
     
-    # Compute prior Mean ratio
-    prior_mean_ratio = np.log2(prior_mix.mu/p)
+    # Compute Log2FC ratio from prior mixture
+    prior_Log2FC = np.log2(prior_mix.mu/p)
+    
     # Posterior mix:
-    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = plot)
+    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = report)
+    
+    # Compute CDF of the posterior distibution
     cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
 
-    # As null weight have been removed duruing computation, we use SPECIE instead of index as key
-    data["posterioir_weights"] = float(0)
-    for j in range(0, len(labels)):
-        data.loc[data["SPECIE"] == labels[j], "posterioir_weights"] = posterior_mix.weights[j]
-    
-    Log2numFC = np.log2(posterior_mix.mu/p)
+    # Compute Log(odds) from the CDF
+    Log_odds = compute_log_odds(cdf_posterior_mix)
 
-    if plot:
+    # Compute Log2FC from the posterior mixture
+    post_Log2FC = np.log2(posterior_mix.mu/p)
+
+    # If the inputs are a specific specie with a specific MeSH, we need export the data table
+    if update_data:
+
+        # As null weight have been removed during computation, we use SPECIE instead of index as key
+        data["posterioir_weights"] = float(0)
+        data["CDF"] = np.NaN
+        data["LogOdds"] = np.NaN
+        data["Log2FC"] = np.NaN
+        for j in data.index:
+            data.loc[j, "posterioir_weights"] = posterior_mix.weights[j]
+            data.loc[j, "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j])
+            data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
+            data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
+
+    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, post_Log2FC, prior_mix_CDF, prior_Log2FC, True]))
+
+    # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
+    if report:
+
         # If names have been provided, use them instead of species labels in Figures:
         if species_name_path:
             species_name = pd.read_csv(species_name_path)
-            df_l = pd.merge(pd.DataFrame({"SPECIE": labels}), species_name, on = "SPECIE", how = "left")
-            labels = df_l["SPECIE_NAME"]
+            _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on = "SPECIE", how = "left")
+            names = _df_names["SPECIE_NAME"].tolist()
+        
         # We set the top to top 10: 
         top = 10
-        # We need to keep the same color palette between the both plots
-        # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict (so max number of contributors displayed is 20)
-        set_contributors = set([labels[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [labels[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
-        palette = dict(zip(set_contributors, cm.tab20(np.linspace(0,1,len(set_contributors)))))
-        plot_mix_distributions(prior_mix, labels, seq, "Prior components", palette, top)
-        plot_mix_distributions(posterior_mix, labels, seq, "Posterior components", palette, top)
-        plot_distributions(prior_mix, posterior_mix)
-    
-    resultat = r(n, k, posterior_mix.mu, cdf_posterior_mix, Log2numFC, prior_mix_CDF, prior_mean_ratio, True)
 
+        # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict (so max number of contributors displayed is 20)
+        set_contributors = set([names[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [names[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
+        
+        # We need to keep the same color palette between the both plots
+        palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
+        
+        # Plot
+        # plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
+        f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
+        # plot_mix_distributions(posterior_mix, names, seq, "Posterior components", palette, top)
+        f2 = plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
+        # plot_distributions(prior_mix, posterior_mix)
+        f3 = plot_distributions_plotly(prior_mix, posterior_mix)
+
+        # Contribution plot
+        f4 = contributions_plot(data, names)
+
+        # Generate report:
+        generate_html_report(report, [f1, f2, f3, f4], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Contributions"], resultat)
+    
     return resultat
 
 
-def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, forget):
+def specie2mesh(index, table_cooc, table_species_corpora, weights, table_mesh, forget):
     """This function is used to computed associations from a specific specie against all available MeSHs.
 
     Args:
@@ -842,7 +1038,7 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     # Create result Dataframe from MeSH list
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
+    store = []
 
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
@@ -851,13 +1047,13 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
         for i in indexes:
             mesh = mesh_list[i]
             # Get cooc vector. It only contains species that have at least one article, need to left join.
-            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["SPECIE", "COOC"]]
             # Get data
-            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
             
             # If forget option is true, remove observation of the studied specie
             if forget:
-                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+                data.loc[index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             
             # Get MeSH info
             MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
@@ -865,13 +1061,14 @@ def specie_mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
             
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
-            df_.loc[i] = r
+            store.append(r)
             bar.update(i)
     
+    df_ = pd.DataFrame(store)     
     df_.insert(0, "MESH", mesh_list)
     return(df_)
 
-def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, forget):
+def mesh2specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, forget):
     """This function is used to computed associations from a specific MeSH against all available species.
 
     Args:
@@ -884,28 +1081,29 @@ def mesh_specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     """
     specie_list = table_species_corpora["SPECIE"].tolist()
     indexes = range(0, len(specie_list))
-    df_ = pd.DataFrame(index = indexes, columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])
+    store = []
     
     # Get MeSH info
     MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
-    cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
+    cooc = table_cooc[table_cooc["MESH"] == mesh][["SPECIE", "COOC"]]
     p = float(MeSH_info["P"])
     
     # Browser all species
     with progressbar.ProgressBar(max_value=len(indexes)) as bar:
         for i in indexes:
             table_species_corpora["weights"] = weights[:, i].tolist()
-            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
             
             # If forget option is true, remove observation of the studied specie
             if forget:
-                data.loc[data["index"] == i, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+                data.loc[i, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             
             # Computation
             r = computation(i, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
-            df_.loc[i] = r
+            store.append(r)
             bar.update(i)
     
+    df_ = pd.DataFrame(store)
     df_.insert(0, "SPECIE", specie_list)
     return(df_)
 
@@ -931,32 +1129,34 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
         # Keep only rows with available info:
         f = f.loc[f["SPECIE"].isin(table_species_corpora["SPECIE"]) & f["MESH"].isin(table_mesh["MESH"])]
     
-    associations = pd.concat([f, pd.DataFrame(columns = ["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"])])
-    n = len(associations)
+    store = []
+    n = f.shape[0]
     
     # Browse associations
     with progressbar.ProgressBar(max_value = n) as bar:
         for i in range(0, n):
-            specie = str(associations.iloc[[i], 0].item())
-            mesh = str(associations.iloc[[i], 1].item())
-            index = int(table_species_corpora[table_species_corpora["SPECIE"] == specie]["index"])
+            specie = str(f.iloc[[i], 0].item())
+            mesh = str(f.iloc[[i], 1].item())
+            index = table_species_corpora[table_species_corpora["SPECIE"] == specie].index[0]
             # Prepare data
             table_species_corpora["weights"] = weights[:, index].tolist()
-            cooc = table_cooc[table_cooc["MESH"] == mesh][["index", "COOC"]]
-            data = pd.merge(table_species_corpora, cooc, on = "index", how = "left").fillna(0)
+            cooc = table_cooc[table_cooc["MESH"] == mesh][["SPECIE", "COOC"]]
+            data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
             
             # If forget option is true, remove observation of the studied specie
             if forget:
-                data.loc[data["index"] == index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
+                data.loc[index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             
             # Get MeSH info
             MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
             p = float(MeSH_info["P"])
 
             # Computation
-            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, plot = False)
-            associations.iloc[i, 2:10] = list(r)
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001)
+            store.append(r)
             bar.update(i)
+    
+    associations = pd.concat([f, pd.DataFrame(store)], axis = 1)
     return associations
 
 def add_names(result, species_name_path, mesh_name_path):

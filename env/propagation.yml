@@ -8,7 +8,7 @@ dependencies:
   - scipy  
   - argparse
   - python-igraph
-  - pycairo
   - pylint
   - matplotlib
   - progressbar2
+  - plotly

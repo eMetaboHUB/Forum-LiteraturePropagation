@@ -687,8 +687,8 @@ def plot_distributions_plotly(prior_mix, posterior_mix):
         )
     )
     fig.update_layout(title = "Differences between prior mix and posterior mix distribution",
-        xaxis_title = "Probability",
-        yaxis_title = "Density",
+        xaxis = dict(title = "Probability", titlefont_size = 25, tickfont_size = 20),
+        yaxis = dict(title =  "Density", titlefont_size = 25, tickfont_size = 20),
         template = "simple_white")
     # fig.show()
     return fig
@@ -754,8 +754,8 @@ def plot_mix_distributions_plotly(mix, labels, seq, name, color_palette, top):
                 hovertemplate = "<b>Contributor:</b>"+ labels[it] + "<extra></extra>")
             )
     fig.update_layout(title = "Top " + str(min(len(weights), top)) + " - " + name + " decomposition",
-        xaxis_title = "Probability",
-        yaxis_title = "Density",
+        xaxis = dict(title = "Probability", titlefont_size = 25, tickfont_size = 20),
+        yaxis = dict(title =  "Density", titlefont_size = 25, tickfont_size = 20),
         template = "simple_white")
     # fig.show()
     return fig
@@ -833,6 +833,7 @@ def contributions_plot(data, names, limit = 0.99):
     _data.loc[_data.LogOdds >= np.log(100), "w_LogOdds"] = np.log(100)
     _data.loc[_data.LogOdds <= np.log(0.01), "w_LogOdds"] = np.log(0.01)
     _data["LogOdds"] = [str(v) for v in np.round(_data["LogOdds"], 2)]
+    
     fig = px.bar(_data, y = "y",
         x = "posterioir_weights",
         color="w_LogOdds",
@@ -847,10 +848,15 @@ def contributions_plot(data, names, limit = 0.99):
         labels = {"y": '', "posterioir_weights": "Posterior weights"})
     
     # The 'len' attribute in important
-    fig.update_layout(coloraxis_colorbar=dict(title = "Contributor Odds (in log scale)",
+    fig.update_layout(coloraxis_colorbar=dict(
+        title = dict(text = "Contributor Odds (in log scale)", font = dict(size = 25)),
         tickvals = [np.log(0.01), np.log(0.02), np.log(0.1), 0, np.log(10), np.log(50), np.log(100)],
         ticktext = ["<= 0.01", "0.02", "0.1", "0", "10", "50", ">= 100"],
-        len = 5))
+        len = 5,
+        tickfont = dict(size = 20)),
+        xaxis = dict(titlefont_size=25, tickfont_size=20),
+        yaxis = dict(titlefont_size=25, tickfont_size=20)
+    )
     fig.update_traces(marker_line_color='rgb(0,0,0)', marker_line_width = 1, opacity = 1)
     fig.update_xaxes(range=[0, 1])
     # fig.show()

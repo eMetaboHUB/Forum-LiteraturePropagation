@@ -52,10 +52,17 @@ def import_metabolic_network(path, undirected = True, format = "gml"):
         print("> Used as directed")
     print("> Extract largest component")
     g = g.clusters().giant()
+
+    # Test if g is a multiple graph, if so sum edges weights:
+    if g.has_multiple():
+        print("> /!\ The graph has multiple edges, merge 'Weight' attribute by sum.")
+        g.simplify(multiple = True, combine_edges = dict(Weight = "sum"))
+    
     # Test if the graph is connected
     if not g.is_connected():
         print("The graph needs to be connected: there is a path from any point to any other point in the graph")
         sys.exit(1)
+    
     return g
 
 def import_table(path):

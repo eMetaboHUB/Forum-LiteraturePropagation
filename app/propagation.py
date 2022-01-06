@@ -452,7 +452,7 @@ def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior,
             - mu (float): Mean of the distribution  
     """
     # Get parameters
-    r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f", "mu"])
+    r = collections.namedtuple("priormix", ["alpha", "beta", "weights", "x", "f", "mu", "l_mu"])
     x = None
     y = None
 
@@ -472,7 +472,7 @@ def create_prior_beta_mix(weights, cooc , corpora, seq, alpha_prior, beta_prior,
     mu_i = [(alpha[it]/(alpha[it] + beta[it])) for it in range(0, l)]
     mu = np.dot(weights, mu_i)
 
-    mix = r(alpha, beta, weights, x, y, mu)
+    mix = r(alpha, beta, weights, x, y, mu, mu_i)
 
     return mix
     
@@ -804,12 +804,13 @@ def compute_log_odds(cdf):
     
     return log_odds
 
-def contributions_plot(data, names, limit = 0.99):
+def contributions_plot(data, names, attr, limit = 0.99):
     """This function is used to produce the contribution plot
 
     Args:
         data (pandas.DataFrame): Data from computation 
         names (list): A list of names
+        attr (str): The attribute used to sort contributors (weights or posterioir_weights) 
         limit (float, optional): The limit from which contributors will be assigned to the 'others' category by computing the cumulative sum of their posterior weights. Defaults to 0.99.
 
     Returns:
@@ -819,10 +820,12 @@ def contributions_plot(data, names, limit = 0.99):
     _data = data.copy()
     _data["y"] = "contributors"
     _data["name"] = names
+    _data = _data.rename(columns = {attr: "Contributions"})
+    _data = _data[["SPECIE", "TOTAL_PMID_SPECIE", "COOC", "Contributions", "CDF", "LogOdds", "Log2FC", "y", "name"]]
 
     # Sort by posterior weights and determine contributors that belong the the 'others' category
-    _data.sort_values(by = 'posterioir_weights', inplace = True, ascending = False, ignore_index = True)
-    cumsum = np.cumsum(_data["posterioir_weights"].tolist())
+    _data.sort_values(by = 'Contributions', inplace = True, ascending = False, ignore_index = True)
+    cumsum = np.cumsum(_data["Contributions"].tolist())
     l = np.argmin(abs(cumsum - limit))
     
     # Compute stats for the 'others' category
@@ -830,9 +833,9 @@ def contributions_plot(data, names, limit = 0.99):
     others_COOC = np.median(_data.loc[_data.index[(l + 1):], "COOC"])
     others_TOTAL_PMID_SPECIE = np.median(_data.loc[_data.index[(l + 1):], "TOTAL_PMID_SPECIE"])
 
-    # Replace 'others' contributors by the 'others' line  
+    # Replace 'others' contributors by the 'others' line
     _data.drop(index = _data.index[(l + 1):], inplace = True)
-    _data.loc[-1] = ["others", others_TOTAL_PMID_SPECIE, np.NaN, others_COOC, (1 - cumsum[l]), np.NaN, others_median, np.NaN, "contributors", "others"]
+    _data.loc[-1] = ["others", others_TOTAL_PMID_SPECIE, others_COOC, (1 - cumsum[l]), np.NaN, others_median, np.NaN, "contributors", "others"]
 
     # To manage the color scale, we have to make a copy of Log_Odds. As many contributors could have very high or small LogOdds (eg. Inf or -Inf) we restrict their values to a range of -100 - 100 (in Odds, not LogOdds)
     # For contributors that have an Odds higher than 100 or lower than -100, we replace their value by le limit (100 or -100) to restrict the color scale.
@@ -842,17 +845,17 @@ def contributions_plot(data, names, limit = 0.99):
     _data["LogOdds"] = [str(v) for v in np.round(_data["LogOdds"], 2)]
     
     fig = px.bar(_data, y = "y",
-        x = "posterioir_weights",
+        x = "Contributions",
         color="w_LogOdds",
         orientation="h",
-        hover_data = dict({"TOTAL_PMID_SPECIE": ":.", "COOC": ":.", "posterioir_weights": ":.2f", "LogOdds": True, "w_LogOdds": False, "y": False}),
+        hover_data = dict({"TOTAL_PMID_SPECIE": ":.", "COOC": ":.", "Contributions": ":.2f", "LogOdds": True, "w_LogOdds": False, "y": False}),
         hover_name="name",
         height=800,
         range_color=[np.log(0.01), np.log(100)],
         facet_col_spacing = 1,
         color_continuous_scale = [(0, "blue"), (0.5, "white"), (1, "red")],
         template = "seaborn",
-        labels = {"y": '', "posterioir_weights": "Posterior weights"})
+        labels = {"y": '', "Contributions": "Contributions"})
     
     # The 'len' attribute in important
     fig.update_layout(coloraxis_colorbar=dict(
@@ -939,24 +942,39 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
         
         # use initial prior
         prior = simple_prior(alpha_prior, beta_prior, seq, sampling = report)
-        posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = report)
+        Log2FC_prior =  np.log2(prior.mu/p)
+        cdf_prior = ss.beta.cdf(p, prior.alpha, prior.beta)
+        Log_odds_prior = compute_log_odds(cdf_prior)
         
-        # Compute Log2FC:
-        Log2numFC = np.log2(posterior.mu/p)
+        # If there are observations available:
+        if n > 0:
+            posterior = simple_posterior(k, n, alpha_prior, beta_prior, seq, sampling = report)
+            # Compute Log2FC:
+            Log2numFC = np.log2(posterior.mu/p)
+            
+            # Compute the CDF from the posterior distribution
+            cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
 
-        # Compute the CDF from the posterior distribution
-        cdf_posterior = ss.beta.cdf(p, posterior.alpha, posterior.beta)
+            # Compute Log(odds) from the CDF
+            Log_odds = compute_log_odds(cdf_posterior)
 
-        # Compute Log(odds) from the CDF
-        Log_odds = compute_log_odds(cdf_posterior)
-
-        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, np.NaN, np.NaN, False]))
+            resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, Log_odds, Log2numFC, cdf_prior, Log2FC_prior, False]))
         
-        # In case of no neighborhood information, we simply plot prior vs posterior distributions:
-        if report:
-            # plot_distributions(prior, posterior)
-            f1 = plot_distributions_plotly(prior, posterior)
-            generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat)
+            # In case of no neighborhood information, we simply plot prior vs posterior distributions:
+            if report:
+                f1 = plot_distributions_plotly(prior, posterior)
+                generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat)
+        
+        # If there are no observations:
+        else:
+
+            resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior.mu, cdf_prior, Log_odds_prior, Log2FC_prior, np.NaN, np.NaN, False]))
+            
+            if report:
+                f1 = go.Figure()
+                f1.add_trace(go.Scatter(x = prior.x, y = prior.f, line = dict(color = "blue"), name = "Prior"))
+                f1.update_layout(title = "Prior from the MeSH overall frequency", xaxis = dict(title = "Probability", titlefont_size = 25, tickfont_size = 20), yaxis = dict(title =  "Density", titlefont_size = 25, tickfont_size = 20), template = "simple_white")
+                generate_html_report(report, [f1], ["MeSH overall prior"], resultat)
 
         return resultat
 
@@ -974,65 +992,117 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
     # Compute Log2FC ratio from prior mixture
     prior_Log2FC = np.log2(prior_mix.mu/p)
     
-    # Posterior mix:
-    posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = report)
+    # If there are observations available:
+    if n > 0:
+        # Posterior mix:
+        posterior_mix = create_posterior_beta_mix(k, n, prior_mix.weights, prior_mix.alpha, prior_mix.beta, seq, sampling = report)
+
+        # Compute CDF of the posterior distibution
+        cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
+
+        # Compute Log(odds) from the CDF
+        Log_odds = compute_log_odds(cdf_posterior_mix)
+
+        # Compute Log2FC from the posterior mixture
+        Log2FC = np.log2(posterior_mix.mu/p)
+
+        # If the inputs are a specific specie with a specific MeSH, we need export the data table
+        if update_data:
+
+            # As null weight have been removed during computation, we use SPECIE instead of index as key
+            data["posterioir_weights"] = float(0)
+            data["CDF"] = np.NaN
+            data["LogOdds"] = np.NaN
+            data["Log2FC"] = np.NaN
+            for j in data.index:
+                data.loc[j, "posterioir_weights"] = posterior_mix.weights[j]
+                data.loc[j, "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j])
+                data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
+                data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
+
+        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, Log2FC, prior_mix_CDF, prior_Log2FC, True]))
+
+        # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
+        if report:
+
+            # If names have been provided, use them instead of species labels in Figures:
+            if species_name_path:
+                species_name = pd.read_csv(species_name_path)
+                _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on = "SPECIE", how = "left")
+                names = _df_names["SPECIE_NAME"].tolist()
+            
+            # We set the top to top 10: 
+            top = 10
+
+            # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict (so max number of contributors displayed is 20)
+            set_contributors = set([names[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [names[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
+            
+            # We need to keep the same color palette between the both plots
+            palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
+            
+            # Plot
+            # plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
+            f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
+            # plot_mix_distributions(posterior_mix, names, seq, "Posterior components", palette, top)
+            f2 = plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
+            # plot_distributions(prior_mix, posterior_mix)
+            f3 = plot_distributions_plotly(prior_mix, posterior_mix)
+
+            # Contribution plot
+            f4 = contributions_plot(data, names, "posterioir_weights")
+
+            # Generate report:
+            generate_html_report(report, [f1, f2, f3, f4], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Contributions"], resultat)
     
-    # Compute CDF of the posterior distibution
-    cdf_posterior_mix = compute_mix_CDF(p, posterior_mix.weights, posterior_mix.alpha, posterior_mix.beta)
+    # If there are no observations:
+    else:
+        # Compute Log(odds) from the CDF
+        Log_odds = compute_log_odds(prior_mix_CDF)
 
-    # Compute Log(odds) from the CDF
-    Log_odds = compute_log_odds(cdf_posterior_mix)
+        # Compute Log2FC from the posterior mixture
+        Log2FC = np.log2(prior_mix.mu/p)
 
-    # Compute Log2FC from the posterior mixture
-    post_Log2FC = np.log2(posterior_mix.mu/p)
+        # If the inputs are a specific specie with a specific MeSH, we need export the data table
+        if update_data:
 
-    # If the inputs are a specific specie with a specific MeSH, we need export the data table
-    if update_data:
+            # As null weight have been removed during computation, we use SPECIE instead of index as key
+            data["CDF"] = np.NaN
+            data["LogOdds"] = np.NaN
+            data["Log2FC"] = np.NaN
+            for j in data.index:
+                data.loc[j, "CDF"] = ss.beta.cdf(p, prior_mix.alpha[j], prior_mix.beta[j])
+                data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
+                data.loc[j, "Log2FC"] = np.log2(prior_mix.l_mu[j]/p)
 
-        # As null weight have been removed during computation, we use SPECIE instead of index as key
-        data["posterioir_weights"] = float(0)
-        data["CDF"] = np.NaN
-        data["LogOdds"] = np.NaN
-        data["Log2FC"] = np.NaN
-        for j in data.index:
-            data.loc[j, "posterioir_weights"] = posterior_mix.weights[j]
-            data.loc[j, "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j])
-            data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
-            data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
+        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior_mix.mu, prior_mix_CDF, Log_odds, Log2FC, np.NaN, np.NaN, True]))
 
-    resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, Log_odds, post_Log2FC, prior_mix_CDF, prior_Log2FC, True]))
+        # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
+        if report:
 
-    # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
-    if report:
+            # If names have been provided, use them instead of species labels in Figures:
+            if species_name_path:
+                species_name = pd.read_csv(species_name_path)
+                _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on = "SPECIE", how = "left")
+                names = _df_names["SPECIE_NAME"].tolist()
+            
+            # We set the top to top 10: 
+            top = 10
 
-        # If names have been provided, use them instead of species labels in Figures:
-        if species_name_path:
-            species_name = pd.read_csv(species_name_path)
-            _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on = "SPECIE", how = "left")
-            names = _df_names["SPECIE_NAME"].tolist()
-        
-        # We set the top to top 10: 
-        top = 10
+            # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict (so max number of contributors displayed is 20)
+            set_contributors = set([names[i] for i in np.argsort(prior_mix.weights)[::-1][:top]])
+            
+            # We need to keep the same color palette between the both plots
+            palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
+            
+            # Plot
+            # plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
+            f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Neighbourhood components", palette, top)
 
-        # We select the union of the top 10 contributors in the both groups and then assign a unique color to it in a dict (so max number of contributors displayed is 20)
-        set_contributors = set([names[i] for i in np.argsort(prior_mix.weights)[::-1][:top]] + [names[i] for i in np.argsort(posterior_mix.weights)[::-1][:top]])
-        
-        # We need to keep the same color palette between the both plots
-        palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
-        
-        # Plot
-        # plot_mix_distributions(prior_mix, names, seq, "Prior components", palette, top)
-        f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
-        # plot_mix_distributions(posterior_mix, names, seq, "Posterior components", palette, top)
-        f2 = plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
-        # plot_distributions(prior_mix, posterior_mix)
-        f3 = plot_distributions_plotly(prior_mix, posterior_mix)
+            # Contribution plot
+            f2 = contributions_plot(data, names, "weights")
 
-        # Contribution plot
-        f4 = contributions_plot(data, names)
-
-        # Generate report:
-        generate_html_report(report, [f1, f2, f3, f4], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Contributions"], resultat)
+            # Generate report:
+            generate_html_report(report, [f1, f2], ["Neighbourhood Contributors", "Contributions"], resultat)
     
     return resultat
 

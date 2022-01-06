@@ -51,7 +51,7 @@ if table_species_corpora is None:
 
 # Fill na if some species are not indicated in the file
 table_species_corpora = table_species_corpora.fillna(0)
-
+# table_species_corpora.to_csv("tests/data/Human1_test/table_species_corpora.csv", index = False)
 # Compute total number of cpd-articles mentions
 TOTAL_CPD_MENTIONS = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
 print("Ok")
@@ -68,7 +68,7 @@ table_mesh_corpora = table_coocurences.groupby('MESH', as_index=False)[['COOC']]
 
 # Compute MeSH probabilities normalising by the total number of cpd-article mentions
 table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/TOTAL_CPD_MENTIONS
-
+# table_mesh_corpora.to_csv("tests/data/Human1_test/table_mesh_corpora.csv", index = False)
 # Test if provided MeSH exists
 if args.mesh and (not args.mesh in table_mesh_corpora["MESH"].tolist()):
     print("Unknown MeSH identifier: " + args.mesh)
@@ -186,12 +186,17 @@ for alpha in alpha_set:
             table_species_corpora["weights"] = weights[:, index].tolist()
             cooc = table_coocurences[table_coocurences["MESH"] == args.mesh][["SPECIE", "COOC"]]
             data = pd.merge(table_species_corpora, cooc, on = "SPECIE", how = "left").fillna(0)
+            # data.to_csv("tests/data/Human1_test/data.csv", index = False)
             if args.forget:
                 data.loc[index, ["TOTAL_PMID_SPECIE", "COOC"]] = [0, 0]
             MeSH_info = table_mesh_corpora_work[table_mesh_corpora_work["MESH"] ==  args.mesh]
             p = float(MeSH_info["P"])
-            print("P = " + str(p))
+            # print("P = " + str(p))
             out_path_report = os.path.join(out_path, "report_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".html")
+            # print(index)
+            # print(p)
+            # print(float(MeSH_info["alpha_prior"]))
+            # print(float(MeSH_info["beta_prior"]))
             res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq = 0.0001, species_name_path = args.species_name_path, update_data = True, report = out_path_report)
             df_ = pd.concat([pd.DataFrame([{"SPECIE": args.specie, "MESH": args.mesh}]), pd.DataFrame([res])], axis = 1)
             df_["Entropy"] = df_Entropy.loc[index, "Entropy"]

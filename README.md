@@ -58,6 +58,7 @@ python app/main.py --graph="path/to/graph" --specie.corpora="path/to specie-tabl
 ### Data format details
 
 * ```--specie.corpora```: a two column table
+
 Eg.
 
 | SPECIE    | TOTAL_PMID_SPECIE |
@@ -68,6 +69,7 @@ Eg.
 | ...       | ...               |
 
 * ```--specie.cooc```: a three column table
+
 Eg.
 
 | SPECIE    | MESH       | COOC |
@@ -78,6 +80,7 @@ Eg.
 | ...       | ...        |      |
 
 * ```--file```: a two column requested association file
+
 Eg.
 
 | SPECIE    | MESH    |
@@ -88,6 +91,7 @@ Eg.
 | ...       | ...     |
 
 * ```--species_name_path```: a two column file
+
 Eg.
 
 | SPECIE     | SPECIE_NAME                        |
@@ -98,6 +102,7 @@ Eg.
 | ...        | ...                                |
 
 * ```--meshs_name_path```: a two column file
+
 Eg.
 
 | MESH       | MESH_NAME              |
@@ -132,3 +137,8 @@ Data are availbale in the *data* directory
 ```bash
 python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp_no1C_cpds.gml" --specie.corpora="data/Human1/1.7/species_pmids_Human1_1.7.csv" --specie.cooc="data/Human1/1.7/species_mesh_pmids_Human1_1.7.csv" --specie="M_34dhpe_c"  --mesh="D010300" --out="notes/results/"  --alpha 0.4 --sample_size 1000 --species_name_path="data/Human1/1.7/species_names.csv" --meshs_name_path="data/Human1/1.7/mesh_labels.csv"
 ```
+#### Expected result! M_34dhpe_c_D010300_0.4_1000.csv
+
+| SPECIE     | MESH               | TOTAL_PMID_SPECIE | COOC | Mean              | CDF                  | LogOdds          | Log2FC           | priorCDF | priorLog2FC | NeighborhoodInformation | Entropy | CtbAvgDistance | CtbAvgCorporaSize | NbCtb | SPECIE_NAME                | MESH_NAME         |
+|------------|--------------------|-------------------|------|-------------------|----------------------|------------------|------------------|----------|-------------|-------------------------|---------|----------------|-------------------|-------|----------------------------|-------------------|
+| M_34dhpe_c | D010300            | 0                 | 0    | 0.07 | 4.57-05 | 9.99 | 3.55 |          |             | True                    | 1.23   | 1.99           | 63375.29         | 9     | 3,4-Dihydroxyphenylethanol | Parkinson Disease |

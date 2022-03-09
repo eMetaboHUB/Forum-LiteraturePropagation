@@ -1,5 +1,0 @@
-Mais oui, si je devais penser à 4 Figures, je ferai pareil :
-1) Pareto/MindTheGap Litterature avec Label propagation
-2) Une figure pour illustrer les différentes étapes de la méthode
-3) La Roc
-4) Et après sous-réseau pour un exemple

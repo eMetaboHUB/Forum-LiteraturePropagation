@@ -978,6 +978,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
 
         return resultat
 
+    # If all weights are NOT null: neighborhood information.
     # Null weights have to be removed before the computation as we will use the log(weights) during the computation.
     to_remove = data[data["weights"] == 0].index
     data.drop(index = to_remove, inplace = True)
@@ -1047,6 +1048,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq = 0.0001, report = 
             f2 = plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
             # plot_distributions(prior_mix, posterior_mix)
             f3 = plot_distributions_plotly(prior_mix, posterior_mix)
+
+            # For pub
+            # aa = pd.DataFrame({'x': prior_mix.x, 'prior': prior_mix.f, 'posterior': posterior_mix.f})
+            # aa.to_csv("coord_prior_post.csv", index = False)
 
             # Contribution plot
             f4 = contributions_plot(data, names, "posterioir_weights")

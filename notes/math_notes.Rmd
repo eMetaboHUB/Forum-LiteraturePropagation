@@ -1145,5 +1145,45 @@ Ce comportement est intérressant et fait même du sens par rapport à notre hyp
 
 Cette comportementest important car en effet on ne voudrait pas considérer les même chances aprior d'être associé à un MeSH très rare ou à un MeSH très fréquent. De base c'est plus de chance d'être associé à *Neoplasm* par exemple qu'une maladie rare. Le fait que la distribution Beta soit déséquilibrer prend en compte cela naturellement. **Ce déséquilibre indique que: Plus la fréquence générale d'un MeSH est faible moins j'ai de chance que ma probabilité d'en parler soit supérieure à sa fréquence générale, a priori (et inversement)**
 
+## Détails sur les TPR, FPR a seuil proches de 0.5 pour des valeurs de $\nu$ élevée !
+
+La skewness influence également nos résultats lorsque choisit un threshold sur la CDF à 0.5 (ou 0 sur le logOdds). En effet, lorsque l'on va utiliser un $\nu$ très grand (10e5 ou plus) on va réduire l'effet de la skewness, c'est comme si on recentrait la courbe. Ainsi cela fait tendre toutes les CDF vers 0.5 en moyenne et les Log2FC par exemple vers 0. Dans cette configuration, toutes les associations pour lesquels les contributors tendent un peu en faire pencher l'association côté positive par des co-occurence fréquente font facilement faire passer la CDF sous la barre des 0.5, mais cela peut également arrtiver pour des faux positif ! L'effet qui est non-souhaitable, c'est que ça a tendance à 'lisser' toutes nos prédictions ! Elles sont toutes tirés vers une CDF proches de 0.5 ...
+
+En fait ce que l'on observe c'est que globalement on a plus de positif qui sont "trouvés" au seuil de CDF < 0.5, mais en revanche ayant lissé nos résultats on a moins d'association vraiment significative avec un CDF < 0.1 par exemple ! C'est donc plus facile de récupérer les positives, on a un meilleur TPR par contre toutes nos prédictions se ressemble car écraser par le prior .... initial. Deplus on récupère aussi plus de FP !Dans tout les cas mettre des valeurs de $\nu$ trop hautes écrase l'expression des contributeur et du composé en lui-même !
+
+Pareil pour le LogOdds, on veut pas juste sortir des associés en mode 50/50 !
+
+Aussi, on veut quand même être suffisament précis car on sait que lorsque l'on va testé sur tout nos MeSH: par exemple les 5000 MeSH disease, la majorité des associations que l'on testent sont négatives car en réalité un métabolites ne devrait être associé qu'à un poignet de maladie, on veut donc chercher à miniser au maximum le nombre de Faux-positifs. J'ai par exemple 4900 associations négatives et parmis elles je veux avoir le plus faible tôt de Faux-positif car en terme de nombre de prédictions brutes, ça ferait beaucoup de mauvaise prédicition par exemple à un taux de 0.1 !!
 
 
+
+Dans le papier An empirical Bayes Mixture method for effect size and false discovery rate, il montre justement ce ue je fais !
+Dans cet article p.428, leur $p_j(H_j)$ correspond à mon $W_{i,k}$ où à l'intérieure leur $f^{(j)}(H_i; N_i)$ correspond à mon $C_{i,k}$ (moi je mets $k$ pour indiquer le targeted compound mais pas obligé) !
+
+D'alleurs ils propose une autre interprétation de $W_{i,k}$ (pour eux  $p_j(H_j)$), ils disent: Let $p_j(H_j) = \frac{\pi_j f^{(j)}(z)}{f(z)}$ be the posterior probability that $z$ came from group $j$, and $g_j(δ|z)$ be the posterior for the $j$ th group (that is, the posterior corresponding to prior $g_j$ ) -> Voir l'article mais $g_j(δ|z)$ c'est l'équivalent de notre $f^{(2)}_i(p)$
+
+(où $f(z) = \sum_j \pi_j f^{(j)}(z)$, c'est la distribution marginale comme nous lorsque l'on fait $\sum_{i' \in T_k} w_{i',k} C_{i', k}$)
+
+En effet, on peut peut être faire la même interprétation dans notre cas :
+$W_{i, k} = \frac{ w_{i, k} C_{i, k}} { \sum_{i' \in T_k} w_{i',k} C_{i', k} }  \text{ with } C_{i, k} = \binom{n_k}{c_{k}} \frac{B(\alpha^{(2)}_{i}, \beta^{(2)}_{i})}{B(\alpha^{(1)}_{i}, \beta^{(1)}_{i})}$ En notant que  $C_{i, k}$ représente la probability d'observer les données ($k$ successes over $n$ trials) depuis une distribution Beta-Binomial avec un prior sur $p$ (the success probability) définis par $B(\alpha^{(1)}_{i}, \beta^{(1)}_{i})$.
+
+
+
+# Stein estimator et l'explication du paradoxe: Stein's paradox in statistics. Dans le paradox de stein on s'intéresse à l'estimation de plusieurs moyenne k > 3, pour des variables qui peuvent être complètement indépendante. Ce que montre Stein, et qui est paradoxal, c'est que en "shrinkant" les estimateurs des moyennes individuelles vers la "grand-average" (la moyenne des moyennes) ont obtient *marginalement" de meilleurs estimateurs des moyennes individuelles, même si de base les différentes variables n'ont rien à voir entre elles. De ce que j'ai compris c'est bien un estimateur marginal c'est à dire que c'est mieux globalement, mais que ce n'est pas forcémnt un meilleur estimateur de toutes les moyennes individuelles. Il parle aussi d'admissibilité qui peut un peu faire pensser à la notion de pareto, ca d qu'un estimateur est admissible si aucun autre n'est meilleur ou aussi bon que lui sur tout l'espace du paramètre estimé. D'ailleurs Stein n'est pas n'ont plus admissible ^^
+
+Le rapport à le Bayesian shrinkage est qu'il montre que l'on peut retrouver l'estimateur de Stein avec la règle de Bayes, en utilisant un prior sur la moyenne issue de toutes les données.
+
+Lire aussi https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2872278/ pour un petit historique
+
+Même si dans l'article on utilise pas nécéssaire la moyenne, on montre dans les exemples que l'estimateur de la moyenne que l'on obtient est moins biaisé. effectivement par définit l'estimateur bayesien, la posterior mean ($E[\sigma|x]$) sui minimise le minimum mean square error (MMSE)
+
+
+https://en.wikipedia.org/wiki/Bayes_estimator
+
+https://www.youtube.com/watch?v=b1GxZdFN6cY
+
+https://www.youtube.com/watch?v=fjqd0gG-5OE
+
+Lire aussi les docs dans /home/mxdelmas/Documents/Thèse/cours/stats/Stein_bayes_risk
+
+Ce qui faut retyenir c'est que l'estimateur à posterior est celui qui minimise le risque bayesien

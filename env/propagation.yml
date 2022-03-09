@@ -1,6 +1,6 @@
 name: propagation
 dependencies:
-- python=3.7
+- python=3.8
 - pip
 - pip:
   - numpy
@@ -8,7 +8,7 @@ dependencies:
   - scipy  
   - argparse
   - python-igraph
-  - pylint
+  - pylint==2.4.4
   - matplotlib
   - progressbar2
   - plotly

@@ -410,7 +410,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
         - LogOdds (float): The logarithm of the Odds, computed from the CDF
         - Log2FC (float): The log2 fold change between the mean of the posterior distribution and the general probability to observed the MeSH (the 'p' argument of the function)
-        - priorCDF: Same as CDF, but for the mixture prior.
+        - priorLogOdds: Same as LogOdds, but for the mixture prior.
         - priorLog2FC: Same as Log2FC, but for the mixture prior.
     """
 
@@ -440,7 +440,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             # Compute Log(odds) from the CDF
             log_odds = compute_log_odds(cdf_posterior)
 
-            resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, log_odds, log2fc, cdf_prior, log2fc_prior, False]))
+            resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorLogOdds", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior.mu, cdf_posterior, log_odds, log2fc, log_odds_prior, log2fc_prior, False]))
 
             # In case of no neighborhood information, we simply plot prior vs posterior distributions:
             if report:
@@ -450,7 +450,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         # If there are no observations:
         else:
 
-            resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior.mu, cdf_prior, log_odds_prior, log2fc_prior, np.NaN, np.NaN, False]))
+            resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorLogOdds", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior.mu, cdf_prior, log_odds_prior, log2fc_prior, np.NaN, np.NaN, False]))
 
             if report:
                 f1 = go.Figure()
@@ -470,6 +470,9 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
 
     # Get ratio between initial prior on MeSH and (posterior) prior using neighboors' indicating whether the neighbours are in favour of the relationship
     prior_mix_CDF = compute_mix_CDF(p, prior_mix.weights, prior_mix.alpha, prior_mix.beta)
+
+    # Compute priorLogOdds
+    prior_log_odds = compute_log_odds(prior_mix_CDF)
 
     # Compute Log2FC ratio from prior mixture
     prior_log2fc = np.log2(prior_mix.mu/p)
@@ -503,7 +506,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
                 data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
                 data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
 
-        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, log_odds, log2fc, prior_mix_CDF, prior_log2fc, True]))
+        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorLogOdds", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, log_odds, log2fc, prior_log_odds, prior_log2fc, True]))
 
         # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
         if report:
@@ -537,11 +540,6 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
 
     # If there are no observations:
     else:
-        # Compute Log(odds) from the CDF
-        log_odds = compute_log_odds(prior_mix_CDF)
-
-        # Compute Log2FC from the posterior mixture
-        log2fc = np.log2(prior_mix.mu/p)
 
         # If the inputs are a specific specie with a specific MeSH, we need export the data table
         if update_data:
@@ -555,7 +553,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
                 data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
                 data.loc[j, "Log2FC"] = np.log2(prior_mix.l_mu[j]/p)
 
-        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorCDF", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior_mix.mu, prior_mix_CDF, log_odds, log2fc, np.NaN, np.NaN, True]))
+        resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorLogOdds", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior_mix.mu, prior_mix_CDF, prior_log_odds, prior_log2fc, np.NaN, np.NaN, True]))
 
         # Plot figure ? Only when the inputs are a specific specie with a specific MeSH
         if report:

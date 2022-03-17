@@ -497,14 +497,27 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
 
             # As null weight have been removed during computation, we use SPECIE instead of index as key
             data["posterioir_weights"] = float(0)
-            data["CDF"] = np.NaN
-            data["LogOdds"] = np.NaN
-            data["Log2FC"] = np.NaN
+            data["PriorLogOdds"] = np.NaN
+            data["PostLogOdds"] = np.NaN
+            data["PriorLog2FC"] = np.NaN
+            data["PostLog2FC"] = np.NaN
             for j in data.index:
+                # Contributor posterior weight
                 data.loc[j, "posterioir_weights"] = posterior_mix.weights[j]
-                data.loc[j, "CDF"] = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j])
-                data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
-                data.loc[j, "Log2FC"] = np.log2(posterior_mix.l_mu[j]/p)
+
+                # Contributor prior LogLodds
+                ctb_prior_cdf = ss.beta.cdf(p, prior_mix.alpha[j], prior_mix.beta[j])
+                data.loc[j, "PriorLogOdds"] = compute_log_odds(ctb_prior_cdf)
+
+                # Contributor posterior LogLodds
+                ctb_post_cdf = ss.beta.cdf(p, posterior_mix.alpha[j], posterior_mix.beta[j])
+                data.loc[j, "PostLogOdds"] = compute_log_odds(ctb_post_cdf)
+
+                # Contributor prior Log2FC
+                data.loc[j, "PriorLog2FC"] = np.log2(prior_mix.l_mu[j]/p)
+
+                # Contributor posterior LogFC
+                data.loc[j, "PostLog2FC"] = np.log2(posterior_mix.l_mu[j]/p)
 
         resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorLogOdds", "priorLog2FC", "NeighborhoodInformation"], [n, k, posterior_mix.mu, cdf_posterior_mix, log_odds, log2fc, prior_log_odds, prior_log2fc, True]))
 
@@ -532,8 +545,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             f3 = plot_distributions_plotly(prior_mix, posterior_mix)
 
             # Contribution plots
-            f4 = contributions_plot(data, names, "weights")
-            f5 = contributions_plot(data, names, "posterioir_weights")
+            f4 = contributions_plot(data, names, "weights", "PriorLogOdds")
+            f5 = contributions_plot(data, names, "posterioir_weights", "PostLogOdds")
 
             # Generate report:
             generate_html_report(report, [f1, f2, f3, f4, f5], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Prior Contributions", "Posterior Contributions"], resultat)
@@ -545,12 +558,11 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if update_data:
 
             # As null weight have been removed during computation, we use SPECIE instead of index as key
-            data["CDF"] = np.NaN
             data["LogOdds"] = np.NaN
             data["Log2FC"] = np.NaN
             for j in data.index:
-                data.loc[j, "CDF"] = ss.beta.cdf(p, prior_mix.alpha[j], prior_mix.beta[j])
-                data.loc[j, "LogOdds"] = compute_log_odds(data.loc[j, "CDF"])
+                ctb_cdf = ss.beta.cdf(p, prior_mix.alpha[j], prior_mix.beta[j])
+                data.loc[j, "LogOdds"] = compute_log_odds(ctb_cdf)
                 data.loc[j, "Log2FC"] = np.log2(prior_mix.l_mu[j]/p)
 
         resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorLogOdds", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior_mix.mu, prior_mix_CDF, prior_log_odds, prior_log2fc, np.NaN, np.NaN, True]))
@@ -577,7 +589,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Neighbourhood components", palette, top)
 
             # Contribution plot
-            f2 = contributions_plot(data, names, "weights")
+            f2 = contributions_plot(data, names, "weights", "LogOdds")
 
             # Generate report:
             generate_html_report(report, [f1, f2], ["Neighbourhood Contributors", "Prior Contributions"], resultat)

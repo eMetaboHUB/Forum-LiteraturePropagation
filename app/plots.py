@@ -77,7 +77,7 @@ def plot_mix_distributions_plotly(mix, labels, seq, name, color_palette, top):
     return fig
 
 
-def contributions_plot(data, names, attr, limit=0.99):
+def contributions_plot(data, names, attr, odds_var, limit=0.99):
     """This function is used to produce the contribution plot
 
     Args:
@@ -94,7 +94,7 @@ def contributions_plot(data, names, attr, limit=0.99):
     _data["y"] = "contributors"
     _data["name"] = names
     _data = _data.rename(columns={attr: "Contributions"})
-    _data = _data[["SPECIE", "TOTAL_PMID_SPECIE", "COOC", "Contributions", "CDF", "LogOdds", "Log2FC", "y", "name"]]
+    _data = _data[["SPECIE", "TOTAL_PMID_SPECIE", "COOC", "Contributions", odds_var, "y", "name"]]
 
     # Sort by posterior weights and determine contributors that belong the the 'others' category
     _data.sort_values(by='Contributions', inplace=True, ascending=False, ignore_index=True)
@@ -102,26 +102,29 @@ def contributions_plot(data, names, attr, limit=0.99):
     l = np.argmin(abs(cumsum - limit))
 
     # Compute stats for the 'others' category
-    others_median = np.median(_data.loc[_data.index[(l + 1):], "LogOdds"])
+    others_median = np.median(_data.loc[_data.index[(l + 1):], odds_var])
     others_cooc = np.median(_data.loc[_data.index[(l + 1):], "COOC"])
     others_total_pmid_specie = np.median(_data.loc[_data.index[(l + 1):], "TOTAL_PMID_SPECIE"])
 
     # Replace 'others' contributors by the 'others' line
     _data.drop(index=_data.index[(l + 1):], inplace=True)
-    _data.loc[-1] = ["others", others_total_pmid_specie, others_cooc, (1 - cumsum[l]), np.NaN, others_median, np.NaN, "contributors", "others"]
+    _data.loc[-1] = ["others", others_total_pmid_specie, others_cooc, (1 - cumsum[l]), others_median, "contributors", "others"]
 
     # To manage the color scale, we have to make a copy of Log_Odds. As many contributors could have very high or small LogOdds (eg. Inf or -Inf) we restrict their values to a range of -100 - 100 (in Odds, not LogOdds)
     # For contributors that have an Odds higher than 100 or lower than -100, we replace their value by le limit (100 or -100) to restrict the color scale.
-    _data["w_LogOdds"] = _data["LogOdds"]
-    _data.loc[_data.LogOdds >= np.log(100), "w_LogOdds"] = np.log(100)
-    _data.loc[_data.LogOdds <= np.log(0.01), "w_LogOdds"] = np.log(0.01)
-    _data["LogOdds"] = [str(v) for v in np.round(_data["LogOdds"], 2)]
+    _data["w_LogOdds"] = _data[odds_var]
+    _data.loc[_data.w_LogOdds >= np.log(100), "w_LogOdds"] = np.log(100)
+    _data.loc[_data.w_LogOdds <= np.log(0.01), "w_LogOdds"] = np.log(0.01)
+    _data[odds_var] = [str(v) for v in np.round(_data[odds_var], 2)]
+
+    # hover_dict = dict({"TOTAL_PMID_SPECIE": ":.", "COOC": ":.", "Contributions": ":.2f", "LogOdds": True, "w_LogOdds": False, "y": False})
+    hover_dict = dict(zip(("TOTAL_PMID_SPECIE", "COOC", "Contributions", odds_var, "w_LogOdds", "y"), (":.", ":.", ":.2f", True, False, False)))
 
     fig = px.bar(_data, y="y",
         x="Contributions",
         color="w_LogOdds",
         orientation="h",
-        hover_data=dict({"TOTAL_PMID_SPECIE": ":.", "COOC": ":.", "Contributions": ":.2f", "LogOdds": True, "w_LogOdds": False, "y": False}),
+        hover_data=hover_dict,
         hover_name="name",
         height=800,
         range_color=[np.log(0.01), np.log(100)],

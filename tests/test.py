@@ -74,7 +74,7 @@ class TestPropagationMethods(unittest.TestCase):
         res = computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=False)
         self.assertEqual(np.round(res['CDF'], 9), 0.002187131)
         self.assertEqual(np.round(res['Log2FC'], 9), 4.086590931)
-        self.assertEqual(np.round(res['priorCDF'], 9), 0.430934850)
+        self.assertEqual(np.round(res['priorLogOdds'], 9), 0.278038007)
         self.assertEqual(np.round(res['priorLog2FC'], 9), 3.071626381)
 
     def test_intial_prior(self):

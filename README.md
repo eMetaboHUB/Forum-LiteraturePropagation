@@ -116,29 +116,151 @@ Data are availbale in the *data* directory
 
 ## Output
 
-* For a specific pair of specie and MeSH (```--specie``` and ```--mesh``` options), 3 files are outputed: 
-   - *specie*\_*mesh*\_*alpha*\_*sample_size*.csv: association results
-   - data_*specie*\_*mesh*\_*alpha*\_*sample_size*.csv: details of the prior contributors
+Predictions are reported in a table format with columns:
+
+### Literature and identifiers
+
+- SPECIE: The metabolic specie identifier
+
+- MESH: The MeSH identifier
+
+- TOTAL_PMID_SPECIE: The total number of articles discussing the metabolic specie (from *specie.corpora*)
+
+- COOC: The number of co-mentions between the specie and the MeSH (from *specie.cooc*)
+
+- Mean: The exapected probability of discussing the MeSH
+
+### Estimators
+
+- CDF: The probability that the specie discuss the MeSH less frequently than expected (compared to *MEAN*)
+
+- LogOdds: The LogOdds computed from the CDF: (probability that the specie discusses the MeSH more frequently than expected) / (probability that the specie discusses the MeSH less frequently)
+
+- Log2FC: Fold-Change computed from the average probability that the specie discusses the MeSH, compared to the expected probability (*MEAN*)
+
+**Warnings**: 
+  - When a specie **has no** available literature (COOC = 0): CDF, LogOdds, and Log2FC are computed from the **prior** distribution (the neighbouring literaure)
+
+  - When a specie **has** annotated literature (COOC > 0): CDF, LogOdds, and Log2FC are computed from the **posterior** distribution (using neighbouring literature and observations)
+
+  - When a specie has **no literature in the neighbourhood** (NeighborhoodInformation = FALSE), a prior can't be built from the neighbouring literature. In this case, we use the *general* prior (see publication for details) and the predictions are computed from its posterior distribution.
+
+  - When a specie has both no annotated literature and no literature in the neighbourdhood (COOC = 0 & NeighborhoodInformation = FALSE), predictions are directly derived from the *general* prior, but should be discarded.
+
+### Diagnostic values
+
+- priorLogOdds: This indicators is computed only for species that have annotated literature (COOC > 0), as LogOdds is already derived from the prior distribution for species without available literature. It corresponds to the LogOdds computed form the prior distribution (the neighbouring literature), without considering the literature of the targeted specie.
+
+- priorLog2FC: Same as priorLogOdds but for Log2FC
+
+- NeighborhoodInformation: Indicates if there is available literature in the neighbourhood.
+
+- Entropy: Entropy of the contributions in the prior distribution
+
+- CtbAvgDistance: Averaged distance of prior contributors 
+
+- CtbAvgCorporaSize:	Averaged number of articles of prior contributors 
+
+- NbCtb: Number of contributors
+	
+- SPECIE_NAME: label of the specie (from species_name_path)
+
+- MESH_NAME: label of the MeSH (from meshs_name_path)
+
+## Examples
+
+### For a specific pair of specie and MeSH (```--specie``` and ```--mesh``` options)
+
+```bash
+python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp_no1C_cpds.gml" --specie.corpora="data/Human1/1.7/species_pmids_Human1_1.7.csv" --specie.cooc="data/Human1/1.7/species_mesh_pmids_Human1_1.7.csv" --specie="M_m01064c"  --mesh="D011085" --out="path/to/out/dir"  --alpha 0.4 --sample_size 1000 --species_name_path="data/Human1/1.7/species_names.csv" --meshs_name_path="data/Human1/1.7/mesh_labels.csv"
+```
+
+#### 3 files are outputed: 
+  - *specie*\_*mesh*\_*alpha*\_*sample_size*.csv: association results
+
+**Eg:** 
+
+| SPECIE    | MESH    | TOTAL_PMID_SPECIE | COOC | Mean | CDF  | LogOdds | Log2FC | priorLogOdds | priorLog2FC | NeighborhoodInformation | Entropy | CtbAvgDistance | CtbAvgCorporaSize | NbCtb | SPECIE_NAME                  | MESH_NAME                 |
+|-----------|---------|-------------------|------|------|------|---------|--------|--------------|-------------|-------------------------|---------|----------------|-------------------|-------|------------------------------|---------------------------|
+| M_m01064c | D011085 |             82 | 1 | 0.02 | 0.00 |    6.23 |   3.14 |         5.47 |        3.98 | TRUE                    |    2.29 |           1.58 |          35869.47 | 24 | 5alpha-androstane-3,17-dione | Polycystic Ovary Syndrome |
+
+  - data_*specie*\_*mesh*\_*alpha*\_*sample_size*.csv: details of the contributors
+
+**Eg:** 
+
+
+| SPECIE    | TOTAL_PMID_SPECIE | weights     | COOC    | posterioir_weights | PriorLogOdds | PostLogOdds | PriorLog2FC       | PostLog2FC        | SPECIE_NAME          |
+|-----------|-------------------|-------------|---------|--------------------|--------------|-------------|-------------------|-------------------|----------------------|
+| M_m01338c |              2348 |     0.29    |  45  |        0.51        |     48.59    |    49.44    |        2.60       |        2.59       | androsterone         |
+| M_m02969c |             79421 |     0.29    | 2521 |        0.28        |      inf     |     inf     |        3.75       |        3.75       | testosterone         |
+| M_m02968c |             69365 |     0.09    | 1939 |        0.10        |      inf     |     inf     |        3.56       |        3.56       | testosterone sulfate |
+| M_m01787c |             93909 |     0.02    | 1102 |        0.04        |      inf     |     inf     |        2.32       |        2.32       | estradiol-17beta     |
+| M_m01787c | 93909             | 0.023936701 | 37      | 0.024870212        | -inf         | -inf        | -3.65098133939937 | -3.65222726884335 | estradiol-17beta     |
+
+For each contributor: 
+
+- SPECIE: contributor identifier
+- TOTAL_PMID_SPECIE: number of annotated articles
+- COOC number of co-mentions with the MeSH
+- weights: weight in the prior distribution
+- posterioir_weights: weight in the posterior distribution
+- PriorLogOdds: LogOdds (specific to the contributor) computed only from its literature in the prior distribution.
+- PostLogOdds: LogOdds (specific to the contributor) computed only from its literature in the posterior distribution.
+- PriorLog2FC: Log2FC (specific to the contributor) computed only from its literature in the prior distribution.
+- PostLog2FC: Log2FC (specific to the contributor) computed only from its literature in the posterior distribution.
+- SPECIE_NAME: name of the contributor
+
+**Warnings**: When a specie has **no** literature, the predictions are only based on the prior distribution and therefore PostLogOdds and PostLog2FC are not returned for the contributors. Same for posterioir_weights which is not returned if the specie has no literature.
+
   - report_*specie*\_*mesh*\_*alpha*\_*sample_size*.csv: an html report with figure of distributions and contributor profiles
 
-* For only a MeSH descriptor (```--mesh``` option):
+* * *
+
+### For only a MeSH descriptor (```--mesh``` option):
   - *mesh*.csv: associations with all the metabolic species in the network
 
-* For only a metabolic specie (```--specie``` option):
+```bash
+python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp_no1C_cpds.gml" --specie.corpora="data/Human1/1.7/species_pmids_Human1_1.7.csv" --specie.cooc="data/Human1/1.7/species_mesh_pmids_Human1_1.7.csv" --specie="M_m01064c" --out="path/to/out/dir"  --alpha 0.4 --sample_size 1000 --species_name_path="data/Human1/1.7/species_names.csv" --meshs_name_path="data/Human1/1.7/mesh_labels.csv"
+```
+
+| SPECIE    | TOTAL_PMID_SPECIE | COOC | Mean | CDF  | LogOdds | Log2FC | priorLogOdds | priorLog2FC | NeighborhoodInformation | Entropy | CtbAvgDistance | CtbAvgCorporaSize | NbCtb | SPECIE_NAME                               |
+|-----------|-------------------|------|------|------|---------|--------|--------------|-------------|-------------------------|---------|----------------|-------------------|-------|-------------------------------------------|
+| M_m02731c |              0 | 0 | 0.00 | 1.00 |   -7.57 |  -2.24 |              |             | VRAI                    |    0.89 |           2.24 |          52940.92 | 11 | phosphatidate-LD-PS pool                  |
+| M_m02864c |              0 | 0 | 0.00 | 0.99 |   -4.36 |  -2.32 |              |             | VRAI                    |    2.71 |           1.43 |          66854.47 | 73 | S-(PGJ2)-glutathione                      |
+| M_m01666c |            282 | 0 | 0.00 | 0.99 |   -5.17 |  -3.39 |        -4.29 |       -3.13 | VRAI                    |    1.29 |           1.17 |          24152.59 | 30 | deoxyadenosine                            |
+| M_m01799c |             46 | 8 | 0.01 | 0.00 |   21.51 |   2.60 |         6.12 |        2.20 | VRAI                    |    0.03 |           1.00 |           1162.25 | 14 | etiocholan-3alpha-ol-17-one 3-glucuronide |
+
+
+* * *
+
+
+### For only a metabolic specie (```--specie``` option):
   - *specie*.csv: associations with all the MeSH descriptors provided in the *specie.cooc* file.
 
-* For a file of specific association (```--file``` option)
+```bash
+python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp_no1C_cpds.gml" --specie.corpora="data/Human1/1.7/species_pmids_Human1_1.7.csv" --specie.cooc="data/Human1/1.7/species_mesh_pmids_Human1_1.7.csv" --specie="M_m01064c" --out="path/to/out/dir"  --alpha 0.4 --sample_size 1000 --species_name_path="data/Human1/1.7/species_names.csv" --meshs_name_path="data/Human1/1.7/mesh_labels.csv"
+```
+
+| MESH    | TOTAL_PMID_SPECIE | COOC | Mean | CDF  | LogOdds | Log2FC | priorLogOdds | priorLog2FC | NeighborhoodInformation | Entropy | CtbAvgDistance | CtbAvgCorporaSize | NbCtb | MESH_NAME               |
+|---------|-------------------|------|------|------|---------|--------|--------------|-------------|-------------------------|---------|----------------|-------------------|-------|-------------------------|
+| D011469 |             82 | 9 | 0.06 | 0.00 |   23.47 |   3.44 |         4.16 |        2.75 | VRAI                    |    2.29 |           1.58 |          35869.47 | 24 | Prostatic Diseases      |
+| D005834 |             82 | 8 | 0.05 | 0.00 |   21.19 |   3.38 |         5.79 |        2.77 | VRAI                    |    2.29 |           1.58 |          35869.47 | 24 | Genital Neoplasms, Male |
+| D011471 |             82 | 8 | 0.05 | 0.00 |   19.82 |   3.43 |         4.17 |        2.61 | VRAI                    |    2.29 |           1.58 |          35869.47 | 24 | Prostatic Neoplasms     |
+| D005832 |             82 | 9 | 0.12 | 0.00 |   19.15 |   3.50 |         5.68 |        2.89 | VRAI                    |    2.29 |           1.58 |          35869.47 | 24 | Genital Diseases, Male  |
+
+* * *
+
+### For a file of specific association (```--file``` option)
   * *file_name*\_*alpha*\_*sample_size*.csv: associations results
 
 
+| SPECIE    | MESH    | TOTAL_PMID_SPECIE | COOC | Mean | CDF  | LogOdds | Log2FC | priorCDF | priorLog2FC | NeighborhoodInformation | Entropy | CtbAvgDistance | CtbAvgCorporaSize | NbCtb |
+|-----------|---------|-------------------|------|------|------|---------|--------|----------|-------------|-------------------------|---------|----------------|-------------------|-------|
+| M_m03120c | D005271 |                 0 |    0 | 0.00 | 0.69 |   -0.79 |   0.15 |     0.69 |        0.15 | VRAI                    |    2.29 |           1.16 |          14201.39 |    41 |
+| M_m03099c | D006973 |                 0 |    0 | 0.01 | 0.96 |   -3.20 |  -0.16 |     0.96 |       -0.16 | VRAI                    |    1.34 |           1.06 |          92486.93 |    35 |
+| M_m02756c | D020969 |                 0 |    0 | 0.03 | 0.03 |    3.33 |   0.37 |     0.03 |        0.37 | VRAI                    |    0.29 |           1.03 |           7310.96 |    12 |
+| M_m01830c | D007592 |                 0 |    0 | 0.01 | 0.28 |    0.93 |   0.34 |     0.28 |        0.34 | VRAI                    |    0.75 |           1.17 |            247.84 |     5 |
 
-## Example of execution
+#
 
-```bash
-python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp_no1C_cpds.gml" --specie.corpora="data/Human1/1.7/species_pmids_Human1_1.7.csv" --specie.cooc="data/Human1/1.7/species_mesh_pmids_Human1_1.7.csv" --specie="M_34dhpe_c"  --mesh="D010300" --out="notes/results/"  --alpha 0.4 --sample_size 1000 --species_name_path="data/Human1/1.7/species_names.csv" --meshs_name_path="data/Human1/1.7/mesh_labels.csv"
-```
-#### Expected result! M_34dhpe_c_D010300_0.4_1000.csv
-
-| SPECIE     | MESH               | TOTAL_PMID_SPECIE | COOC | Mean              | CDF                  | LogOdds          | Log2FC           | priorCDF | priorLog2FC | NeighborhoodInformation | Entropy | CtbAvgDistance | CtbAvgCorporaSize | NbCtb | SPECIE_NAME                | MESH_NAME         |
-|------------|--------------------|-------------------|------|-------------------|----------------------|------------------|------------------|----------|-------------|-------------------------|---------|----------------|-------------------|-------|----------------------------|-------------------|
-| M_34dhpe_c | D010300            | 0                 | 0    | 0.07 | 4.57-05 | 9.99 | 3.55 |          |             | True                    | 1.23   | 1.99           | 63375.29         | 9     | 3,4-Dihydroxyphenylethanol | Parkinson Disease |
+For more details, see the publication.

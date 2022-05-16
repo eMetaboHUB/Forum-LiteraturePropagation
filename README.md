@@ -3,6 +3,35 @@
 Suggesting relations between metabolic species and disease-related MeSH descriptors by propagating the neighbouring literature.
 [ABSTRACT]
 
+
+## Availability
+
+All computed relations are available on the FORUM ftp server.
+
+- host: sftp://ftp.semantic-metabolomics.org
+- user: forum
+- password: Forum2021Cov!
+
+They can be accessed using any FTP client (like FileZilla) or the command line interface sftp. For downloading all the suggested associations, use for instance:
+
+```bash
+sftp forum@ftp.semantic-metabolomics.org:/Propagation/Human1_1.7/2021/global.csv
+```
+
+The directory contains: 
+
+- *global.csv*: all the computed associations.
+- *predictions.csv*: the selected associations with: LogOdds > 2, Log2FC > 1, Entropy > 1.
+- *specie_names*: species labels in the Human1 1.7 metabolic network.
+- *mesh_labels*: MeSH descriptor labels.
+
+
+The set of selected associations was also integrated in the FORUM KG in the *<https://forum.semantic-metabolomics.org/Propagation/Human1_1.7/2021>* graph, which is directly queryable in the [FORUM KG](https://forum.semantic-metabolomics.fr/sparql). See more details at [FORUM](https://forum-webapp.semantic-metabolomics.fr/#/about). The RDF files also are available in the RDF directory at: 
+
+```bash
+sftp forum@ftp.semantic-metabolomics.org:/Propagation/Human1_1.7/2021/RDF/*.ttl.gz
+```
+
 ## Environment
 Requirement: conda
 
@@ -26,7 +55,7 @@ python app/main.py --graph="path/to/graph" --specie.corpora="path/to specie-tabl
 
   --graph:  Path to the metabolic network compound graph in .gml format
 
-  --undirected: Is the graph undirected ? If the graph is directed the probability are extracted from the 'Weight' attribute of the edges. In case of a multi-graph, the multiple edges are merged by summing the weights. If the graph in undirected transition probabilities are computed form the adjacency matrix
+  --undirected: Is the graph undirected ? If the graph is directed, the probability are extracted from the 'Weight' attribute of the edges. In case of a multi-graph, the multiple edges are merged by summing the weights. If the graph in undirected, transition probabilities are computed from the adjacency matrix
 
   --specie.corpora: Path to the SPECIE corpus file
 
@@ -38,19 +67,19 @@ python app/main.py --graph="path/to/graph" --specie.corpora="path/to specie-tabl
 
   --file:   Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH). This argument is incompatible with the 'mesh' and 'specie' arguments.
 
-  --forget: Only the prior from neighborhood will be used in the computation, observations of treated species are hidden.
+  --forget: Only the prior from neighbourhood will be used in the computation, observations of treated species are hidden.
 
   --alpha:  The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1
 
   --sample_size:    The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100
 
-  --q:  The tolerance threshold for PPR probabilities. If q is negative the default value is used. The Default = 1/(N - 1)
+  --q:  The tolerance threshold for PPR probabilities. If q is negative, the default value is used. The Default = 1/(N - 1)
 
   --id_att: The name of the vertex attribute containing the SPECIE identifier (eg. M_m0001c) in the graph. These identifiers must match with those provided in the 'SPECIE' column of specie.corpora and specie.cooc files. Default is the 'label' attribute
 
-  --species_name_path:  Path to the file containing species names in a .csv format. First column should be named 'SPECIE' and contains the SPECIE identifiers (eg. M_m0001c) and the second column should be named 'SPECIE_NAME' and contains the species' chemical names
+  --species_name_path:  Path to the file containing species names in a .csv format. The first column should be named 'SPECIE' and contains the SPECIE identifiers (eg. M_m0001c) and the second column should be named 'SPECIE_NAME' and contains the species' chemical names
 
-  --meshs_name_path:    Path to the file containing species names in a .csv format. First column should be named 'MESH' and contains the MESH identifiers (eg. D000017) and the second column should be named 'MESH_NAME' and contains the MeSH labels
+  --meshs_name_path:    Path to the file containing species names in a .csv format. The first column should be named 'MESH' and contains the MESH identifiers (eg. D000017) and the second column should be named 'MESH_NAME' and contains the MeSH labels
 
   --out:    Path to the output directory
 ```
@@ -128,7 +157,7 @@ Predictions are reported in a table format with columns:
 
 - COOC: The number of co-mentions between the specie and the MeSH (from *specie.cooc*)
 
-- Mean: The exapected probability of discussing the MeSH
+- Mean: The expected probability of discussing the MeSH
 
 ### Estimators
 
@@ -162,7 +191,7 @@ Predictions are reported in a table format with columns:
 - CtbAvgCorporaSize:	Averaged number of articles of prior contributors 
 
 - NbCtb: Number of contributors
-	
+
 - SPECIE_NAME: label of the specie (from species_name_path)
 
 - MESH_NAME: label of the MeSH (from meshs_name_path)
@@ -251,7 +280,7 @@ python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp
 * * *
 
 ### For a file of specific association (```--file``` option)
-  * *file_name*\_*alpha*\_*sample_size*.csv: associations results
+  - *file_name*\_*alpha*\_*sample_size*.csv: associations results
 
 
 | SPECIE    | MESH    | TOTAL_PMID_SPECIE | COOC | Mean | CDF  | LogOdds | Log2FC | priorCDF | priorLog2FC | NeighborhoodInformation | Entropy | CtbAvgDistance | CtbAvgCorporaSize | NbCtb |
@@ -261,6 +290,5 @@ python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp
 | M_m02756c | D020969 |                 0 |    0 | 0.03 | 0.03 |    3.33 |   0.37 |     0.03 |        0.37 | VRAI                    |    0.29 |           1.03 |           7310.96 |    12 |
 | M_m01830c | D007592 |                 0 |    0 | 0.01 | 0.28 |    0.93 |   0.34 |     0.28 |        0.34 | VRAI                    |    0.75 |           1.17 |            247.84 |     5 |
 
-#
 
 For more details, see the publication.

@@ -558,12 +558,15 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if update_data:
 
             # As null weight have been removed during computation, we use SPECIE instead of index as key
-            data["LogOdds"] = np.NaN
-            data["Log2FC"] = np.NaN
+            data["posterioir_weights"] = np.NaN
+            data["PriorLogOdds"] = np.NaN
+            data["PostLogOdds"] = np.NaN
+            data["PriorLog2FC"] = np.NaN
+            data["PostLog2FC"] = np.NaN
             for j in data.index:
                 ctb_cdf = ss.beta.cdf(p, prior_mix.alpha[j], prior_mix.beta[j])
-                data.loc[j, "LogOdds"] = compute_log_odds(ctb_cdf)
-                data.loc[j, "Log2FC"] = np.log2(prior_mix.l_mu[j]/p)
+                data.loc[j, "PriorLogOdds"] = compute_log_odds(ctb_cdf)
+                data.loc[j, "PriorLog2FC"] = np.log2(prior_mix.l_mu[j]/p)
 
         resultat = dict(zip(["TOTAL_PMID_SPECIE", "COOC", "Mean", "CDF", "LogOdds", "Log2FC", "priorLogOdds", "priorLog2FC", "NeighborhoodInformation"], [n, k, prior_mix.mu, prior_mix_CDF, prior_log_odds, prior_log2fc, np.NaN, np.NaN, True]))
 
@@ -589,7 +592,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Neighbourhood components", palette, top)
 
             # Contribution plot
-            f2 = contributions_plot(data, names, "weights", "LogOdds")
+            f2 = contributions_plot(data, names, "weights", "PriorLogOdds")
 
             # Generate report:
             generate_html_report(report, [f1, f2], ["Neighbourhood Contributors", "Prior Contributions"], resultat)
@@ -687,7 +690,7 @@ def mesh2specie(mesh, table_cooc, table_species_corpora, weights, table_mesh, fo
     df_.insert(0, "SPECIE", specie_list)
     return df_
 
-def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, forget):
+def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, forget, species_name_path, out):
     """This function is used to compute all associations specified in a Dataframe (SPECIE, MESH)
 
     Args:
@@ -701,6 +704,9 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     Returns:
         [pd.DataFrame]: association table
     """
+
+    global args
+
     # Test if all provided species and MeSH are present in the network :*
     if (sum(~f["SPECIE"].isin(table_species_corpora["SPECIE"]))) or (sum(~f["MESH"].isin(table_mesh["MESH"]))):
         print("It seems that some species or MeSH descriptors provided in the file are not present in the graph. They will be removed !")
@@ -733,7 +739,13 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
             p = float(MeSH_info["P"])
 
             # Computation
-            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001)
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True)
+            
+            # add names to data
+            data = add_names(data, species_name_path, None)
+            out_data = os.path.join(out, "data_" + specie + "_" + mesh + ".csv")
+            data.to_csv(out_data, index=False)
+
             store.append(r)
             bar.update(i)
 

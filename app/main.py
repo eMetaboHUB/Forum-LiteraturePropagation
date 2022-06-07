@@ -148,7 +148,7 @@ for alpha in alpha_set:
 
             # Compute predictions
             print("[INFO] Compute association from file: " + args.file)
-            r = association_file(f, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget)
+            r = association_file(f, table_coocurences, table_species_corpora, weights, table_mesh_corpora_work, args.forget, args.species_name_path, args.out)
 
             # Add diagnostic values for each prior
             r = pd.merge(r, df_Entropy, on="SPECIE", how="left")

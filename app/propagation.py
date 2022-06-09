@@ -495,15 +495,18 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         # If the inputs are a specific specie with a specific MeSH, we need to export the data table
         if update_data:
 
+            # Rename weight column
+            data.rename(columns={'weights':'PriorWeights'}, inplace = True)
+
             # As null weight have been removed during computation, we use SPECIE instead of index as key
-            data["posterioir_weights"] = float(0)
+            data["PostWeights"] = float(0)
             data["PriorLogOdds"] = np.NaN
             data["PostLogOdds"] = np.NaN
             data["PriorLog2FC"] = np.NaN
             data["PostLog2FC"] = np.NaN
             for j in data.index:
                 # Contributor posterior weight
-                data.loc[j, "posterioir_weights"] = posterior_mix.weights[j]
+                data.loc[j, "PostWeights"] = posterior_mix.weights[j]
 
                 # Contributor prior LogLodds
                 ctb_prior_cdf = ss.beta.cdf(p, prior_mix.alpha[j], prior_mix.beta[j])
@@ -545,8 +548,8 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             f3 = plot_distributions_plotly(prior_mix, posterior_mix)
 
             # Contribution plots
-            f4 = contributions_plot(data, names, "weights", "PriorLogOdds")
-            f5 = contributions_plot(data, names, "posterioir_weights", "PostLogOdds")
+            f4 = contributions_plot(data, names, "PriorWeights", "PriorLogOdds")
+            f5 = contributions_plot(data, names, "PostWeights", "PostLogOdds")
 
             # Generate report:
             generate_html_report(report, [f1, f2, f3, f4, f5], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Prior Contributions", "Posterior Contributions"], resultat)
@@ -557,12 +560,13 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         # If the inputs are a specific specie with a specific MeSH, we need export the data table
         if update_data:
 
+            # Rename weight column
+            data.rename(columns={'weights':'PriorWeights'}, inplace = True)
+
             # As null weight have been removed during computation, we use SPECIE instead of index as key
-            data["posterioir_weights"] = np.NaN
             data["PriorLogOdds"] = np.NaN
-            data["PostLogOdds"] = np.NaN
             data["PriorLog2FC"] = np.NaN
-            data["PostLog2FC"] = np.NaN
+
             for j in data.index:
                 ctb_cdf = ss.beta.cdf(p, prior_mix.alpha[j], prior_mix.beta[j])
                 data.loc[j, "PriorLogOdds"] = compute_log_odds(ctb_cdf)
@@ -592,7 +596,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Neighbourhood components", palette, top)
 
             # Contribution plot
-            f2 = contributions_plot(data, names, "weights", "PriorLogOdds")
+            f2 = contributions_plot(data, names, "PriorWeights", "PriorLogOdds")
 
             # Generate report:
             generate_html_report(report, [f1, f2], ["Neighbourhood Contributors", "Prior Contributions"], resultat)

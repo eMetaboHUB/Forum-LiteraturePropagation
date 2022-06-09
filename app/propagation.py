@@ -404,7 +404,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
 
     Returns:
         [dict]: A dictionnary with:
-        - TOTAL_PMID_SPECIE (int): The total number of mentions for the targeted compound
+        - TOTALspecies_name_path_PMID_SPECIE (int): The total number of mentions for the targeted compound
         - COOC (int): The total number of co-occurences between the targeted compound and the MeSH
         - Mean (float): The mean of the posterior distribution.
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
@@ -445,7 +445,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             # In case of no neighborhood information, we simply plot prior vs posterior distributions:
             if report:
                 f1 = plot_distributions_plotly(prior, posterior)
-                generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat)
+                generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat, pd.DataFrame())
 
         # If there are no observations:
         else:
@@ -456,7 +456,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
                 f1 = go.Figure()
                 f1.add_trace(go.Scatter(x=prior.x, y=prior.f, line=dict(color="blue"), name="Prior"))
                 f1.update_layout(title="Prior from the MeSH overall frequency", xaxis=dict(title="Probability", titlefont_size=25, tickfont_size=20), yaxis=dict(title="Density", titlefont_size=25, tickfont_size=20), template="simple_white")
-                generate_html_report(report, [f1], ["MeSH overall prior"], resultat)
+                generate_html_report(report, [f1], ["MeSH overall prior"], resultat,  pd.DataFrame())
 
         return resultat
 
@@ -496,7 +496,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if update_data:
 
             # Rename weight column
-            data.rename(columns={'weights':'PriorWeights'}, inplace = True)
+            data.rename(columns={'weights':'PriorWeights'}, inplace=True)
 
             # As null weight have been removed during computation, we use SPECIE instead of index as key
             data["PostWeights"] = float(0)
@@ -528,10 +528,11 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if report:
 
             # If names have been provided, use them instead of species labels in Figures:
-            if species_name_path:
-                species_name = pd.read_csv(species_name_path)
-                _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on="SPECIE", how="left")
-                names = _df_names["SPECIE_NAME"].tolist()
+            if "SPECIE_NAME" in data.columns:
+                names = data["SPECIE_NAME"].tolist()
+            else:
+                names = data["SPECIE"]
+
 
             # We set the top to top 10:
             top = 10
@@ -543,16 +544,16 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
 
             # Plot
-            f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
-            f2 = plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
-            f3 = plot_distributions_plotly(prior_mix, posterior_mix)
+            # f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Prior components", palette, top)
+            # f2 = plot_mix_distributions_plotly(posterior_mix, names, seq, "Posterior components", palette, top)
+            # f3 = plot_distributions_plotly(prior_mix, posterior_mix)
 
             # Contribution plots
             f4 = contributions_plot(data, names, "PriorWeights", "PriorLogOdds")
             f5 = contributions_plot(data, names, "PostWeights", "PostLogOdds")
 
             # Generate report:
-            generate_html_report(report, [f1, f2, f3, f4, f5], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Prior Contributions", "Posterior Contributions"], resultat)
+            generate_html_report(report, [f4, f5], ["Prior Contributions", "Posterior Contributions"], resultat, data)
 
     # If there are no observations:
     else:
@@ -578,10 +579,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if report:
 
             # If names have been provided, use them instead of species labels in Figures:
-            if species_name_path:
-                species_name = pd.read_csv(species_name_path)
-                _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on="SPECIE", how="left")
-                names = _df_names["SPECIE_NAME"].tolist()
+            if "SPECIE_NAME" in data.columns:
+                names = data["SPECIE_NAME"].tolist()
+            else:
+                names = data["SPECIE"]
 
             # We set the top to top 10:
             top = 10
@@ -593,13 +594,13 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             palette = dict(zip(set_contributors, cm.tab20(np.linspace(0, 1, len(set_contributors)))))
 
             # Plot
-            f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Neighbourhood components", palette, top)
+            # f1 = plot_mix_distributions_plotly(prior_mix, names, seq, "Neighbourhood components", palette, top)
 
             # Contribution plot
             f2 = contributions_plot(data, names, "PriorWeights", "PriorLogOdds")
 
             # Generate report:
-            generate_html_report(report, [f1, f2], ["Neighbourhood Contributors", "Prior Contributions"], resultat)
+            generate_html_report(report, [f2], ["Prior Contributions"], resultat, data)
 
     return resultat
 
@@ -623,7 +624,7 @@ def specie2mesh(index, table_cooc, table_species_corpora, weights, table_mesh, f
     mesh_list = table_mesh["MESH"].tolist()
     indexes = range(0, len(mesh_list))
     store = []
-
+    
     # Prepare data table
     table_species_corpora["weights"] = weights[:, index].tolist()
 
@@ -719,7 +720,12 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
 
     store = []
     n = f.shape[0]
-
+    
+    # Add names
+    if species_name_path:
+        table_species_corpora = add_names(table_species_corpora, species_name_path, None)
+        table_species_corpora = table_species_corpora[["SPECIE_NAME", "SPECIE", "TOTAL_PMID_SPECIE"]]
+    
     # Browse associations
     with progressbar.ProgressBar(max_value=n) as bar:
         for i in range(0, n):
@@ -745,9 +751,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
 
             # Computation
             r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True, report=path_report, species_name_path=species_name_path)
-            
-            # add names to data
-            data = add_names(data, species_name_path, None)
+
             out_data = os.path.join(out, "data_" + specie + "_" + mesh + ".csv")
             data.to_csv(out_data, index=False)
 
@@ -758,6 +762,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
     return associations
 
 def add_names(result, species_name_path, mesh_name_path):
+    #TODO faire par index de colonne pour éviter de devoir spécifier SPECIE_NAME en header du fichier
     # Add species' names if provided
     if species_name_path:
         species_name = pd.read_csv(species_name_path)

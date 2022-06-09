@@ -736,6 +736,8 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
             # Prepare data
             table_species_corpora["weights"] = weights[:, index].tolist()
             cooc = table_cooc[table_cooc["MESH"] == mesh][["SPECIE", "COOC"]]
+            cooc['COOC'] = cooc['COOC'].astype(int)
+
             data = pd.merge(table_species_corpora, cooc, on="SPECIE", how="left").fillna(0)
 
             # If forget option is true, remove observation of the studied specie

@@ -52,6 +52,7 @@ if table_species_corpora is None:
 
 # Fill na if some species are not indicated in the file
 table_species_corpora = table_species_corpora.fillna(0)
+table_species_corpora['TOTAL_PMID_SPECIE'] = table_species_corpora['TOTAL_PMID_SPECIE'].astype(int)
 
 # Compute total number of cpd-articles mentions
 total_cpd_mention = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
@@ -59,6 +60,7 @@ print("Ok")
 
 print("[INFO] Import species-MeSH co-occurences ... ", end='')
 table_coocurences = import_and_map(args.specie_mesh_path, g, args.id_att)
+
 if table_coocurences is None:
     print("[INFO] Exit due to errors during data import")
     sys.exit(1)
@@ -66,7 +68,9 @@ print("Ok")
 
 # Compute the total number of mentions between a compound and an article, that also involved MeSHs
 table_mesh_corpora = table_coocurences.groupby('MESH', as_index=False)[['COOC']].sum().rename(columns={"COOC": "TOTAL_CPD_MENTION_MESH"})
+table_mesh_corpora['TOTAL_CPD_MENTION_MESH'] = table_mesh_corpora['TOTAL_CPD_MENTION_MESH'].astype(int)
 
+print(table_mesh_corpora)
 # Compute MeSH probabilities normalising by the total number of cpd-article mentions
 table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/total_cpd_mention
 

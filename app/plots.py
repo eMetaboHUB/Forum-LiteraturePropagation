@@ -157,7 +157,7 @@ def generate_html_report(out_path, figs, section_titles, resultat, data):
         section_titles (list): A list of section titles for the figures
         resultat (dict): The result dict with CDF, LogOdds, etc ...
     """
-    table_html = data.to_html(table_id="table")
+    table_html = data.to_html(table_id="table", index=False, float_format='{:.2E}'.format)
     contributors = "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs=False, output_type='div') for i in range(len(figs))])
     res = "<p>".join(["<b>" + k + ": </b> " + "{:.2e}".format(v) if isinstance(v, float) else "<b>" + k + ": </b> " + str(v) for k, v in resultat.items()])
     html_template = f"""

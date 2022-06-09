@@ -230,7 +230,7 @@ for alpha in alpha_set:
             out_path_report = os.path.join(out_path, "report_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".html")
             
             # Computation
-            res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, species_name_path=args.species_name_path, update_data=True, report=out_path_report)
+            res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True, report=out_path_report)
             df_ = pd.concat([pd.DataFrame([{"SPECIE": args.specie, "MESH": args.mesh}]), pd.DataFrame([res])], axis=1)
 
             # Add diagnostic values for each prior

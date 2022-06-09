@@ -386,7 +386,7 @@ def compute_log_odds(cdf):
 
 
 
-def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None, weigth_limit=1e-5, species_name_path=None, update_data=False):
+def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None, weigth_limit=1e-5, update_data=False):
     """This function is used to compute the complete analysis for a Compound - MeSH relation.
     If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh is used, otherwise we will used the prior mixture.
 
@@ -399,12 +399,11 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
         report (optional): Path to output the html report. Defaults to None.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
-        species_name_path (str): Path to the file containing species' names for figures legend
         update_data (bool, optional): Does the data table need to be updated with posterior weights, cdf, etc of each contributors (for export)
 
     Returns:
         [dict]: A dictionnary with:
-        - TOTALspecies_name_path_PMID_SPECIE (int): The total number of mentions for the targeted compound
+        - TOTAL_PMID_SPECIE (int): The total number of mentions for the targeted compound
         - COOC (int): The total number of co-occurences between the targeted compound and the MeSH
         - Mean (float): The mean of the posterior distribution.
         - CDF (float): The probability P(q <= p(M)) derived from the CDF of the posterior distribution. The more this probability is low, the more we are certain that the mean of the posterior distribution is higher than the general probability to observed the MeSH (the 'p' argument of the function), representing independence hypothsis.
@@ -752,7 +751,7 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
             path_report = os.path.join(out, "report_" + specie + "_" + mesh + ".html")
 
             # Computation
-            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True, report=path_report, species_name_path=species_name_path)
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True, report=path_report)
 
             out_data = os.path.join(out, "data_" + specie + "_" + mesh + ".csv")
             data.to_csv(out_data, index=False)

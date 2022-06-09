@@ -172,7 +172,7 @@ def generate_html_report(out_path, figs, section_titles, resultat, data):
         {res}
         <h2> CONTRIBUTORS PLOTS </h2>
         {contributors}
-        <h2> CONTRIBUTORS TABLES </h2>
+        <h2> CONTRIBUTORS TABLE </h2>
         {table_html}
         <script src="https://code.jquery.com/jquery-3.6.0.slim.min.js" integrity="sha256-u7e5khyithlIdTpu22PHhENmPcRdFiHRjhAuHcs05RI=" crossorigin="anonymous"></script>
         <script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>

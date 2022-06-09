@@ -148,7 +148,7 @@ def contributions_plot(data, names, attr, odds_var, limit=0.99):
 
     return fig
 
-def generate_html_report(out_path, figs, section_titles, resultat):
+def generate_html_report(out_path, figs, section_titles, resultat, data):
     """This function is used to produce the HTML report
 
     Args:
@@ -157,20 +157,33 @@ def generate_html_report(out_path, figs, section_titles, resultat):
         section_titles (list): A list of section titles for the figures
         resultat (dict): The result dict with CDF, LogOdds, etc ...
     """
-    
+    table_html = data.to_html(table_id="table", index=False, float_format='{:.2E}'.format)
     contributors = "<p>".join(["<h2>" + section_titles[i] + "</h2>" + plotly.offline.plot(figs[i], include_plotlyjs=False, output_type='div') for i in range(len(figs))])
     res = "<p>".join(["<b>" + k + ": </b> " + "{:.2e}".format(v) if isinstance(v, float) else "<b>" + k + ": </b> " + str(v) for k, v in resultat.items()])
     html_template = f"""
     <html>
     <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css" rel="stylesheet">
     </head>
     <body>
-        <h1>NEIGHBORHOOD CONTRIBUTION: HTML REPORT</h1>
+        <h1>HTML REPORT</h1>
         <h2> RESULTS</h2>
         {res}
-        <h2> CONTRIBUTORS </h2>
+        <h2> CONTRIBUTORS PLOTS </h2>
         {contributors}
+        <h2> CONTRIBUTORS TABLE </h2>
+        {table_html}
+        <script src="https://code.jquery.com/jquery-3.6.0.slim.min.js" integrity="sha256-u7e5khyithlIdTpu22PHhENmPcRdFiHRjhAuHcs05RI=" crossorigin="anonymous"></script>
+        <script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+        <script>
+            $(document).ready( function () {{
+                $('#table').DataTable({{
+                    // paging: false,    
+                    // scrollY: 400,
+                }});
+            }});
+        </script>
     </body>
     </html>
     """

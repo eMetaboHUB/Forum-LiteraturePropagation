@@ -52,6 +52,7 @@ if table_species_corpora is None:
 
 # Fill na if some species are not indicated in the file
 table_species_corpora = table_species_corpora.fillna(0)
+table_species_corpora['TOTAL_PMID_SPECIE'] = table_species_corpora['TOTAL_PMID_SPECIE'].astype(int)
 
 # Compute total number of cpd-articles mentions
 total_cpd_mention = table_species_corpora['TOTAL_PMID_SPECIE'].sum()
@@ -66,6 +67,7 @@ print("Ok")
 
 # Compute the total number of mentions between a compound and an article, that also involved MeSHs
 table_mesh_corpora = table_coocurences.groupby('MESH', as_index=False)[['COOC']].sum().rename(columns={"COOC": "TOTAL_CPD_MENTION_MESH"})
+table_mesh_corpora['TOTAL_CPD_MENTION_MESH'] = table_mesh_corpora['TOTAL_CPD_MENTION_MESH'].astype(int)
 
 # Compute MeSH probabilities normalising by the total number of cpd-article mentions
 table_mesh_corpora["P"] = table_mesh_corpora["TOTAL_CPD_MENTION_MESH"]/total_cpd_mention
@@ -209,11 +211,17 @@ for alpha in alpha_set:
         elif args.mesh and args.specie:
 
             print("[INFO] Compute associations between " + args.specie + " and " + args.mesh)
+            # Add names
+            if args.species_name_path:
+                table_species_corpora = add_names(table_species_corpora, args.species_name_path, None)
+                table_species_corpora = table_species_corpora[["SPECIE_NAME", "SPECIE", "TOTAL_PMID_SPECIE"]]
 
             # Prepare data table
             index = table_species_corpora[table_species_corpora["SPECIE"] == args.specie].index[0]
             table_species_corpora["weights"] = weights[:, index].tolist()
             cooc = table_coocurences[table_coocurences["MESH"] == args.mesh][["SPECIE", "COOC"]]
+            cooc['COOC'] = cooc['COOC'].astype(int)
+
             data = pd.merge(table_species_corpora, cooc, on="SPECIE", how="left").fillna(0)
 
             # Forget specie's literature ?
@@ -226,7 +234,7 @@ for alpha in alpha_set:
             out_path_report = os.path.join(out_path, "report_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".html")
             
             # Computation
-            res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, species_name_path=args.species_name_path, update_data=True, report=out_path_report)
+            res = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True, report=out_path_report)
             df_ = pd.concat([pd.DataFrame([{"SPECIE": args.specie, "MESH": args.mesh}]), pd.DataFrame([res])], axis=1)
 
             # Add diagnostic values for each prior
@@ -238,7 +246,7 @@ for alpha in alpha_set:
 
             # Export
             df_ = add_names(df_, args.species_name_path, args.meshs_name_path)
-            data = add_names(data, args.species_name_path, None)
+            
             print("[INFO] Export results in " + out)
             df_.to_csv(out, index=False)
             out_data = os.path.join(out_path, "data_" + args.specie + "_" + args.mesh + "_" + str(alpha) + "_" + str(sample_size) + ("_Forget" * args.forget) + ".csv")

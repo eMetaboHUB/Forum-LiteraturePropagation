@@ -386,7 +386,7 @@ def compute_log_odds(cdf):
 
 
 
-def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None, weigth_limit=1e-5, species_name_path=None, update_data=False):
+def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None, weigth_limit=1e-5, update_data=False):
     """This function is used to compute the complete analysis for a Compound - MeSH relation.
     If the neighborhood can't provide information about the prior distribution, then the default prior from estimate_prior_distribution_mesh is used, otherwise we will used the prior mixture.
 
@@ -399,7 +399,6 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         seq (float, optional): The step used to create a x vector of probabilities (used for plotting distribution only). Defaults to 0.0001.
         report (optional): Path to output the html report. Defaults to None.
         weigth_limit (float, optional): If the weight of a compound in the prior mixture is lower than this threshild, the compound is removed from the mixture. It may be usefull when plotting distribution as there could be a lot of compounds involved in the mxiture. Defaults to 1e-5.
-        species_name_path (str): Path to the file containing species' names for figures legend
         update_data (bool, optional): Does the data table need to be updated with posterior weights, cdf, etc of each contributors (for export)
 
     Returns:
@@ -445,7 +444,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             # In case of no neighborhood information, we simply plot prior vs posterior distributions:
             if report:
                 f1 = plot_distributions_plotly(prior, posterior)
-                generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat)
+                generate_html_report(report, [f1], ["Prior .VS. Posterior"], resultat, pd.DataFrame())
 
         # If there are no observations:
         else:
@@ -456,7 +455,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
                 f1 = go.Figure()
                 f1.add_trace(go.Scatter(x=prior.x, y=prior.f, line=dict(color="blue"), name="Prior"))
                 f1.update_layout(title="Prior from the MeSH overall frequency", xaxis=dict(title="Probability", titlefont_size=25, tickfont_size=20), yaxis=dict(title="Density", titlefont_size=25, tickfont_size=20), template="simple_white")
-                generate_html_report(report, [f1], ["MeSH overall prior"], resultat)
+                generate_html_report(report, [f1], ["MeSH overall prior"], resultat, pd.DataFrame())
 
         return resultat
 
@@ -496,7 +495,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if update_data:
 
             # Rename weight column
-            data.rename(columns={'weights':'PriorWeights'}, inplace = True)
+            data.rename(columns={'weights':'PriorWeights'}, inplace=True)
 
             # As null weight have been removed during computation, we use SPECIE instead of index as key
             data["PostWeights"] = float(0)
@@ -528,10 +527,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if report:
 
             # If names have been provided, use them instead of species labels in Figures:
-            if species_name_path:
-                species_name = pd.read_csv(species_name_path)
-                _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on="SPECIE", how="left")
-                names = _df_names["SPECIE_NAME"].tolist()
+            if "SPECIE_NAME" in data.columns:
+                names = data["SPECIE_NAME"].tolist()
+            else:
+                names = data["SPECIE"]
 
             # We set the top to top 10:
             top = 10
@@ -552,7 +551,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             f5 = contributions_plot(data, names, "PostWeights", "PostLogOdds")
 
             # Generate report:
-            generate_html_report(report, [f1, f2, f3, f4, f5], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Prior Contributions", "Posterior Contributions"], resultat)
+            generate_html_report(report, [f1, f2, f3, f4, f5], ["Prior contributors", "Posterior contributors", "Prior .VS. Posterior", "Prior Contributions", "Posterior Contributions"], resultat, data)
 
     # If there are no observations:
     else:
@@ -561,7 +560,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if update_data:
             
             # Rename weight column
-            data.rename(columns={'weights':'PriorWeights'}, inplace = True)
+            data.rename(columns={'weights':'PriorWeights'}, inplace=True)
             
             # As null weight have been removed during computation, we use SPECIE instead of index as key
             data["PriorLogOdds"] = np.NaN
@@ -577,10 +576,10 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
         if report:
 
             # If names have been provided, use them instead of species labels in Figures:
-            if species_name_path:
-                species_name = pd.read_csv(species_name_path)
-                _df_names = pd.merge(pd.DataFrame({"SPECIE": data["SPECIE"]}), species_name, on="SPECIE", how="left")
-                names = _df_names["SPECIE_NAME"].tolist()
+            if "SPECIE_NAME" in data.columns:
+                names = data["SPECIE_NAME"].tolist()
+            else:
+                names = data["SPECIE"]
 
             # We set the top to top 10:
             top = 10
@@ -598,7 +597,7 @@ def computation(index, data, p, alpha_prior, beta_prior, seq=0.0001, report=None
             f2 = contributions_plot(data, names, "PriorWeights", "PriorLogOdds")
 
             # Generate report:
-            generate_html_report(report, [f1, f2], ["Neighbourhood Contributors", "Prior Contributions"], resultat)
+            generate_html_report(report, [f1, f2], ["Neighbourhood Contributors", "Prior Contributions"], resultat, data)
 
     return resultat
 

@@ -709,8 +709,6 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
         [pd.DataFrame]: association table
     """
 
-    global args
-
     # Test if all provided species and MeSH are present in the network :*
     if (sum(~f["SPECIE"].isin(table_species_corpora["SPECIE"]))) or (sum(~f["MESH"].isin(table_mesh["MESH"]))):
         print("It seems that some species or MeSH descriptors provided in the file are not present in the graph. They will be removed !")
@@ -742,8 +740,11 @@ def association_file(f, table_cooc, table_species_corpora, weights, table_mesh, 
             MeSH_info = table_mesh[table_mesh["MESH"] == mesh]
             p = float(MeSH_info["P"])
 
+            # html report
+            path_report = os.path.join(out, "report_" + specie + "_" + mesh + ".html")
+
             # Computation
-            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True)
+            r = computation(index, data, p, float(MeSH_info["alpha_prior"]), float(MeSH_info["beta_prior"]), seq=0.0001, update_data=True, report=path_report, species_name_path=species_name_path)
             
             # add names to data
             data = add_names(data, species_name_path, None)

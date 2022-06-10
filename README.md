@@ -25,12 +25,14 @@ The directory contains:
 - *specie_names*: species labels in the Human1 1.7 metabolic network.
 - *mesh_labels*: MeSH descriptor labels.
 
-
-The set of selected associations was also integrated in the FORUM KG in the *<https://forum.semantic-metabolomics.org/Propagation/Human1_1.7/2021>* graph, which is directly queryable in the [FORUM KG](https://forum.semantic-metabolomics.fr/sparql). See more details at [FORUM](https://forum-webapp.semantic-metabolomics.fr/#/about). The RDF files also are available in the RDF directory at: 
+In the RDF directory, you can find the RDF graphs related to these associations.
 
 ```bash
 sftp forum@ftp.semantic-metabolomics.org:/Propagation/Human1_1.7/2021/RDF/*.ttl.gz
 ```
+
+The data.tar.gz archive contains all the contributors tables for each of the 35585 extracted and provided associations. Reciprocally, the report.tar.gz contains all the associated html reports.
+
 
 ## Environment
 Requirement: conda
@@ -178,7 +180,7 @@ Predictions are reported in a table format with columns:
 
 ### Diagnostic values
 
-- priorLogOdds: This indicators is computed only for species that have annotated literature (COOC > 0), as LogOdds is already derived from the prior distribution for species without available literature. It corresponds to the LogOdds computed form the prior distribution (the neighbouring literature), without considering the literature of the targeted specie.
+- priorLogOdds: This indicators is computed only for species that have annotated literature (COOC > 0), as LogOdds is by default derived from the prior distribution for species without available literature. It corresponds to the LogOdds computed form the prior distribution (the neighbouring literature), without considering the literature of the targeted specie.
 
 - priorLog2FC: Same as priorLogOdds but for Log2FC
 
@@ -218,7 +220,7 @@ python app/main.py --graph="data/Human1/1.7/Human-GEM_CarbonSkeletonGraph_noComp
 **Eg:** 
 
 
-| SPECIE    | TOTAL_PMID_SPECIE | weights     | COOC    | posterioir_weights | PriorLogOdds | PostLogOdds | PriorLog2FC       | PostLog2FC        | SPECIE_NAME          |
+| SPECIE    | TOTAL_PMID_SPECIE | PriorWeights     | COOC    | PostWeights | PriorLogOdds | PostLogOdds | PriorLog2FC       | PostLog2FC        | SPECIE_NAME          |
 |-----------|-------------------|-------------|---------|--------------------|--------------|-------------|-------------------|-------------------|----------------------|
 | M_m01338c |              2348 |     0.29    |  45  |        0.51        |     48.59    |    49.44    |        2.60       |        2.59       | androsterone         |
 | M_m02969c |             79421 |     0.29    | 2521 |        0.28        |      inf     |     inf     |        3.75       |        3.75       | testosterone         |
@@ -231,17 +233,17 @@ For each contributor:
 - SPECIE: contributor identifier
 - TOTAL_PMID_SPECIE: number of annotated articles
 - COOC number of co-mentions with the MeSH
-- weights: weight in the prior distribution
-- posterioir_weights: weight in the posterior distribution
+- PriorWeights: weights in the prior distribution
+- PostWeights: weights in the posterior distribution
 - PriorLogOdds: LogOdds (specific to the contributor) computed only from its literature in the prior distribution.
 - PostLogOdds: LogOdds (specific to the contributor) computed only from its literature in the posterior distribution.
 - PriorLog2FC: Log2FC (specific to the contributor) computed only from its literature in the prior distribution.
 - PostLog2FC: Log2FC (specific to the contributor) computed only from its literature in the posterior distribution.
 - SPECIE_NAME: name of the contributor
 
-**Warnings**: When a specie has **no** literature, the predictions are only based on the prior distribution and therefore PostLogOdds and PostLog2FC are not returned for the contributors. Same for posterioir_weights which is not returned if the specie has no literature.
+**Warnings**: When a specie has **no** literature, the predictions are only based on the prior distribution and therefore PostLogOdds and PostLog2FC are not returned for the contributors. Same for PostWeights which is not returned if the specie has no literature.
 
-  - report_*specie*\_*mesh*\_*alpha*\_*sample_size*.csv: an html report with figure of distributions and contributor profiles
+  - report_*specie*\_*mesh*\_*alpha*\_*sample_size*.csv: an html report with figure of distributions, a table and contributor profiles.
 
 * * *
 

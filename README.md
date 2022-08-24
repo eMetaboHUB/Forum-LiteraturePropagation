@@ -33,7 +33,7 @@ In the RDF directory, you can find the RDF graphs related to these associations.
 sftp forum@ftp.semantic-metabolomics.org:/Propagation/Human1_1.7/2021/RDF/*.ttl.gz
 ```
 
-Predictions supplementary data and html reports:
+Supplementary data and html reports for predictions:
 
 The **data.tar.gz** archive contains all the contributors tables for each of the 35585 extracted and provided associations. Reciprocally, the **report.tar.gz** contains all the associated html reports.
 
@@ -69,30 +69,30 @@ python app/main.py --graph="path/to/graph" --specie.corpora="path/to specie-tabl
 
   --mesh:   The studied MeSH descriptor identifier (eg. D010661). This argument is incompatible with the 'file' argument. This will return all associations between this MeSH and all species in the metabolic network. If the 'specie' option is also set, only this specific association will be computed.
 
-  --specie: The studied specie identifier in the network according to the *id_att* value (eg. M_m01778c). This argument is incompatible with the 'file' argument. The program will return all associations between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.
+  --specie: The studied metabolic specie identifier in the network according to the *id_att* value (eg. M_m01778c). This argument is incompatible with the 'file' argument. The program will return all associations between this specie and all MeSHs. If the 'mesh' option is also set, only this association specific association will be computed.
 
   --file:   Path to a file containing pairs of SPECIE and MESH associations to be computed (format csv: SPECIE, MESH). This argument is incompatible with the 'mesh' and 'specie' arguments.
 
-  --forget: Only the prior from neighbourhood will be used in the computation, observations of treated species are hidden.
+  --forget: Only the prior from neighbourhood will be used in the computation, observations are hidden.
 
-  --alpha:  The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.1
+  --alpha:  The damping factor (alpha). It could be a single value, or several values to test different parametrizations. All provided alpha values will be tested against all provided sample size values. Default = 0.4
 
-  --sample_size:    The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 100
+  --sample_size:    The sample size parameter. It could be a single value, or several values to test different parametrizations. All provided sample size values will be tested against all provided alpha values. Default = 1000
 
   --q:  The tolerance threshold for PPR probabilities. If q is negative, the default value is used. The Default = 1/(N - 1)
 
   --id_att: The name of the vertex attribute containing the SPECIE identifier (eg. M_m0001c) in the graph. These identifiers must match with those provided in the 'SPECIE' column of specie.corpora and specie.cooc files. Default is the 'label' attribute
 
-  --species_name_path:  Path to the file containing species names in a .csv format. The first column should be named 'SPECIE' and contains the SPECIE identifiers (eg. M_m0001c) and the second column should be named 'SPECIE_NAME' and contains the species' chemical names
+  --species_name_path:  Path to the file containing species names in a .csv format. The first column should be named 'SPECIE' and contains the species' identifiers (eg. M_m0001c) and the second column should be named 'SPECIE_NAME' and contains the species' chemical names
 
-  --meshs_name_path:    Path to the file containing species names in a .csv format. The first column should be named 'MESH' and contains the MESH identifiers (eg. D000017) and the second column should be named 'MESH_NAME' and contains the MeSH labels
+  --meshs_name_path:    Path to the file containing MeSH names in a .csv format. The first column should be named 'MESH' and contains the MeSH identifiers (eg. D000017) and the second column should be named 'MESH_NAME' and contains the MeSH labels
 
   --out:    Path to the output directory
 ```
 
 ### Data format details
 
-* ```--specie.corpora```: a two column table
+* ```--specie.corpora```: a two-column table
 
 Eg.
 
@@ -103,7 +103,7 @@ Eg.
 | M_m01784c | 6193              |
 | ...       | ...               |
 
-* ```--specie.cooc```: a three column table
+* ```--specie.cooc```: a three-column table
 
 Eg.
 
@@ -114,7 +114,7 @@ Eg.
 | M_m01778c | D000236    | 1    |
 | ...       | ...        |      |
 
-* ```--file```: a two column requested association file
+* ```--file```: an association file with two column
 
 Eg.
 
@@ -125,7 +125,7 @@ Eg.
 | M_m02756c | D020969 |
 | ...       | ...     |
 
-* ```--species_name_path```: a two column file
+* ```--species_name_path```: a two-column file
 
 Eg.
 
@@ -136,7 +136,7 @@ Eg.
 | M_m02864c  | S-(PGJ2)-glutathione               |
 | ...        | ...                                |
 
-* ```--meshs_name_path```: a two column file
+* ```--meshs_name_path```: a two-column file
 
 Eg.
 
@@ -163,15 +163,15 @@ Predictions are reported in a table format with columns:
 
 - COOC: The number of co-mentions between the specie and the MeSH (from *specie.cooc*)
 
-- Mean: The computed averaged probability that one article mentioning the compound would mention the disease
+- Mean: The computed averaged probability that one article mentioning the specie would mention the disease
 
 ### Estimators
 
-- CDF: The probability that the specie discuss the MeSH less frequently than expected (the marginal probability of mentioning the disease)
+- CDF: The probability that an article mentioning the specie, would mention the disease less frequently than expected (the marginal probability of mentioning the disease)
 
-- LogOdds: The LogOdds computed from the CDF: (probability that the specie discusses the MeSH more frequently than expected) / (probability that the specie discusses the MeSH less frequently)
+- LogOdds: The LogOdds computed from the CDF: (1 - CDF) / (CDF)
 
-- Log2FC: Fold-Change computed from the average probability that the specie discusses the MeSH, compared to the expected probability
+- Log2FC: Fold-Change computed from the averaged probability that one article mentioning the compound would mention the disease (MEAN), compared to the expected probability (the marginal probability of mentioning the disease).
 
 **Warnings**: 
   - When a specie **has no** available literature (COOC = 0): CDF, LogOdds, and Log2FC are computed from the **prior** distribution (the neighbouring literaure)
@@ -184,7 +184,7 @@ Predictions are reported in a table format with columns:
 
 ### Diagnostic values
 
-- priorLogOdds: This indicators is computed only for species that have annotated literature (COOC > 0). It corresponds to the LogOdds computed form the prior distribution (the neighbouring literature), without considering the literature of the targeted specie.
+- priorLogOdds: This indicators is computed only for species that have annotated literature (COOC > 0). It corresponds to the LogOdds computed from the prior distribution (the neighbouring literature), without considering the literature of the targeted specie.
 
 - priorLog2FC: Same as priorLogOdds but for Log2FC
 
@@ -192,9 +192,9 @@ Predictions are reported in a table format with columns:
 
 - Entropy: Entropy of the contributions in the prior distribution
 
-- CtbAvgDistance: Averaged distance of prior contributors 
+- CtbAvgDistance: Averaged distance of the contributors
 
-- CtbAvgCorporaSize:	Averaged number of articles of prior contributors 
+- CtbAvgCorporaSize:	Averaged number of articles for the contributors 
 
 - NbCtb: Number of contributors
 
@@ -239,10 +239,10 @@ For each contributor:
 - COOC number of co-mentions with the MeSH
 - PriorWeights: weights in the prior distribution
 - PostWeights: weights in the posterior distribution
-- PriorLogOdds: LogOdds (specific to the contributor) computed only from its literature in the prior distribution.
-- PostLogOdds: LogOdds (specific to the contributor) computed only from its literature in the posterior distribution.
-- PriorLog2FC: Log2FC (specific to the contributor) computed only from its literature in the prior distribution.
-- PostLog2FC: Log2FC (specific to the contributor) computed only from its literature in the posterior distribution.
+- PriorLogOdds: LogOdds (specific to the contributor) computed only from its literature in the **prior** distribution.
+- PostLogOdds: LogOdds (specific to the contributor) computed only from its literature in the **posterior** distribution.
+- PriorLog2FC: Log2FC (specific to the contributor) computed only from its literature in the **prior** distribution.
+- PostLog2FC: Log2FC (specific to the contributor) computed only from its literature in the **posterior** distribution.
 - SPECIE_NAME: name of the contributor
 
 **Warnings**: When a specie has **no** literature, the predictions are only based on the prior distribution and therefore PostLogOdds and PostLog2FC are not returned for the contributors. Same for PostWeights which is not returned if the specie has no literature.

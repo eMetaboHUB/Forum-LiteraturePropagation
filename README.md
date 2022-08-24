@@ -1,10 +1,10 @@
-# Propagation
+# Suggesting disease associations for overlooked metabolites using literature from metabolic neighbours
 
-Suggesting relations between metabolic species and disease-related MeSH descriptors by propagating the neighbouring literature.
-
+<div style="text-align: justify">
 In human health, metabolic signatures are of high importance for stratifying patients and identifying biomarkers. Nevertheless, one of the main challenges is to interpret and relate these lists of discriminant metabolites to pathological mechanisms. This task is achieved by manually combining expert knowledge, databases and scientific literature.
-However, we show that a large fraction of metabolites are rarely or never mentioned in the literature, and without external knowledge to help interpret them, they are frequently set aside in subsequent analyses. To suggest potential pathological phenotypes related to these understudied metabolites, we extend the 'guilt by association' principle to literature data by using a bayesian framework. With this approach, we suggest more than 35,000 relations between 1,047 overlooked metabolites and 3,288 diseases (or disease families), which are available on the FORUM ftp server (See information below).
 
+However, we show that a large fraction of metabolites are rarely or never mentioned in the literature, and without external knowledge to help interpret them, they are frequently set aside in subsequent analyses. To suggest potential pathological phenotypes related to these understudied metabolites, we extend the 'guilt by association' principle to literature data by using a bayesian framework. With this approach, we suggest more than 35,000 relations between 1,047 overlooked metabolites and 3,288 diseases (or disease families), which are available on the FORUM ftp server (See information below).
+</div>
 
 ## Availability
 
@@ -163,28 +163,28 @@ Predictions are reported in a table format with columns:
 
 - COOC: The number of co-mentions between the specie and the MeSH (from *specie.cooc*)
 
-- Mean: The expected probability of discussing the MeSH
+- Mean: The computed averaged probability that one article mentioning the compound would mention the disease
 
 ### Estimators
 
-- CDF: The probability that the specie discuss the MeSH less frequently than expected (compared to *MEAN*)
+- CDF: The probability that the specie discuss the MeSH less frequently than expected (the marginal probability of mentioning the disease)
 
 - LogOdds: The LogOdds computed from the CDF: (probability that the specie discusses the MeSH more frequently than expected) / (probability that the specie discusses the MeSH less frequently)
 
-- Log2FC: Fold-Change computed from the average probability that the specie discusses the MeSH, compared to the expected probability (*MEAN*)
+- Log2FC: Fold-Change computed from the average probability that the specie discusses the MeSH, compared to the expected probability
 
 **Warnings**: 
   - When a specie **has no** available literature (COOC = 0): CDF, LogOdds, and Log2FC are computed from the **prior** distribution (the neighbouring literaure)
 
   - When a specie **has** annotated literature (COOC > 0): CDF, LogOdds, and Log2FC are computed from the **posterior** distribution (using neighbouring literature and observations)
 
-  - When a specie has **no literature in the neighbourhood** (NeighborhoodInformation = FALSE), a prior can't be built from the neighbouring literature. In this case, we use the *general* prior (see publication for details) and the predictions are computed from its posterior distribution.
+  - When a specie has **no literature in its neighbourhood** (NeighborhoodInformation = FALSE), a prior can't be built from the neighbouring literature. In this case, we use the *general* prior (see publication for details) and the predictions are computed from its posterior distribution.
 
   - When a specie has both no annotated literature and no literature in the neighbourdhood (COOC = 0 & NeighborhoodInformation = FALSE), predictions are directly derived from the *general* prior, but should be discarded.
 
 ### Diagnostic values
 
-- priorLogOdds: This indicators is computed only for species that have annotated literature (COOC > 0), as LogOdds is by default derived from the prior distribution for species without available literature. It corresponds to the LogOdds computed form the prior distribution (the neighbouring literature), without considering the literature of the targeted specie.
+- priorLogOdds: This indicators is computed only for species that have annotated literature (COOC > 0). It corresponds to the LogOdds computed form the prior distribution (the neighbouring literature), without considering the literature of the targeted specie.
 
 - priorLog2FC: Same as priorLogOdds but for Log2FC
 

@@ -1,7 +1,9 @@
 # Propagation
 
 Suggesting relations between metabolic species and disease-related MeSH descriptors by propagating the neighbouring literature.
-[ABSTRACT]
+
+In human health, metabolic signatures are of high importance for stratifying patients and identifying biomarkers. Nevertheless, one of the main challenges is to interpret and relate these lists of discriminant metabolites to pathological mechanisms. This task is achieved by manually combining expert knowledge, databases and scientific literature.
+However, we show that a large fraction of metabolites are rarely or never mentioned in the literature, and without external knowledge to help interpret them, they are frequently set aside in subsequent analyses. To suggest potential pathological phenotypes related to these understudied metabolites, we extend the 'guilt by association' principle to literature data by using a bayesian framework. With this approach, we suggest more than 35,000 relations between 1,047 overlooked metabolites and 3,288 diseases (or disease families), which are available on the FORUM ftp server (See information below).
 
 
 ## Availability
@@ -31,7 +33,9 @@ In the RDF directory, you can find the RDF graphs related to these associations.
 sftp forum@ftp.semantic-metabolomics.org:/Propagation/Human1_1.7/2021/RDF/*.ttl.gz
 ```
 
-The data.tar.gz archive contains all the contributors tables for each of the 35585 extracted and provided associations. Reciprocally, the report.tar.gz contains all the associated html reports.
+Predictions supplementary data and html reports:
+
+The **data.tar.gz** archive contains all the contributors tables for each of the 35585 extracted and provided associations. Reciprocally, the **report.tar.gz** contains all the associated html reports.
 
 
 ## Environment

@@ -36,7 +36,7 @@ sftp forum@ftp.semantic-metabolomics.org:/Propagation/Human1_1.7/2021/RDF/*.ttl.
 
 Supplementary data and html reports for predictions:
 
-The **data.tar.gz** archive contains all the contributors tables for each of the 35585 extracted and provided associations. Reciprocally, the **report.tar.gz** contains all the associated html reports.
+The **data.tar.gz** archive contains all the contributors tables for each of the 35585 extracted and provided associations. Reciprocally, the **report.tar.gz** contains all the associated html reports. All the reports are also available online through static html files. See for example for the relationship between [5alpha-androstane-3,17-dione and Polycystic Ovary Syndrome](https://forum-static-files.semantic-metabolomics.fr/1.1/report/report_M_m01064c_D011085.html). See more info [here](https://forum-static-files.semantic-metabolomics.fr/).
 
 
 ## Environment

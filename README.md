@@ -25,8 +25,8 @@ The directory contains:
 
 - *global.csv*: all the computed associations.
 - *predictions.csv*: the selected associations with: LogOdds > 2, Log2FC > 1, Entropy > 1.
-- *specie_names*: species labels in the Human1 1.7 metabolic network.
-- *mesh_labels*: MeSH descriptor labels.
+- *specie_names.csv*: species labels in the Human1 1.7 metabolic network.
+- *mesh_labels.csv*: MeSH descriptor labels.
 - *overlooked_metabolites_list.tsv*: the list of the 2113 metabolites considered as overlooked in the analysis carried out in the article. This file is also stored in the data directory of this repository.
 
 In the RDF directory, you can find the RDF graphs related to these associations.
